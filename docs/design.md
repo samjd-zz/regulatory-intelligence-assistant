@@ -1,9 +1,9 @@
 # Technical Design Document: Regulatory Intelligence Assistant for Public Service
 
-**Version:** 1.0  
-**Date:** November 19, 2025  
+**Version:** 1.1 (MVP Reality)  
+**Date:** November 20, 2025  
 **Project:** G7 GovAI Grand Challenge - Statement 2 (Navigating Complex Regulations)  
-**Status:** Draft - Challenge Submission
+**Status:** MVP Implementation - Aligned with parallel-plan.md
 
 ## 1. Architecture Overview
 
@@ -40,11 +40,9 @@ flowchart TB
     end
     
     subgraph "Data Layer"
-        Q[(PostgreSQL<br/>Metadata)]
+        Q[(PostgreSQL<br/>Metadata & Documents)]
         R[(Neo4j<br/>Knowledge Graph)]
-        S[(Elasticsearch<br/>Search Index)]
-        T[(Pinecone<br/>Vectors)]
-        U[S3<br/>Documents]
+        S[(Elasticsearch<br/>Hybrid Search + Vectors)]
     end
     
     A --> E
@@ -85,21 +83,15 @@ flowchart TB
     M --> Q
     M --> R
     M --> S
-    M --> T
     N --> Q
     N --> R
     N --> S
-    N --> T
     O --> Q
     O --> R
     O --> S
-    O --> T
     P --> Q
     P --> R
     P --> S
-    P --> T
-    
-    H --> U
 ```
 
 ### 1.2 2-Week MVP Architecture Decisions
@@ -108,9 +100,16 @@ flowchart TB
 - **Frontend:** React SPA with simple search/Q&A interface
 - **Backend:** FastAPI (Python) monolith with modular structure
 - **AI:** Gemini API for RAG + legal NLP
-- **Search:** Elasticsearch for keyword + vector search
+- **Search:** Elasticsearch 8.11+ for hybrid keyword + vector search
 - **Knowledge Graph:** Neo4j Community Edition
+- **Database:** PostgreSQL for metadata and full regulation text
+- **Cache:** Redis for session and query caching
 - **Deployment:** Docker containers on single cloud instance
+
+**Key MVP Simplifications:**
+- Elasticsearch's native `dense_vector` support eliminates need for separate vector database (Pinecone)
+- PostgreSQL stores full regulation text for small dataset (50-100 regulations), eliminating need for S3
+- Reduced infrastructure complexity enables 2-week timeline
 
 ```mermaid
 flowchart LR
@@ -344,7 +343,7 @@ flowchart TD
     A[User Query] --> B[Query Enhancement]
     
     B --> C[Keyword Search<br/>Elasticsearch BM25]
-    B --> D[Semantic Search<br/>Vector Similarity]
+    B --> D[Semantic Search<br/>Elasticsearch Vectors]
     B --> E[Graph Search<br/>Neo4j Traversal]
     
     C --> F[Result Fusion]
@@ -362,16 +361,15 @@ flowchart TD
 class RegulatorySearch:
     def __init__(self):
         self.es_client = Elasticsearch()
-        self.vector_db = PineconeClient()
         self.graph_db = Neo4jClient()
     
     async def search(self, query: str, filters: dict) -> list:
         """Hybrid search across multiple indices"""
         
-        # 1. Keyword search
+        # 1. Keyword search (BM25)
         keyword_results = await self.keyword_search(query, filters)
         
-        # 2. Semantic search
+        # 2. Semantic search (Elasticsearch vectors)
         semantic_results = await self.semantic_search(query, filters)
         
         # 3. Graph search for related regulations
@@ -396,6 +394,25 @@ class RegulatorySearch:
                 'bool': {
                     'must': {'match': {'content': query}},
                     'filter': self.build_filters(filters)
+                }
+            },
+            'size': 50
+        }
+        return await self.es_client.search(index='regulations', body=body)
+    
+    async def semantic_search(self, query: str, filters: dict):
+        """Vector similarity search in Elasticsearch"""
+        # Generate query embedding (using Gemini or sentence-transformers)
+        query_embedding = await self.generate_embedding(query)
+        
+        body = {
+            'query': {
+                'script_score': {
+                    'query': {'bool': {'filter': self.build_filters(filters)}},
+                    'script': {
+                        'source': "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
+                        'params': {'query_vector': query_embedding}
+                    }
                 }
             },
             'size': 50
@@ -695,6 +712,8 @@ CREATE TABLE alerts (
   }
 }
 ```
+
+**Note:** Elasticsearch 8.11+ provides native vector search capabilities via the `dense_vector` field type, eliminating the need for a separate vector database. This single index supports both keyword (BM25) and semantic (vector similarity) search.
 
 ## 4. API Design
 
@@ -1178,4 +1197,39 @@ flowchart TD
 
 ---
 
-**Document Status:** Complete - MVP Design
+## 11. MVP vs Future Architecture
+
+### 11.1 Current MVP Implementation (2-Week Timeline)
+
+**Data Stores (3):**
+- **PostgreSQL:** All metadata + full regulation text (10-20 MB total)
+- **Neo4j:** Knowledge graph with regulatory relationships
+- **Elasticsearch 8.11+:** Hybrid keyword + vector search in single index
+
+**Rationale:**
+- Small dataset (50-100 regulations) fits comfortably in PostgreSQL
+- Elasticsearch's native vector support eliminates need for separate vector DB
+- Simpler infrastructure = faster development and deployment
+- All features achievable within 2-week constraint
+
+### 11.2 Future Production Architecture (If Scaling Required)
+
+**Additional Data Stores:**
+- **Pinecone/Weaviate:** Dedicated vector database for millions of embeddings
+- **S3/Object Storage:** Large-scale document storage and versioning
+- **Redis Cluster:** Distributed caching and session management
+
+**When to Scale:**
+- Dataset grows beyond 1,000 regulations
+- Vector search performance degrades (<500ms response time)
+- Need for advanced vector operations (hybrid search, filtering)
+- Multi-tenant deployment with data isolation
+
+**Migration Path:**
+1. PostgreSQL → S3: When document storage exceeds 100 MB
+2. Elasticsearch vectors → Pinecone: When vector queries exceed 100ms
+3. Single Redis → Redis Cluster: When concurrent users exceed 1,000
+
+---
+
+**Document Status:** Complete - MVP Implementation (v1.1)
