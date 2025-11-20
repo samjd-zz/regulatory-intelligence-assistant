@@ -94,61 +94,82 @@ This project addresses the challenge of navigating complex regulatory environmen
 
 ## 📚 Documentation
 
-- **[Idea Document](./idea.md)**: Initial concept and vision
-- **[PRD](./prd.md)**: Comprehensive product requirements
-- **[Design Document](./design.md)**: Technical architecture and implementation details
-- **[Implementation Plan](./plan.md)**: 2-week sprint plan with detailed steps
+### Planning & Architecture
+- **[Idea Document](./docs/idea.md)**: Initial concept and vision
+- **[PRD](./docs/prd.md)**: Comprehensive product requirements
+- **[Design Document](./docs/design.md)**: Technical architecture and implementation details
+- **[Implementation Plan](./docs/plan.md)**: 2-week sprint plan with detailed steps
+- **[Parallel Execution Plan](./docs/parallel-plan.md)**: Optimized parallel work streams for 4-developer team
+
+### Technical Documentation
+- **[Neo4j Knowledge Graph](./docs/neo4j-knowledge-graph.md)**: Complete graph schema, query patterns, and API usage
+- **[Neo4j MCP Setup](./docs/neo4j-mcp-setup.md)**: MCP server configuration for AI-powered graph operations
+- **[Database Management](./docs/database-management.md)**: PostgreSQL schema, models, and migrations guide
+
+### Development Guides
+- **[Developer Assignments](./docs/developer-assignments.md)**: Team member responsibilities and work streams
 
 ## 🚀 Quick Start (MVP)
 
 ### Prerequisites
-- Python 3.11+
+- Python 3.11+ or 3.12
 - Node.js 18+
 - Docker & Docker Compose
-- Neo4j Desktop or Community Edition
-- Elasticsearch 8.x
-- API Keys: Gemini API, OpenAI API
+- Git
+- API Keys: Gemini API (for RAG), OpenAI API (for embeddings)
+
+**Note:** All database services (PostgreSQL, Neo4j, Elasticsearch, Redis) run in Docker containers - no local installation needed!
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/samjd-zz/regulatory-intelligence-assistant.git
 cd regulatory-intelligence-assistant
 
 # Set up environment variables
 cp backend/.env.example backend/.env
 # Edit backend/.env with your database credentials and API keys
 
-# Start services with Docker Compose
+# Start all services with Docker Compose
 docker-compose up -d
 
 # This starts:
-# - PostgreSQL (port 5432)
-# - Neo4j (ports 7474, 7687)
-# - Elasticsearch (port 9200)
-# - Redis (port 6379)
+# - PostgreSQL (port 5432) - Relational database
+# - Neo4j (ports 7474, 7687) - Knowledge graph database
+# - Elasticsearch (port 9200) - Search engine
+# - Redis (port 6379) - Cache layer
 
-# Set up backend
+# Wait ~30 seconds for services to be ready, then verify:
+docker ps
+
+# Set up backend environment
 cd backend
 
-# Create Python virtual environment
+# Option 1: Using Python venv (recommended)
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install dependencies
+# Option 2: Using conda (if you prefer)
+# conda create -n regulatory-ai python=3.12
+# conda activate regulatory-ai
+
+# Install Python dependencies
 pip install -r requirements.txt
 
-# Run database migrations
+# Run database migrations (PostgreSQL)
 alembic upgrade head
 
-# (Optional) Seed database with sample data
+# Initialize Neo4j knowledge graph with schema and sample data
+python scripts/init_neo4j.py
+
+# (Optional) Seed PostgreSQL with additional sample data
 python seed_data.py
 
-# Start FastAPI server
+# Start FastAPI backend server
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-# Install frontend dependencies (in another terminal)
+# In a new terminal: Install frontend dependencies
 cd frontend
 npm install
 npm run dev
@@ -171,8 +192,34 @@ curl http://localhost:8000/health/all | jq
 #   }
 # }
 
+# Verify Neo4j knowledge graph specifically
+cd backend
+python scripts/verify_graph.py
+
+# Expected output:
+# ============================================================
+# Neo4j Knowledge Graph Verification
+# ============================================================
+#
+# 1. Checking Neo4j connectivity...
+#    ✓ Connected to Neo4j successfully
+#
+# 2. Graph Statistics:
+#    Nodes:
+#      - Legislation: 4
+#      - Section: 4
+#      - Regulation: 1
+#      - Program: 3
+#      - Situation: 2
+#    ...
+
 # View API documentation
 open http://localhost:8000/docs
+
+# Explore Neo4j graph visually
+open http://localhost:7474
+# Login: neo4j / password123
+# Run query: MATCH (n) RETURN n LIMIT 50
 ```
 
 ### Access Points
@@ -356,5 +403,24 @@ For questions or support, please refer to the project documentation or contact t
 
 ---
 
-**Status**: 🚧 In Development (MVP Phase)  
-**Last Updated**: November 19, 2025
+**Status**: 🚧 In Development (MVP Phase - Phase 1 Complete)  
+**Last Updated**: November 20, 2025
+
+### Current Progress
+
+**Phase 1: Foundation (Days 1-2)** ✅ COMPLETE
+- ✅ Stream 1A: Backend Setup & Database (Developer 1)
+  - PostgreSQL database with 10 models and Alembic migrations
+  - FastAPI server with comprehensive health checks
+  - Docker Compose with all services (PostgreSQL, Neo4j, Elasticsearch, Redis)
+  
+- ✅ Stream 1B: Neo4j Knowledge Graph Setup (Developer 3)
+  - Complete graph schema with 6 node types and 9 relationship types
+  - Neo4j client with connection pooling and JSON serialization
+  - Graph service with full CRUD operations
+  - Sample data: 4 Acts, 4 Sections, 1 Regulation, 3 Programs, 2 Situations
+  - Comprehensive documentation and verification scripts
+
+**Next Phase**: Phase 2 - Document Processing (Days 3-4)
+- Stream 2A: Document Parsing & Graph Population (Developer 3)
+- Stream 2B: Legal NLP Processing (Developer 2)
