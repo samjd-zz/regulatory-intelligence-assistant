@@ -117,8 +117,8 @@ git clone <repository-url>
 cd regulatory-intelligence-assistant
 
 # Set up environment variables
-cp .env.example .env
-# Edit .env with your API keys
+cp backend/.env.example backend/.env
+# Edit backend/.env with your database credentials and API keys
 
 # Start services with Docker Compose
 docker-compose up -d
@@ -129,15 +129,50 @@ docker-compose up -d
 # - Elasticsearch (port 9200)
 # - Redis (port 6379)
 
-# Install backend dependencies
+# Set up backend
 cd backend
+
+# Create Python virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
 pip install -r requirements.txt
-uvicorn main:app --reload
+
+# Run database migrations
+alembic upgrade head
+
+# (Optional) Seed database with sample data
+python seed_data.py
+
+# Start FastAPI server
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # Install frontend dependencies (in another terminal)
 cd frontend
 npm install
 npm run dev
+```
+
+### Verify Installation
+
+```bash
+# Check all services are healthy
+curl http://localhost:8000/health/all | jq
+
+# Expected output:
+# {
+#   "status": "healthy",
+#   "services": {
+#     "postgres": { "status": "healthy", "tables": 11, ... },
+#     "neo4j": { "status": "healthy", ... },
+#     "elasticsearch": { "status": "healthy", ... },
+#     "redis": { "status": "healthy", ... }
+#   }
+# }
+
+# View API documentation
+open http://localhost:8000/docs
 ```
 
 ### Access Points
