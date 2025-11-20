@@ -1,0 +1,103 @@
+# Cline Rules for Regulatory Intelligence Assistant
+
+## Project Overview
+This is the **Regulatory Intelligence Assistant for Public Service** - an AI-powered platform to help navigate complex laws, policies, and regulations (G7 GovAI Challenge - Statement 2).
+
+## Core Principles
+
+### 1. Legal Accuracy & Reliability
+- Legal interpretations must be verifiable with source citations
+- Always provide confidence scores for recommendations
+- Human expert review for high-stakes decisions
+- Clear disclaimers about AI limitations
+- Maintain audit trails for all queries and responses
+
+### 2. Regulatory Compliance & Authority
+- Only reference official, authoritative legal sources
+- Verify content authenticity with cryptographic signatures
+- Track legislative changes and amendments
+- Version control for all regulatory content
+- Maintain legal precedent database
+
+### 3. Explainability & Transparency
+- Cite specific sections, clauses, and amendments
+- Explain reasoning with legal references
+- Provide alternative interpretations when ambiguous
+- Flag conflicts between regulations
+- Show confidence levels for all recommendations
+
+### 4. User Accessibility & Support
+- Plain language explanations for complex legal concepts
+- Guided workflows for common processes
+- Multi-language support for bilingual services
+- Context-aware help based on user role
+- Progressive disclosure (simple → detailed)
+
+## Development Guidelines
+
+### Legal NLP Standards
+- Fine-tune models on government legal corpus
+- Preserve legal terminology and formatting
+- Handle cross-references and citations accurately
+- Detect semantic relationships between regulations
+- Maintain legal document structure
+
+### Knowledge Graph Design
+- Comprehensive relationship mapping (references, amendments, dependencies)
+- Temporal versioning for regulatory changes
+- Cross-jurisdictional connections
+- Program and service mappings
+- Precedent and case law integration
+
+### Search & Retrieval
+- Hybrid search (keyword + semantic + graph traversal)
+- Faceted filtering (jurisdiction, date, program, etc.)
+- Relevance ranking with legal context
+- Citation-aware result presentation
+- Query reformulation for legal terminology
+
+### Code Quality
+- Unit tests with legal expert validation
+- Integration tests for end-to-end workflows
+- Accuracy benchmarks against test cases
+- Performance tests for response times
+- Security tests for access controls
+
+## Technology Constraints
+- **Frontend**: React with accessible design
+- **Backend**: Python FastAPI for legal NLP
+- **AI**: BERT/RoBERTa fine-tuned on legal text, Gemini API for RAG
+- **Knowledge Graph**: Neo4j for regulatory relationships
+- **Search**: Elasticsearch + vector database (Pinecone/Weaviate)
+- **Database**: PostgreSQL for metadata
+
+## Key Features to Prioritize
+1. Regulatory knowledge graph
+2. Legal NLP engine (entity extraction, intent classification)
+3. RAG system with Gemini API
+4. Semantic search across regulations
+5. Compliance checking engine
+6. Guided workflows for common scenarios
+
+## Testing Requirements
+- Validate against expert-labeled test queries
+- Test with real government use cases
+- Accuracy testing (precision/recall on legal Q&A)
+- Legal expert review of recommendations
+- User acceptance testing with caseworkers
+
+## What NOT to Do
+- Don't provide legal interpretations without citations
+- Don't claim certainty when regulations are ambiguous
+- Don't skip version control for regulatory content
+- Don't ignore conflicts between regulations
+- Don't deploy without legal expert validation
+- Don't mix personal opinions with legal facts
+
+## Success Criteria
+- Search accuracy: >75% precision and recall
+- Response time: <3 seconds for queries
+- Citation accuracy: 100% verifiable sources
+- User confidence: 80% report increased confidence
+- Time savings: 60-75% reduction in research time
+- Consistency: 80% reduction in decision inconsistencies
