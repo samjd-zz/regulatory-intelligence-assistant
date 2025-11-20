@@ -110,6 +110,77 @@ This project addresses the challenge of navigating complex regulatory environmen
     └────────┘   └──────────┘  └────────┘
 ```
 
+## 📁 Project Structure
+
+```
+regulatory-intelligence-assistant/
+├── backend/                          # FastAPI backend service
+│   ├── alembic/                      # Database migrations
+│   │   ├── versions/                 # Migration scripts
+│   │   │   └── 001_initial_schema.py
+│   │   ├── env.py                    # Alembic configuration
+│   │   └── script.py.mako            # Migration template
+│   ├── models/                       # SQLAlchemy models
+│   │   ├── __init__.py
+│   │   └── models.py                 # Database models (10 tables)
+│   ├── routes/                       # API endpoints
+│   │   └── compliance.py             # Compliance API routes
+│   ├── schemas/                      # Pydantic schemas
+│   │   └── compliance_rules.py       # Compliance data models
+│   ├── services/                     # Business logic
+│   │   ├── compliance_checker.py     # Compliance engine
+│   │   └── graph_service.py          # Neo4j operations
+│   ├── scripts/                      # Utility scripts
+│   │   ├── init_graph.cypher         # Neo4j schema initialization
+│   │   ├── init_neo4j.py             # Graph setup script
+│   │   └── verify_graph.py           # Graph verification
+│   ├── tests/                        # Test suite
+│   │   ├── test_compliance_checker.py        # Unit tests (24 tests)
+│   │   └── test_compliance_integration.py    # Integration tests
+│   ├── utils/                        # Helper utilities
+│   │   └── neo4j_client.py           # Neo4j connection manager
+│   ├── .env.example                  # Environment template
+│   ├── alembic.ini                   # Alembic config
+│   ├── database.py                   # Database connection
+│   ├── main.py                       # FastAPI application
+│   ├── pytest.ini                    # Test configuration
+│   ├── requirements.txt              # Python dependencies
+│   └── seed_data.py                  # Sample data seeding
+├── frontend/                         # React frontend (TBD)
+│   ├── src/
+│   ├── public/
+│   └── package.json
+├── docs/                             # Documentation
+│   ├── dev/                          # Development guides
+│   │   ├── compliance-engine.md      # Compliance system docs
+│   │   ├── database-management.md    # PostgreSQL guide
+│   │   ├── developer-assignments.md  # Team responsibilities
+│   │   ├── neo4j-knowledge-graph.md  # Graph schema & queries
+│   │   └── neo4j-mcp-setup.md        # MCP server setup
+│   ├── design.md                     # Technical architecture
+│   ├── idea.md                       # Initial concept
+│   ├── parallel-plan.md              # Development workflow
+│   ├── plan.md                       # Implementation plan
+│   └── prd.md                        # Product requirements
+├── .clinerules                       # Cline AI assistant rules
+├── .gitignore                        # Git ignore rules
+├── CLAUDE.md                         # Claude AI context
+├── docker-compose.yml                # Service orchestration
+└── README.md                         # This file
+```
+
+### Key Directories
+
+- **`backend/`**: FastAPI server with all business logic and API endpoints
+- **`backend/models/`**: SQLAlchemy ORM models for PostgreSQL database
+- **`backend/services/`**: Core services (compliance checking, graph operations, search, RAG)
+- **`backend/routes/`**: RESTful API endpoint definitions
+- **`backend/schemas/`**: Pydantic models for request/response validation
+- **`backend/scripts/`**: Initialization and utility scripts
+- **`backend/tests/`**: Comprehensive test suite with unit and integration tests
+- **`docs/dev/`**: Technical documentation for developers
+- **`docs/`**: Planning, architecture, and design documents
+
 ## 📚 Documentation
 
 ### Planning & Architecture
