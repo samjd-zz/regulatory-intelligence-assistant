@@ -145,6 +145,7 @@ build/
 ehthumbs.db
 Thumbs.db
 Desktop.ini
+*:Zone.Identifier
 
 # Databases
 *.db
