@@ -228,34 +228,39 @@ flowchart LR
 
 ## Technical Considerations (System Integration)
 
-### Technology Stack
+### Technology Stack (MVP)
 
 ```mermaid
 flowchart TD
-    A[Frontend] --> B[React/Next.js Web App]
-    A --> C[React Native Mobile]
-    A --> D[Chatbot UI]
+    A[Frontend] --> B[React/TypeScript Web App]
+    A --> C[Tailwind CSS Styling]
     
-    E[API Gateway] --> F[GraphQL/REST APIs]
-    E --> G[Authentication - OAuth2/SAML]
+    E[API Gateway] --> F[FastAPI REST APIs]
+    E --> G[Authentication - JWT/OAuth2]
     
-    H[Backend Services] --> I[Python FastAPI Microservices]
-    H --> J[Node.js Event Processing]
+    H[Backend Services] --> I[Python FastAPI Monolith]
     
-    K[AI/ML Layer] --> L[Hugging Face Transformers]
-    K --> M[OpenAI GPT-4/Claude API]
-    K --> N[Custom Legal NLP Models]
-    K --> O[Vector Database - Pinecone/Weaviate]
+    K[AI/ML Layer] --> L[Gemini API]
+    K --> M[RAG + Embeddings]
+    K --> N[Legal NLP Processing]
     
-    P[Data Layer] --> Q[PostgreSQL - Structured Data]
+    P[Data Layer - 3 Stores] --> Q[PostgreSQL - Metadata + Full Text]
     P --> R[Neo4j - Knowledge Graph]
-    P --> S[Elasticsearch - Search Index]
-    P --> T[Redis - Caching]
+    P --> S[Elasticsearch 8.11+ - Hybrid Search + Vectors]
     
-    U[Integration] --> V[Government Legal APIs]
-    U --> W[Case Management Systems]
-    U --> X[Document Management]
+    T[Caching] --> U[Redis]
+    
+    V[Integration] --> W[Government Legal APIs]
+    V --> X[Case Management Systems]
+    V --> Y[Document Management]
 ```
+
+**Simplified MVP Architecture:**
+- **3 Data Layers**: PostgreSQL (metadata + documents), Neo4j (graph), Elasticsearch (search + vectors)
+- **Single AI Service**: Gemini API for both RAG and embeddings
+- **No Separate Vector DB**: Elasticsearch 8.11+ has native dense_vector support
+- **Monolithic Backend**: FastAPI for rapid development
+- **Docker Deployment**: All services containerized
 
 ### Data Architecture
 
@@ -281,16 +286,17 @@ flowchart TD
 - **Question Answering**: Fine-tuned models on government Q&A datasets
 - **Summarization**: Extractive and abstractive summarization for long documents
 
-**RAG & Document Management Options:**
-- **Gemini API File Search**: Google's managed RAG solution for legal and regulatory documents
-  - Integrated file upload and management capabilities
-  - Automatic chunking, embedding generation, and semantic search
-  - Supports PDF, TXT, HTML, and other common document formats
-  - Built-in caching for improved performance and reduced costs
-  - Seamless integration with Gemini models for legal Q&A and interpretation
-  - Documentation: https://ai.google.dev/gemini-api/docs/file-search
-- **Custom RAG Implementation**: Vector databases (Pinecone, Weaviate) with specialized legal embeddings
-- **Hybrid Approach**: Combine Gemini API for regulatory document search with Neo4j knowledge graph for relationship mapping
+**RAG Implementation:**
+- **Gemini API**: Primary RAG solution for document Q&A
+  - File upload and management via Gemini File API
+  - Automatic chunking and embedding generation
+  - Context-aware answer generation with citations
+  - Built-in caching for performance
+- **Elasticsearch 8.11+**: Native vector search for semantic matching
+  - Dense vector field type (1536 dimensions)
+  - Cosine similarity for relevance ranking
+  - Hybrid search combining BM25 keyword + vector semantic
+- **Neo4j Knowledge Graph**: Relationship traversal and connected regulations
 
 **Retrieval-Augmented Generation (RAG) Features:**
 - Hybrid search combining keyword and semantic matching

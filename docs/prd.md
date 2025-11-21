@@ -337,19 +337,19 @@ flowchart TD
 ## Dependencies
 
 ### Technology Dependencies
-- **Frontend:** React/Next.js, React Native (mobile)
-- **Backend:** Python (FastAPI), Node.js
-- **AI/ML:** GPT-4, Claude, Gemini API, Hugging Face, LegalBERT
-- **Search:** Elasticsearch, Pinecone/Weaviate (vector DB)
-- **Knowledge Graph:** Neo4j
+- **Frontend:** React/Next.js, TypeScript, Tailwind CSS
+- **Backend:** Python (FastAPI)
+- **AI/ML:** Gemini API (RAG + embeddings), Hugging Face (optional), LegalBERT (fine-tuning)
+- **Search:** Elasticsearch 8.11+ (keyword + vector search)
+- **Knowledge Graph:** Neo4j Community Edition
 - **Databases:** PostgreSQL, Redis
-- **Cloud:** AWS/Azure/GCP
+- **Cloud:** AWS/Azure/GCP (Docker-based deployment)
 
 ### External Service Dependencies
 - Legislative database APIs (where available)
 - Legal research database subscriptions (CanLII, etc.)
-- AI/ML APIs (OpenAI, Anthropic, Google)
-- OCR services for scanned documents
+- Gemini API (Google AI Studio)
+- OCR services for scanned documents (if needed)
 - Translation services (for bilingual support)
 
 ### Government System Dependencies
