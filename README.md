@@ -82,7 +82,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - **Search**: Elasticsearch (keyword + vector)
 - **Relational DB**: PostgreSQL
 - **Cache**: Redis
-- **AI Services**: Gemini API (RAG), OpenAI (embeddings)
+- **AI Services**: Gemini API (RAG + embeddings)
 
 ### System Components
 ```
@@ -206,7 +206,7 @@ regulatory-intelligence-assistant/
 - Node.js 18+
 - Docker & Docker Compose
 - Git
-- API Keys: Gemini API (for RAG), OpenAI API (for embeddings)
+- API Keys: Gemini API (for RAG and embeddings)
 
 **Note:** All database services (PostgreSQL, Neo4j, Elasticsearch, Redis) run in Docker containers - no local installation needed!
 
