@@ -18,6 +18,7 @@ from database import get_db, engine
 from routes.compliance import router as compliance_router
 from routes.nlp import router as nlp_router
 from routes.search import router as search_router
+from routes.rag import router as rag_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -49,6 +50,7 @@ app.add_middleware(
 app.include_router(compliance_router)
 app.include_router(nlp_router)
 app.include_router(search_router)
+app.include_router(rag_router)
 
 
 # Root endpoint
