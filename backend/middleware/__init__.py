@@ -15,7 +15,14 @@ from middleware.validation_middleware import (
     format_validation_error_response
 )
 
+from middleware.rate_limit_middleware import (
+    RateLimitMiddleware,
+    rate_limit,
+    configure_rate_limits
+)
+
 __all__ = [
+    # Validation middleware
     'ValidationMiddleware',
     'validate_document_input',
     'validate_search_query_input',
@@ -23,5 +30,10 @@ __all__ = [
     'validate_pagination',
     'log_validation_errors',
     'RequestValidator',
-    'format_validation_error_response'
+    'format_validation_error_response',
+
+    # Rate limiting middleware
+    'RateLimitMiddleware',
+    'rate_limit',
+    'configure_rate_limits'
 ]
