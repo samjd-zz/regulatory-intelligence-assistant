@@ -16,6 +16,7 @@ from database import get_db, engine
 
 # Import routers
 from routes.compliance import router as compliance_router
+from routes.documents import router as documents_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +46,7 @@ app.add_middleware(
 
 # Register routers
 app.include_router(compliance_router)
+app.include_router(documents_router)
 
 
 # Root endpoint

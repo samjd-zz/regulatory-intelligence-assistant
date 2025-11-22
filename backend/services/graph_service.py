@@ -7,7 +7,7 @@ from datetime import datetime, date
 import uuid
 import logging
 
-from backend.utils.neo4j_client import get_neo4j_client, Neo4jClient
+from utils.neo4j_client import get_neo4j_client, Neo4jClient
 
 logger = logging.getLogger(__name__)
 
