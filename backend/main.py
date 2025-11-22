@@ -19,6 +19,7 @@ from routes.compliance import router as compliance_router
 from routes.nlp import router as nlp_router
 from routes.search import router as search_router
 from routes.rag import router as rag_router
+from routes.BAITMAN_documents import router as documents_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -51,6 +52,7 @@ app.include_router(compliance_router)
 app.include_router(nlp_router)
 app.include_router(search_router)
 app.include_router(rag_router)
+app.include_router(documents_router)
 
 
 # Root endpoint
