@@ -1,0 +1,62 @@
+{
+  "environment": "development",
+  "nlp": {
+    "entity_extraction_enabled": true,
+    "entity_confidence_threshold": 0.5,
+    "query_parsing_enabled": true,
+    "intent_confidence_threshold": 0.6,
+    "enable_caching": true,
+    "cache_ttl_seconds": 3600
+  },
+  "gemini": {
+    "model_name": "gemini-1.5-flash",
+    "temperature": 0.1,
+    "top_p": 0.95,
+    "max_output_tokens": 2048,
+    "rate_limit_per_minute": 60,
+    "enable_rate_limiting": false,
+    "max_retries": 2,
+    "enable_response_cache": true,
+    "cache_ttl_seconds": 3600
+  },
+  "elasticsearch": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "default_search_size": 10,
+    "max_search_size": 100,
+    "enable_query_cache": false,
+    "enable_request_cache": false,
+    "refresh_interval": "1s",
+    "bulk_chunk_size": 500
+  },
+  "search": {
+    "min_relevance_score": 0.1,
+    "boost_exact_match": 2.0,
+    "boost_title_match": 1.5,
+    "boost_recent_docs": true,
+    "enable_facets": true,
+    "enable_autocomplete": true,
+    "enable_suggestions": true
+  },
+  "rag": {
+    "num_context_documents": 5,
+    "min_context_relevance": 0.3,
+    "enable_citation_extraction": true,
+    "enable_confidence_scoring": true,
+    "min_confidence_threshold": 0.4,
+    "enable_answer_cache": true,
+    "cache_ttl_seconds": 3600
+  },
+  "features": {
+    "enable_graph_search": true,
+    "enable_multi_hop_reasoning": true,
+    "enable_autocomplete": true,
+    "enable_query_suggestions": true,
+    "enable_async_indexing": true,
+    "enable_bulk_operations": true,
+    "enable_usage_tracking": false,
+    "enable_performance_monitoring": true,
+    "enable_error_reporting": false
+  },
+  "config_version": "1.0.0"
+}
