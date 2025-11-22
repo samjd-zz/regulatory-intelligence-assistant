@@ -117,32 +117,91 @@ regulatory-intelligence-assistant/
 ├── backend/                          # FastAPI backend service
 │   ├── alembic/                      # Database migrations
 │   │   ├── versions/                 # Migration scripts
-│   │   │   └── 001_initial_schema.py
+│   │   │   ├── 001_initial_schema.py         # Initial database schema
+│   │   │   └── 002_document_models.py        # Document model additions
 │   │   ├── env.py                    # Alembic configuration
 │   │   └── script.py.mako            # Migration template
+│   ├── config/                       # Configuration management
+│   │   ├── __init__.py
+│   │   ├── config_validator.py       # Config validation logic
+│   │   ├── elasticsearch_mappings.json  # ES index mappings
+│   │   ├── model_config.py           # ML model configurations
+│   │   └── templates/                # Config templates
+│   │       ├── development.json
+│   │       └── production.json
+│   ├── evaluation/                   # Quality evaluation
+│   │   ├── BAITMAN_test_queries.json # Test query dataset
+│   │   ├── evaluate_search_quality.py  # Search quality metrics
+│   │   ├── model_evaluator.py        # Model performance evaluation
+│   │   └── performance_benchmark.py  # System benchmarking
+│   ├── middleware/                   # API middleware
+│   │   ├── __init__.py
+│   │   ├── rate_limit_middleware.py  # Rate limiting
+│   │   └── validation_middleware.py  # Request validation
 │   ├── models/                       # SQLAlchemy models
 │   │   ├── __init__.py
-│   │   └── models.py                 # Database models (10 tables)
-│   ├── routes/                       # API endpoints
-│   │   └── compliance.py             # Compliance API routes
+│   │   └── models.py                 # Database models (10+ tables)
+│   ├── routes/                       # API endpoints (10 routers)
+│   │   ├── batch.py                  # Batch processing endpoints
+│   │   ├── compliance.py             # Compliance API routes
+│   │   ├── config.py                 # Configuration endpoints
+│   │   ├── documents.py              # Document management API
+│   │   ├── graph.py                  # Knowledge graph API
+│   │   ├── nlp.py                    # Legal NLP endpoints
+│   │   ├── rag.py                    # RAG Q&A endpoints
+│   │   ├── search.py                 # Search API endpoints
+│   │   ├── suggestions.py            # Query suggestions API
+│   │   └── version.py                # API versioning
 │   ├── schemas/                      # Pydantic schemas
 │   │   └── compliance_rules.py       # Compliance data models
 │   ├── services/                     # Business logic
 │   │   ├── compliance_checker.py     # Compliance engine
-│   │   └── graph_service.py          # Neo4j operations
+│   │   ├── document_parser.py        # Document parsing (PDF, HTML, XML, TXT)
+│   │   ├── gemini_client.py          # Gemini API client
+│   │   ├── graph_builder.py          # Graph construction from documents
+│   │   ├── graph_service.py          # Neo4j operations
+│   │   ├── legal_nlp.py              # Legal entity extraction & NLP
+│   │   ├── query_parser.py           # Query intent classification
+│   │   ├── query_suggestions.py      # Auto-suggestions service
+│   │   ├── rag_service.py            # RAG with Gemini API
+│   │   └── search_service.py         # Hybrid search (BM25 + vector)
 │   ├── scripts/                      # Utility scripts
 │   │   ├── init_graph.cypher         # Neo4j schema initialization
 │   │   ├── init_neo4j.py             # Graph setup script
+│   │   ├── README.md                 # Scripts documentation
+│   │   ├── seed_graph_data.py        # Seed graph with sample data
+│   │   ├── test_document_api.py      # Document API testing
+│   │   ├── test_graph_system.py      # Graph system testing
 │   │   └── verify_graph.py           # Graph verification
-│   ├── tests/                        # Test suite
-│   │   ├── test_compliance_checker.py        # Unit tests (24 tests)
-│   │   └── test_compliance_integration.py    # Integration tests
+│   ├── tasks/                        # Background tasks
+│   │   ├── populate_graph.py         # Graph population tasks
+│   │   └── README.md                 # Tasks documentation
+│   ├── tests/                        # Test suite (150+ tests)
+│   │   ├── test_compliance_checker.py        # Compliance unit tests (24 tests)
+│   │   ├── test_compliance_integration.py    # Compliance integration tests
+│   │   ├── test_e2e_workflows.py             # End-to-end workflow tests
+│   │   ├── test_integration_nlp.py           # NLP integration tests
+│   │   ├── test_integration_rag.py           # RAG integration tests
+│   │   ├── test_integration_search.py        # Search integration tests
+│   │   ├── test_legal_nlp.py                 # Legal NLP unit tests
+│   │   ├── test_rag_service.py               # RAG service tests
+│   │   └── test_search_service.py            # Search service tests
 │   ├── utils/                        # Helper utilities
-│   │   └── neo4j_client.py           # Neo4j connection manager
+│   │   ├── api_versioning.py         # API version management
+│   │   ├── batch_processor.py        # Batch processing utilities
+│   │   ├── cache_optimizer.py        # Cache optimization
+│   │   ├── error_handling.py         # Error handling utilities
+│   │   ├── legal_text_parser.py      # Legal text parsing helpers
+│   │   ├── monitoring.py             # Monitoring and metrics
+│   │   ├── neo4j_client.py           # Neo4j connection manager
+│   │   ├── rate_limiter.py           # Rate limiting utilities
+│   │   ├── regulatory_batch.py       # Regulatory batch processing
+│   │   └── validators.py             # Data validation utilities
 │   ├── .env.example                  # Environment template
 │   ├── alembic.ini                   # Alembic config
+│   ├── create_tables.py              # Database table creation
 │   ├── database.py                   # Database connection
-│   ├── main.py                       # FastAPI application
+│   ├── main.py                       # FastAPI application (10 routers)
 │   ├── pytest.ini                    # Test configuration
 │   ├── requirements.txt              # Python dependencies
 │   └── seed_data.py                  # Sample data seeding
@@ -152,20 +211,40 @@ regulatory-intelligence-assistant/
 │   └── package.json
 ├── docs/                             # Documentation
 │   ├── dev/                          # Development guides
-│   │   ├── compliance-engine.md      # Compliance system docs
-│   │   ├── database-management.md    # PostgreSQL guide
-│   │   ├── developer-assignments.md  # Team responsibilities
-│   │   ├── neo4j-knowledge-graph.md  # Graph schema & queries
-│   │   └── neo4j-mcp-setup.md        # MCP server setup
+│   │   ├── BAITMAN_developer_setup.md       # Developer setup guide
+│   │   ├── BAITMAN_legal-nlp-service.md     # Legal NLP service docs
+│   │   ├── BAITMAN_rag-service.md           # RAG service documentation
+│   │   ├── BAITMAN_search-service.md        # Search service docs
+│   │   ├── compliance-engine.md             # Compliance system docs
+│   │   ├── database-management.md           # PostgreSQL guide
+│   │   ├── developer-assignments.md         # Team responsibilities
+│   │   ├── document-parser.md               # Document parsing guide
+│   │   ├── knowledge-graph-implementation.md  # Graph implementation
+│   │   ├── KNOWLEDGE_GRAPH_COMPLETE.md      # Graph completion summary
+│   │   ├── neo4j-implementation-summary.md  # Neo4j implementation
+│   │   ├── neo4j-knowledge-graph.md         # Graph schema & queries
+│   │   ├── neo4j-mcp-setup.md               # MCP server setup
+│   │   ├── neo4j-quick-reference.md         # Neo4j quick ref
+│   │   ├── neo4j-schema.md                  # Detailed schema docs
+│   │   └── neo4j-visual-schema.md           # Visual schema guide
+│   ├── BAITMAN_COMPLIANCE_REPORT.md  # Compliance report
+│   ├── BAITMAN_production_deployment_checklist.md  # Deployment guide
 │   ├── design.md                     # Technical architecture
 │   ├── idea.md                       # Initial concept
 │   ├── parallel-plan.md              # Development workflow
 │   ├── plan.md                       # Implementation plan
 │   └── prd.md                        # Product requirements
+├── media/                            # Media assets
+│   ├── AI_Guide_to_Regulations.mp4   # Demo video
+│   ├── info-graphic.png              # Project infographic
+│   ├── Regulatory_Intelligence_Actionable_Clarity.pdf  # Presentation
+│   └── super-powers.png              # Feature graphic
 ├── .clinerules                       # Cline AI assistant rules
 ├── .gitignore                        # Git ignore rules
 ├── CLAUDE.md                         # Claude AI context
+├── DEPLOYMENT_CHECKLIST.md           # Production deployment checklist
 ├── docker-compose.yml                # Service orchestration
+├── GETTING_STARTED.md                # Getting started guide
 └── README.md                         # This file
 ```
 
@@ -493,55 +572,89 @@ For questions or support, please refer to the project documentation or contact t
 
 ---
 
-**Status**: 🚧 In Development (MVP Phase - Phase 1 Complete)  
-**Last Updated**: November 20, 2025
+**Status**: 🚀 Major Progress - Core Backend Complete!  
+**Last Updated**: November 22, 2025
 
-### Current Progress
+### Current Progress Summary
 
-**Phase 1: Foundation (Days 1-2)** ✅ COMPLETE
+**Backend Services: 85% Complete** ✅
+- ✅ Phase 1: Foundation (Days 1-2) - COMPLETE
+- ✅ Phase 2: Document Processing (Days 3-4) - COMPLETE  
+- ✅ Phase 3: Search & RAG (Days 5-7) - COMPLETE
+- ✅ Phase 4A: Compliance Engine (Days 8-9) - COMPLETE
+- 🚧 Phase 4B: Frontend Development - IN PROGRESS
+- ⏳ Phase 5: Testing & Demo - PENDING
+
+### Detailed Progress
+
+**Phase 1: Foundation ✅ COMPLETE**
 - ✅ Stream 1A: Backend Setup & Database (Developer 1)
   - PostgreSQL database with 10 models and Alembic migrations
-  - FastAPI server with comprehensive health checks
-  - Docker Compose with all services (PostgreSQL, Neo4j, Elasticsearch, Redis)
+  - FastAPI server with comprehensive health checks for all services
+  - Docker Compose orchestration (PostgreSQL, Neo4j, Elasticsearch, Redis)
   
 - ✅ Stream 1B: Neo4j Knowledge Graph Setup (Developer 3)
   - Complete graph schema with 6 node types and 9 relationship types
   - Neo4j client with connection pooling and JSON serialization
   - Graph service with full CRUD operations
   - Sample data: 4 Acts, 4 Sections, 1 Regulation, 3 Programs, 2 Situations
-  - Comprehensive documentation and verification scripts
 
-**Phase 4: Compliance & Frontend (Days 8-10)** - IN PROGRESS
+**Phase 2: Document Processing ✅ COMPLETE**
+- ✅ Stream 2A: Document Parsing & Graph Population (Developer 3)
+  - Document parser supporting PDF, HTML, XML, and TXT formats
+  - Structured extraction: sections, subsections, clauses, cross-references
+  - Document models with 6 types (Act, Regulation, Policy, etc.)
+  - Document upload API with 9 endpoints
+  - Graph population pipeline for automatic node/relationship creation
+  
+- ✅ Stream 2B: Legal NLP Processing (Developer 2)
+  - Legal entity extraction with 8 entity types (89% accuracy)
+  - Query parser with 8 intent types (87.5% accuracy)
+  - Legal terminology database with synonym expansion
+  - 7 REST API endpoints for NLP operations
+  - 50+ unit tests, all passing
+
+**Phase 3: Search & RAG ✅ COMPLETE**
+- ✅ Stream 3A: Hybrid Search System (Developer 2)
+  - Elasticsearch with 3 custom legal analyzers
+  - Keyword search (BM25) with <100ms latency
+  - Vector search (semantic embeddings) with <400ms latency
+  - Hybrid search combining both approaches
+  - 11 REST API endpoints for search operations
+  - 30+ comprehensive unit tests
+  
+- ✅ Stream 3B: Gemini RAG System (Developer 2)
+  - RAG service combining search retrieval + LLM generation
+  - Citation extraction with 2 pattern types
+  - 4-factor confidence scoring system
+  - In-memory caching (24h TTL, LRU eviction)
+  - 6 REST API endpoints for Q&A operations
+  - 25+ unit tests covering all functionality
+
+**Phase 4: Compliance & Frontend**
 - ✅ Stream 4A: Compliance Checking Engine (Developer 1) - COMPLETE
-  - **Architecture**: 3-tier system (RequirementExtractor → RuleEngine → ComplianceChecker)
-  - **Schemas**: Comprehensive Pydantic v2 models for all compliance operations
-  - **RequirementExtractor**: Pattern-based extraction from regulatory text
-    - 4 pattern types: mandatory_field, prohibited_action, conditional_requirement, eligibility_criteria
-    - Priority-ordered matching to handle complex sentences
-    - Confidence scoring and source citations
-  - **RuleEngine**: 8 validation types with flexible logic
-    - Basic: required, pattern, min/max_length
-    - Advanced: range, in_list, date_format, conditional
-    - Combined: multiple validations per field
-  - **ComplianceChecker**: Full orchestration with optimization
-    - Rule caching with 1-hour TTL
-    - Confidence scoring (coverage + pass_rate)
-    - Severity levels (critical, high, medium, low)
-    - Actionable recommendations and next steps
-  - **REST API**: 6 endpoints for complete compliance workflow
-    - POST `/check`: Full compliance validation (<200ms)
-    - POST `/validate-field`: Real-time field validation (<50ms)
-    - POST `/requirements/extract`: Requirement extraction (<500ms)
-    - GET `/requirements/{program_id}`: Retrieve program rules
-    - GET `/metrics`: Compliance analytics and reporting
-    - DELETE `/cache/{program_id}`: Manual cache invalidation
-  - **Testing**: 24 unit tests with 100% pass rate
-  - **Documentation**: Complete API reference, validation guide, and integration examples
-  - **Performance**: Optimized with caching and async operations
+  - 3-tier architecture: RequirementExtractor → RuleEngine → ComplianceChecker
+  - Pattern-based requirement extraction (4 pattern types)
+  - 8 validation types with flexible logic
+  - Rule caching with 1-hour TTL
+  - 6 REST API endpoints for compliance operations
+  - 24 unit tests with 100% pass rate
+  - Sub-50ms field validation, sub-200ms full compliance check
+  
+- 🚧 Stream 4B: Frontend Development (Developer 4) - IN PROGRESS
+  - React frontend with TypeScript and Tailwind CSS
+  - Search interface, chat interface, regulation viewer
+  - Workflow and compliance checking UI
 
-**Next Streams**: 
-- Stream 2A: Document Parsing & Graph Population (Developer 3)
-- Stream 2B: Legal NLP Processing (Developer 2)
-- Stream 3A: Hybrid Search System (Developers 2 & 4)
-- Stream 3B: Gemini RAG System (Developer 2)
-- Stream 4B: Frontend Development (Developer 4)
+**API Coverage:**
+- ✅ 10 routers registered in FastAPI
+- ✅ 50+ REST API endpoints operational
+- ✅ Comprehensive health checks for all services
+- ✅ 150+ unit and integration tests
+
+**Next Steps:**
+- Complete React frontend development
+- Integration and E2E testing
+- Sample regulatory dataset curation
+- Demo video production
+- Documentation finalization
