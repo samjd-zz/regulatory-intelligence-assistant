@@ -22,6 +22,7 @@ from routes.rag import router as rag_router
 from routes.documents import router as documents_router
 from routes.batch import router as batch_router
 from routes.config import router as config_router
+from routes.suggestions import router as suggestions_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -57,6 +58,7 @@ app.include_router(rag_router)
 app.include_router(documents_router)
 app.include_router(batch_router)
 app.include_router(config_router)
+app.include_router(suggestions_router)
 
 
 # Root endpoint
