@@ -20,6 +20,11 @@ hiredis==2.3.2
 # Search - Elasticsearch
 elasticsearch==8.11.0
 
+# Document Parsing
+PyPDF2==3.0.1
+beautifulsoup4==4.12.3
+lxml==5.1.0
+
 # AI/ML
 google-generativeai==0.3.2
 sentence-transformers==2.3.1

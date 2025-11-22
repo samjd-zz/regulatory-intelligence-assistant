@@ -19,11 +19,17 @@ sys.path.insert(0, str(project_root))
 # Import the Base and all models
 try:
     from backend.database import Base
-    from backend.models import models
+    from backend.models.document_models import (
+        Document, DocumentSection, DocumentSubsection,
+        DocumentClause, CrossReference, DocumentMetadata
+    )
 except ModuleNotFoundError:
     # If running from backend directory, try without backend prefix
     from database import Base
-    from models import models
+    from models.document_models import (
+        Document, DocumentSection, DocumentSubsection,
+        DocumentClause, CrossReference, DocumentMetadata
+    )
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

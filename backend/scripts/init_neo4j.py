@@ -26,7 +26,8 @@ def init_schema():
     client = get_neo4j_client()
     
     # Read Cypher script
-    with open('backend/scripts/init_graph.cypher', 'r') as f:
+    script_path = Path(__file__).parent / 'init_graph.cypher'
+    with open(script_path, 'r') as f:
         cypher_script = f.read()
     
     # Execute each statement separately
