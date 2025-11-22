@@ -24,6 +24,13 @@ elasticsearch==8.11.0
 google-generativeai==0.3.2
 sentence-transformers==2.3.1
 
+# NLP - Legal Text Processing
+spacy==3.7.2
+transformers==4.36.2
+torch==2.1.2
+nltk==3.8.1
+scikit-learn==1.4.0
+
 # Utilities
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
