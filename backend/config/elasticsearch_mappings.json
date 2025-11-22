@@ -1,0 +1,174 @@
+{
+  "settings": {
+    "analysis": {
+      "filter": {
+        "english_stop": {
+          "type": "stop",
+          "stopwords": "_english_"
+        },
+        "english_stemmer": {
+          "type": "stemmer",
+          "language": "english"
+        },
+        "english_possessive_stemmer": {
+          "type": "stemmer",
+          "language": "possessive_english"
+        },
+        "legal_synonym": {
+          "type": "synonym",
+          "synonyms": [
+            "ei, employment insurance, unemployment insurance",
+            "cpp, canada pension plan, pension",
+            "oas, old age security, old age pension",
+            "gis, guaranteed income supplement",
+            "ccb, canada child benefit, child benefit",
+            "sin, social insurance number",
+            "pr, permanent resident, landed immigrant",
+            "temporary resident, temp resident, visitor, tfr, temporary foreign worker",
+            "citizen, canadian citizen",
+            "federal, canada, government of canada, national",
+            "bc, british columbia, b.c.",
+            "on, ontario, ont",
+            "qc, quebec, qué",
+            "ab, alberta",
+            "work permit, employment authorization",
+            "study permit, student visa"
+          ]
+        }
+      },
+      "analyzer": {
+        "legal_text_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "english_possessive_stemmer",
+            "lowercase",
+            "legal_synonym",
+            "english_stop",
+            "english_stemmer"
+          ]
+        },
+        "legal_exact_analyzer": {
+          "type": "custom",
+          "tokenizer": "keyword",
+          "filter": [
+            "lowercase"
+          ]
+        },
+        "legal_citation_analyzer": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase"
+          ]
+        }
+      }
+    },
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "max_result_window": 10000
+    }
+  },
+  "mappings": {
+    "properties": {
+      "document_id": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "legal_text_analyzer",
+        "fields": {
+          "exact": {
+            "type": "keyword"
+          },
+          "raw": {
+            "type": "text",
+            "analyzer": "standard"
+          }
+        }
+      },
+      "content": {
+        "type": "text",
+        "analyzer": "legal_text_analyzer",
+        "term_vector": "with_positions_offsets",
+        "fields": {
+          "raw": {
+            "type": "text",
+            "analyzer": "standard"
+          }
+        }
+      },
+      "document_type": {
+        "type": "keyword"
+      },
+      "jurisdiction": {
+        "type": "keyword"
+      },
+      "program": {
+        "type": "keyword"
+      },
+      "legislation_name": {
+        "type": "text",
+        "analyzer": "legal_text_analyzer",
+        "fields": {
+          "exact": {
+            "type": "keyword"
+          }
+        }
+      },
+      "citation": {
+        "type": "text",
+        "analyzer": "legal_citation_analyzer",
+        "fields": {
+          "exact": {
+            "type": "keyword"
+          }
+        }
+      },
+      "section_number": {
+        "type": "keyword"
+      },
+      "effective_date": {
+        "type": "date",
+        "format": "yyyy-MM-dd||yyyy-MM-dd'T'HH:mm:ss||epoch_millis"
+      },
+      "amendment_date": {
+        "type": "date",
+        "format": "yyyy-MM-dd||yyyy-MM-dd'T'HH:mm:ss||epoch_millis"
+      },
+      "status": {
+        "type": "keyword"
+      },
+      "tags": {
+        "type": "keyword"
+      },
+      "person_types": {
+        "type": "keyword"
+      },
+      "requirements": {
+        "type": "keyword"
+      },
+      "summary": {
+        "type": "text",
+        "analyzer": "legal_text_analyzer"
+      },
+      "embedding": {
+        "type": "dense_vector",
+        "dims": 384,
+        "index": true,
+        "similarity": "cosine"
+      },
+      "created_at": {
+        "type": "date"
+      },
+      "updated_at": {
+        "type": "date"
+      },
+      "metadata": {
+        "type": "object",
+        "enabled": true
+      }
+    }
+  }
+}

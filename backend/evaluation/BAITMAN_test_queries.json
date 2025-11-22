@@ -1,0 +1,650 @@
+{
+  "metadata": {
+    "description": "Test query set for search quality evaluation",
+    "created_by": "Developer 2 (AI/ML Engineer)",
+    "created_date": "2025-11-22",
+    "version": "1.0",
+    "total_queries": 30
+  },
+  "test_queries": [
+    {
+      "id": "Q001",
+      "category": "eligibility",
+      "query": "Can a temporary resident apply for employment insurance?",
+      "expected_entities": {
+        "person_type": ["temporary_resident"],
+        "program": ["employment_insurance"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "ei-act-s7",
+          "title": "Employment Insurance Act - Section 7",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "work permit",
+        "authorized to work",
+        "social insurance number"
+      ]
+    },
+    {
+      "id": "Q002",
+      "category": "eligibility",
+      "query": "Who is eligible for Canada Pension Plan benefits?",
+      "expected_entities": {
+        "program": ["canada_pension_plan"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "cpp-act-eligibility",
+          "title": "Canada Pension Plan - Eligibility",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "age 60",
+        "contributed",
+        "retirement"
+      ]
+    },
+    {
+      "id": "Q003",
+      "category": "procedure",
+      "query": "How do I apply for Old Age Security?",
+      "expected_entities": {
+        "program": ["old_age_security"]
+      },
+      "expected_intent": "procedure",
+      "expected_documents": [
+        {
+          "id": "oas-application",
+          "title": "Old Age Security - Application Process",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "application",
+        "age 65",
+        "Service Canada"
+      ]
+    },
+    {
+      "id": "Q004",
+      "category": "definition",
+      "query": "What is the Guaranteed Income Supplement?",
+      "expected_entities": {
+        "program": ["guaranteed_income_supplement"]
+      },
+      "expected_intent": "definition",
+      "expected_documents": [
+        {
+          "id": "gis-overview",
+          "title": "Guaranteed Income Supplement - Overview",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "low income",
+        "supplement",
+        "Old Age Security"
+      ]
+    },
+    {
+      "id": "Q005",
+      "category": "eligibility",
+      "query": "Can permanent residents receive the Canada Child Benefit?",
+      "expected_entities": {
+        "person_type": ["permanent_resident"],
+        "program": ["canada_child_benefit"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "ccb-eligibility",
+          "title": "Canada Child Benefit - Eligibility",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "permanent resident",
+        "child under 18",
+        "primary caregiver"
+      ]
+    },
+    {
+      "id": "Q006",
+      "category": "compliance",
+      "query": "What documents do I need to prove residency status?",
+      "expected_entities": {
+        "requirement": ["documentation"]
+      },
+      "expected_intent": "compliance",
+      "expected_documents": [
+        {
+          "id": "residency-proof",
+          "title": "Residency Documentation Requirements",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "permanent resident card",
+        "citizenship certificate",
+        "work permit"
+      ]
+    },
+    {
+      "id": "Q007",
+      "category": "search",
+      "query": "Find regulations about workers compensation in British Columbia",
+      "expected_entities": {
+        "program": ["workers_compensation"],
+        "jurisdiction": ["british_columbia"]
+      },
+      "expected_intent": "search",
+      "expected_documents": [
+        {
+          "id": "bc-worksafe",
+          "title": "BC WorkSafe Regulations",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "British Columbia",
+        "WorkSafe BC",
+        "workplace injury"
+      ]
+    },
+    {
+      "id": "Q008",
+      "category": "eligibility",
+      "query": "Are refugees eligible for social assistance?",
+      "expected_entities": {
+        "person_type": ["refugee"],
+        "program": ["social_assistance"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "refugee-assistance",
+          "title": "Refugee Social Assistance Programs",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "protected person",
+        "social assistance",
+        "provincial program"
+      ]
+    },
+    {
+      "id": "Q009",
+      "category": "definition",
+      "query": "What is the difference between EI and CPP?",
+      "expected_entities": {
+        "program": ["employment_insurance", "canada_pension_plan"]
+      },
+      "expected_intent": "comparison",
+      "expected_documents": [
+        {
+          "id": "ei-overview",
+          "title": "Employment Insurance Overview",
+          "relevance": "high"
+        },
+        {
+          "id": "cpp-overview",
+          "title": "Canada Pension Plan Overview",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "unemployment",
+        "retirement",
+        "different programs"
+      ]
+    },
+    {
+      "id": "Q010",
+      "category": "procedure",
+      "query": "How long does it take to process a citizenship application?",
+      "expected_entities": {
+        "requirement": ["processing_time"]
+      },
+      "expected_intent": "procedure",
+      "expected_documents": [
+        {
+          "id": "citizenship-processing",
+          "title": "Citizenship Application Processing Times",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "processing time",
+        "months",
+        "application"
+      ]
+    },
+    {
+      "id": "Q011",
+      "category": "eligibility",
+      "query": "Can international students work in Canada?",
+      "expected_entities": {
+        "person_type": ["student", "foreign_national"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "student-work-permit",
+          "title": "International Student Work Permits",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "study permit",
+        "work hours",
+        "on-campus"
+      ]
+    },
+    {
+      "id": "Q012",
+      "category": "compliance",
+      "query": "What are the requirements to sponsor a family member?",
+      "expected_entities": {
+        "requirement": ["sponsorship"]
+      },
+      "expected_intent": "compliance",
+      "expected_documents": [
+        {
+          "id": "family-sponsorship",
+          "title": "Family Sponsorship Requirements",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "citizen",
+        "permanent resident",
+        "income requirement"
+      ]
+    },
+    {
+      "id": "Q013",
+      "category": "search",
+      "query": "Show me federal regulations about employment standards",
+      "expected_entities": {
+        "jurisdiction": ["federal"]
+      },
+      "expected_intent": "search",
+      "expected_documents": [
+        {
+          "id": "labour-standards-act",
+          "title": "Canada Labour Code - Employment Standards",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "working hours",
+        "minimum wage",
+        "federal"
+      ]
+    },
+    {
+      "id": "Q014",
+      "category": "eligibility",
+      "query": "Are seniors eligible for tax credits?",
+      "expected_entities": {
+        "person_type": ["senior"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "senior-tax-credits",
+          "title": "Tax Credits for Seniors",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "age 65",
+        "tax credit",
+        "pension income"
+      ]
+    },
+    {
+      "id": "Q015",
+      "category": "definition",
+      "query": "What is a work permit?",
+      "expected_entities": {},
+      "expected_intent": "definition",
+      "expected_documents": [
+        {
+          "id": "work-permit-definition",
+          "title": "Work Permit Overview",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "authorization",
+        "temporary",
+        "work in Canada"
+      ]
+    },
+    {
+      "id": "Q016",
+      "category": "procedure",
+      "query": "How do I renew my permanent resident card?",
+      "expected_entities": {
+        "person_type": ["permanent_resident"]
+      },
+      "expected_intent": "procedure",
+      "expected_documents": [
+        {
+          "id": "pr-card-renewal",
+          "title": "PR Card Renewal Process",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "application",
+        "5 years",
+        "residency obligation"
+      ]
+    },
+    {
+      "id": "Q017",
+      "category": "eligibility",
+      "query": "Who qualifies for disability benefits?",
+      "expected_entities": {
+        "program": ["disability_tax_credit"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "disability-benefits",
+          "title": "Disability Benefits Eligibility",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "severe",
+        "prolonged",
+        "impairment"
+      ]
+    },
+    {
+      "id": "Q018",
+      "category": "compliance",
+      "query": "What income do I need to report for EI?",
+      "expected_entities": {
+        "program": ["employment_insurance"]
+      },
+      "expected_intent": "compliance",
+      "expected_documents": [
+        {
+          "id": "ei-reporting",
+          "title": "EI Income Reporting Requirements",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "earnings",
+        "report",
+        "biweekly"
+      ]
+    },
+    {
+      "id": "Q019",
+      "category": "search",
+      "query": "Find Ontario regulations about tenant rights",
+      "expected_entities": {
+        "jurisdiction": ["ontario"]
+      },
+      "expected_intent": "search",
+      "expected_documents": [
+        {
+          "id": "ontario-tenancy-act",
+          "title": "Ontario Residential Tenancies Act",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "tenant",
+        "landlord",
+        "Ontario"
+      ]
+    },
+    {
+      "id": "Q020",
+      "category": "eligibility",
+      "query": "Can self-employed workers claim EI?",
+      "expected_entities": {
+        "person_type": ["self_employed"],
+        "program": ["employment_insurance"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "ei-self-employed",
+          "title": "EI for Self-Employed Workers",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "self-employed",
+        "voluntary",
+        "opt-in"
+      ]
+    },
+    {
+      "id": "Q021",
+      "category": "definition",
+      "query": "What does permanent residency mean?",
+      "expected_entities": {
+        "person_type": ["permanent_resident"]
+      },
+      "expected_intent": "definition",
+      "expected_documents": [
+        {
+          "id": "pr-definition",
+          "title": "Permanent Residence Overview",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "live permanently",
+        "not a citizen",
+        "rights and responsibilities"
+      ]
+    },
+    {
+      "id": "Q022",
+      "category": "procedure",
+      "query": "What are the steps to become a Canadian citizen?",
+      "expected_entities": {},
+      "expected_intent": "procedure",
+      "expected_documents": [
+        {
+          "id": "citizenship-process",
+          "title": "Citizenship Application Process",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "permanent resident",
+        "3 years",
+        "test",
+        "oath"
+      ]
+    },
+    {
+      "id": "Q023",
+      "category": "eligibility",
+      "query": "Are veterans eligible for special benefits?",
+      "expected_entities": {
+        "person_type": ["veteran"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "veteran-benefits",
+          "title": "Veterans Benefits and Services",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "veteran",
+        "Canadian Armed Forces",
+        "benefits"
+      ]
+    },
+    {
+      "id": "Q024",
+      "category": "compliance",
+      "query": "How much income can I earn while on EI?",
+      "expected_entities": {
+        "program": ["employment_insurance"],
+        "requirement": ["income_limit"]
+      },
+      "expected_intent": "compliance",
+      "expected_documents": [
+        {
+          "id": "ei-working-while-claim",
+          "title": "EI - Working While on Claim",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "50 cents",
+        "dollar",
+        "earnings"
+      ]
+    },
+    {
+      "id": "Q025",
+      "category": "search",
+      "query": "Find Quebec regulations about language requirements",
+      "expected_entities": {
+        "jurisdiction": ["quebec"]
+      },
+      "expected_intent": "search",
+      "expected_documents": [
+        {
+          "id": "quebec-language-law",
+          "title": "Quebec Charter of the French Language",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "French",
+        "Quebec",
+        "language"
+      ]
+    },
+    {
+      "id": "Q026",
+      "category": "eligibility",
+      "query": "Can indigenous people access special programs?",
+      "expected_entities": {
+        "person_type": ["indigenous_person"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "indigenous-programs",
+          "title": "Programs for Indigenous Peoples",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "First Nations",
+        "Métis",
+        "Inuit",
+        "programs"
+      ]
+    },
+    {
+      "id": "Q027",
+      "category": "definition",
+      "query": "What is a social insurance number?",
+      "expected_entities": {},
+      "expected_intent": "definition",
+      "expected_documents": [
+        {
+          "id": "sin-overview",
+          "title": "Social Insurance Number Overview",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "9-digit",
+        "identifier",
+        "work",
+        "benefits"
+      ]
+    },
+    {
+      "id": "Q028",
+      "category": "procedure",
+      "query": "How do I apply for a study permit?",
+      "expected_entities": {
+        "person_type": ["student"]
+      },
+      "expected_intent": "procedure",
+      "expected_documents": [
+        {
+          "id": "study-permit-application",
+          "title": "Study Permit Application Process",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "acceptance letter",
+        "financial proof",
+        "application"
+      ]
+    },
+    {
+      "id": "Q029",
+      "category": "eligibility",
+      "query": "Who can sponsor a refugee?",
+      "expected_entities": {
+        "person_type": ["refugee"]
+      },
+      "expected_intent": "eligibility",
+      "expected_documents": [
+        {
+          "id": "refugee-sponsorship",
+          "title": "Refugee Sponsorship Programs",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "Group of Five",
+        "organization",
+        "financial support"
+      ]
+    },
+    {
+      "id": "Q030",
+      "category": "compliance",
+      "query": "What are the residency obligations for permanent residents?",
+      "expected_entities": {
+        "person_type": ["permanent_resident"],
+        "requirement": ["residency"]
+      },
+      "expected_intent": "compliance",
+      "expected_documents": [
+        {
+          "id": "pr-residency-obligation",
+          "title": "Permanent Resident - Residency Obligations",
+          "relevance": "high"
+        }
+      ],
+      "expected_answer_contains": [
+        "730 days",
+        "5 years",
+        "physical presence"
+      ]
+    }
+  ]
+}

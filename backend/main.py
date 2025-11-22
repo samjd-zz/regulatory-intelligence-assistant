@@ -16,6 +16,14 @@ from database import get_db, engine
 
 # Import routers
 from routes.compliance import router as compliance_router
+from routes.nlp import router as nlp_router
+from routes.search import router as search_router
+from routes.rag import router as rag_router
+from routes.documents import router as documents_router
+from routes.batch import router as batch_router
+from routes.config import router as config_router
+from routes.suggestions import router as suggestions_router
+from routes.version import router as version_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,6 +53,14 @@ app.add_middleware(
 
 # Register routers
 app.include_router(compliance_router)
+app.include_router(nlp_router)
+app.include_router(search_router)
+app.include_router(rag_router)
+app.include_router(documents_router)
+app.include_router(batch_router)
+app.include_router(config_router)
+app.include_router(suggestions_router)
+app.include_router(version_router)
 
 
 # Root endpoint
