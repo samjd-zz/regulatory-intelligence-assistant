@@ -223,6 +223,102 @@ class TestSearchService:
             assert results['search_type'] == 'vector'
             mock_model.encode.assert_called_once_with("test query")
 
+    def test_vector_search_knn_query_structure(self, search_service, mock_es):
+        """Test that vector search uses correct kNN query format (not script_score)"""
+        mock_response = {
+            'hits': {
+                'total': {'value': 1},
+                'max_score': 0.95,
+                'hits': [
+                    {
+                        '_id': 'test-doc',
+                        '_score': 0.95,
+                        '_source': {'title': 'Test'}
+                    }
+                ]
+            }
+        }
+        mock_es.search.return_value = mock_response
+
+        # Mock the embedder - return object with tolist() method
+        with patch.object(search_service, '_get_embedder') as mock_embedder:
+            mock_model = Mock()
+            query_vector = [0.1] * 384
+            # Create a mock array-like object with tolist() method
+            mock_embedding = Mock()
+            mock_embedding.tolist.return_value = query_vector
+            mock_model.encode.return_value = mock_embedding
+            mock_embedder.return_value = mock_model
+
+            search_service.vector_search("test query", size=10)
+
+            # Verify the query structure
+            call_args = mock_es.search.call_args
+            assert 'body' in call_args[1]
+            body = call_args[1]['body']
+
+            # Should use kNN query, not script_score
+            assert 'knn' in body, "Query should use kNN format"
+            assert 'script_score' not in body, "Query should NOT use script_score"
+
+            # Verify kNN structure
+            assert body['knn']['field'] == 'embedding'
+            assert body['knn']['query_vector'] == query_vector
+            assert body['knn']['k'] == 10
+            assert body['knn']['num_candidates'] == 100
+            assert body['size'] == 10
+
+    def test_vector_search_with_filters_knn(self, search_service, mock_es):
+        """Test that filters are properly added to kNN query"""
+        mock_response = {
+            'hits': {
+                'total': {'value': 0},
+                'max_score': None,
+                'hits': []
+            }
+        }
+        mock_es.search.return_value = mock_response
+
+        with patch.object(search_service, '_get_embedder') as mock_embedder:
+            mock_model = Mock()
+            # Create mock with tolist() method
+            mock_embedding = Mock()
+            mock_embedding.tolist.return_value = [0.1] * 384
+            mock_model.encode.return_value = mock_embedding
+            mock_embedder.return_value = mock_model
+
+            filters = {'jurisdiction': 'federal', 'program': 'employment_insurance'}
+            search_service.vector_search("test", filters=filters)
+
+            # Verify filters are in kNN query
+            call_args = mock_es.search.call_args
+            body = call_args[1]['body']
+
+            assert 'knn' in body
+            assert 'filter' in body['knn']
+            filter_clauses = body['knn']['filter']
+
+            # Should have 2 filter clauses
+            assert len(filter_clauses) == 2
+
+    def test_vector_search_error_handling(self, search_service, mock_es):
+        """Test vector search error handling"""
+        mock_es.search.side_effect = Exception("Search failed")
+
+        with patch.object(search_service, '_get_embedder') as mock_embedder:
+            mock_model = Mock()
+            # Create mock with tolist() method
+            mock_embedding = Mock()
+            mock_embedding.tolist.return_value = [0.1] * 384
+            mock_model.encode.return_value = mock_embedding
+            mock_embedder.return_value = mock_model
+
+            results = search_service.vector_search("test")
+
+            assert 'error' in results
+            assert results['total'] == 0
+            assert len(results['hits']) == 0
+
     def test_hybrid_search_mock(self, search_service, mock_es):
         """Test hybrid search combines keyword and vector results"""
         mock_keyword_response = {
@@ -461,34 +557,296 @@ class TestSearchServiceIntegration:
     def test_create_index_real(self, live_service):
         """Test creating index on real ES"""
         success = live_service.create_index(force_recreate=True)
-        assert success is True or success is False  # Depends on config file
-
-    def test_index_and_search_real(self, live_service):
-        """Test full indexing and search flow"""
-        # Create index
-        live_service.create_index(force_recreate=True)
-
-        # Index a document
-        doc = {
-            'title': 'Employment Insurance Test',
-            'content': 'This is a test document about employment insurance benefits.',
-            'document_type': 'test',
-            'jurisdiction': 'federal',
-            'program': 'employment_insurance'
-        }
-
-        success = live_service.index_document('test-doc-1', doc, generate_embedding=False)
         assert success is True
 
-        # Wait for indexing
+    def test_index_and_keyword_search_real(self, live_service):
+        """Test full indexing and keyword search flow"""
         import time
+        
+        # Create index
+        live_service.create_index(force_recreate=True)
         time.sleep(1)
 
-        # Search for it
-        results = live_service.keyword_search("employment insurance")
+        # Index test documents
+        docs = [
+            {
+                'id': 'ei-test-1',
+                'title': 'Employment Insurance Eligibility',
+                'content': 'To qualify for employment insurance benefits, you must have worked a certain number of hours and lost your job through no fault of your own.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'employment_insurance',
+                'status': 'in_force'
+            },
+            {
+                'id': 'cpp-test-1',
+                'title': 'Canada Pension Plan Benefits',
+                'content': 'The Canada Pension Plan provides retirement, disability, and survivor benefits to eligible contributors.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'canada_pension_plan',
+                'status': 'in_force'
+            }
+        ]
 
-        # Verify we got results
-        assert results['total'] >= 0  # May be 0 if indexing hasn't completed
+        success, failed = live_service.bulk_index_documents(docs, generate_embeddings=False)
+        assert success == 2
+        assert failed == 0
+
+        # Wait for indexing
+        time.sleep(2)
+
+        # Test keyword search
+        results = live_service.keyword_search("employment insurance")
+        assert results['total'] > 0
+        assert any('employment' in hit['source']['title'].lower() for hit in results['hits'])
+
+    def test_vector_search_e2e_real(self, live_service):
+        """E2E test: Vector search with real embeddings"""
+        import time
+        
+        # Create index
+        live_service.create_index(force_recreate=True)
+        time.sleep(1)
+
+        # Index documents WITH embeddings
+        docs = [
+            {
+                'id': 'vec-test-1',
+                'title': 'Employment Insurance for Workers',
+                'content': 'Employment insurance provides temporary financial assistance to unemployed workers who have lost their job.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'employment_insurance'
+            },
+            {
+                'id': 'vec-test-2',
+                'title': 'Pension Benefits for Seniors',
+                'content': 'Pension plans provide retirement income to seniors who have contributed throughout their working years.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'canada_pension_plan'
+            },
+            {
+                'id': 'vec-test-3',
+                'title': 'Maternity and Parental Leave Benefits',
+                'content': 'Special benefits are available for new parents during maternity and parental leave periods.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'employment_insurance'
+            }
+        ]
+
+        # Index with embeddings
+        success, failed = live_service.bulk_index_documents(docs, generate_embeddings=True)
+        assert success == 3
+        assert failed == 0
+
+        # Wait for indexing to complete
+        time.sleep(3)
+
+        # Test vector search - should find semantically similar docs
+        results = live_service.vector_search("benefits for unemployed people", size=3)
+        
+        # Verify results
+        assert results['total'] > 0, "Vector search should return results"
+        assert results['search_type'] == 'vector'
+        
+        # The most relevant should be the employment insurance doc
+        if results['hits']:
+            top_hit = results['hits'][0]
+            assert 'employment' in top_hit['source']['content'].lower() or \
+                   'unemployed' in top_hit['source']['content'].lower()
+
+    def test_hybrid_search_e2e_real(self, live_service):
+        """E2E test: Hybrid search combining keyword and vector"""
+        import time
+        
+        # Create index
+        live_service.create_index(force_recreate=True)
+        time.sleep(1)
+
+        # Index diverse documents
+        docs = [
+            {
+                'id': 'hybrid-1',
+                'title': 'EI Application Process',
+                'content': 'To apply for employment insurance, you must submit your application online within 4 weeks of your last day of work.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'employment_insurance'
+            },
+            {
+                'id': 'hybrid-2',
+                'title': 'Unemployment Benefits Guide',
+                'content': 'Benefits for unemployed workers include financial assistance and job search support programs.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'employment_insurance'
+            },
+            {
+                'id': 'hybrid-3',
+                'title': 'Pension Eligibility Requirements',
+                'content': 'To receive pension benefits, you must be at least 60 years old and have made contributions.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'canada_pension_plan'
+            }
+        ]
+
+        success, failed = live_service.bulk_index_documents(docs, generate_embeddings=True)
+        assert success == 3
+        assert failed == 0
+
+        time.sleep(3)
+
+        # Test hybrid search
+        results = live_service.hybrid_search(
+            "employment insurance application",
+            size=3,
+            keyword_weight=0.5,
+            vector_weight=0.5
+        )
+
+        assert results['total'] > 0
+        assert results['search_type'] == 'hybrid'
+        assert 'weights' in results
+        
+        # Verify score breakdown exists
+        if results['hits']:
+            first_hit = results['hits'][0]
+            assert 'score_breakdown' in first_hit
+            assert 'keyword' in first_hit['score_breakdown']
+            assert 'vector' in first_hit['score_breakdown']
+            assert 'combined' in first_hit['score_breakdown']
+
+    def test_vector_search_with_filters_e2e_real(self, live_service):
+        """E2E test: Vector search with filters"""
+        import time
+        
+        # Create index
+        live_service.create_index(force_recreate=True)
+        time.sleep(1)
+
+        # Index documents from different programs
+        docs = [
+            {
+                'id': 'filter-1',
+                'title': 'EI Benefits Overview',
+                'content': 'Employment insurance provides financial support during unemployment.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'employment_insurance'
+            },
+            {
+                'id': 'filter-2',
+                'title': 'CPP Benefits Overview',
+                'content': 'Canada Pension Plan provides financial support during retirement.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'canada_pension_plan'
+            },
+            {
+                'id': 'filter-3',
+                'title': 'OAS Benefits Overview',
+                'content': 'Old Age Security provides financial support to seniors.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'old_age_security'
+            }
+        ]
+
+        success, failed = live_service.bulk_index_documents(docs, generate_embeddings=True)
+        assert success == 3
+        assert failed == 0
+
+        time.sleep(3)
+
+        # Search with filter - should only return EI docs
+        results = live_service.vector_search(
+            "financial support programs",
+            filters={'program': 'employment_insurance'},
+            size=5
+        )
+
+        assert results['total'] > 0
+        # All results should be from employment_insurance program
+        for hit in results['hits']:
+            assert hit['source']['program'] == 'employment_insurance'
+
+    def test_vector_search_knn_no_script_score_real(self, live_service):
+        """E2E test: Verify kNN query works (not script_score)"""
+        import time
+        
+        # Create index
+        live_service.create_index(force_recreate=True)
+        time.sleep(1)
+
+        # Index a simple document
+        doc = {
+            'id': 'knn-test-1',
+            'title': 'Test Document',
+            'content': 'This is a test document for kNN search verification.',
+            'document_type': 'test',
+            'jurisdiction': 'federal',
+            'program': 'test'
+        }
+
+        success = live_service.index_document('knn-test-1', doc, generate_embedding=True)
+        assert success is True
+
+        time.sleep(2)
+
+        # This should NOT raise BadRequestError
+        try:
+            results = live_service.vector_search("test document")
+            # If we get here, the query worked
+            assert results['total'] >= 0
+            assert 'error' not in results or results.get('error') == ''
+        except Exception as e:
+            # Should not get search_phase_execution_exception
+            assert 'search_phase_execution_exception' not in str(e)
+            assert 'BadRequestError' not in str(type(e))
+
+    def test_pagination_real(self, live_service):
+        """E2E test: Search pagination"""
+        import time
+        
+        # Create index
+        live_service.create_index(force_recreate=True)
+        time.sleep(1)
+
+        # Index multiple documents
+        docs = [
+            {
+                'id': f'page-test-{i}',
+                'title': f'Document {i}',
+                'content': f'This is test document number {i} about employment insurance.',
+                'document_type': 'test',
+                'jurisdiction': 'federal',
+                'program': 'employment_insurance'
+            }
+            for i in range(1, 11)  # 10 documents
+        ]
+
+        success, failed = live_service.bulk_index_documents(docs, generate_embeddings=False)
+        assert success == 10
+        assert failed == 0
+
+        time.sleep(2)
+
+        # Test pagination
+        page1 = live_service.keyword_search("test document", size=5, from_=0)
+        page2 = live_service.keyword_search("test document", size=5, from_=5)
+
+        # Both pages should have results
+        assert len(page1['hits']) > 0
+        assert len(page2['hits']) > 0
+
+        # Documents should be different
+        page1_ids = {hit['id'] for hit in page1['hits']}
+        page2_ids = {hit['id'] for hit in page2['hits']}
+        assert len(page1_ids.intersection(page2_ids)) == 0  # No overlap
 
 
 if __name__ == "__main__":

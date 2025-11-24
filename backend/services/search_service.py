@@ -158,6 +158,8 @@ class SearchService:
         Returns:
             Tuple of (success_count, failure_count)
         """
+        doc_count = len(documents)
+        
         try:
             # Generate embeddings if requested
             if generate_embeddings:
@@ -174,12 +176,12 @@ class SearchService:
                     doc['created_at'] = now
                 doc['updated_at'] = now
 
-            # Prepare bulk actions
+            # Prepare bulk actions (don't modify original docs)
             actions = [
                 {
                     '_index': self.INDEX_NAME,
-                    '_id': doc.pop('id'),
-                    '_source': doc
+                    '_id': doc['id'],
+                    '_source': {k: v for k, v in doc.items() if k != 'id'}
                 }
                 for doc in documents
             ]
@@ -187,12 +189,12 @@ class SearchService:
             # Execute bulk index
             success, failed = bulk(self.es, actions, stats_only=True)
 
-            logger.info(f"Bulk indexed: {success} successful, {len(failed)} failed")
+            logger.info(f"Bulk indexed: {success} successful, {len(failed) if isinstance(failed, list) else 0} failed")
             return success, len(failed) if isinstance(failed, list) else 0
 
         except Exception as e:
             logger.error(f"Bulk indexing failed: {e}")
-            return 0, len(documents)
+            return 0, doc_count
 
     def keyword_search(self, query: str, filters: Optional[Dict] = None,
                       size: int = 10, from_: int = 0) -> Dict[str, Any]:
@@ -282,26 +284,20 @@ class SearchService:
             # Add filters
             filter_clauses = self._build_filters(filters)
 
-            # Construct query
+            # Construct kNN query for indexed dense vectors
             search_body = {
-                "query": {
-                    "script_score": {
-                        "query": {
-                            "bool": {
-                                "filter": filter_clauses
-                            }
-                        },
-                        "script": {
-                            "source": "cosineSimilarity(params.query_vector, 'embedding') + 1.0",
-                            "params": {
-                                "query_vector": query_embedding
-                            }
-                        }
-                    }
+                "knn": {
+                    "field": "embedding",
+                    "query_vector": query_embedding,
+                    "k": size,
+                    "num_candidates": min(size * 10, 100)  # Search more candidates for better results
                 },
-                "size": size,
-                "from": from_
+                "size": size
             }
+
+            # Add filters if present
+            if filter_clauses:
+                search_body["knn"]["filter"] = filter_clauses
 
             # Execute search
             response = self.es.search(index=self.INDEX_NAME, body=search_body)
