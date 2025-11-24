@@ -721,41 +721,41 @@ CREATE TABLE alerts (
 
 **Search & Query:**
 ```
-POST   /api/v1/search                 - Search regulations
-POST   /api/v1/ask                    - Q&A about regulations
-GET    /api/v1/regulations/{id}       - Get regulation details
-GET    /api/v1/sections/{id}          - Get section details
-POST   /api/v1/similar                - Find similar regulations
+POST   /api/search                 - Search regulations
+POST   /api/ask                    - Q&A about regulations
+GET    /api/regulations/{id}       - Get regulation details
+GET    /api/sections/{id}          - Get section details
+POST   /api/similar                - Find similar regulations
 ```
 
 **Compliance:**
 ```
-POST   /api/v1/compliance/check       - Check form compliance
-POST   /api/v1/compliance/validate    - Validate specific field
-GET    /api/v1/compliance/requirements - Get requirements for program
+POST   /api/compliance/check       - Check form compliance
+POST   /api/compliance/validate    - Validate specific field
+GET    /api/compliance/requirements - Get requirements for program
 ```
 
 **Workflows:**
 ```
-POST   /api/v1/workflows              - Start guided workflow
-GET    /api/v1/workflows/{id}         - Get workflow state
-POST   /api/v1/workflows/{id}/step    - Submit workflow step
-PUT    /api/v1/workflows/{id}/complete - Complete workflow
+POST   /api/workflows              - Start guided workflow
+GET    /api/workflows/{id}         - Get workflow state
+POST   /api/workflows/{id}/step    - Submit workflow step
+PUT    /api/workflows/{id}/complete - Complete workflow
 ```
 
 **Monitoring & Alerts:**
 ```
-POST   /api/v1/subscriptions          - Create alert subscription
-GET    /api/v1/subscriptions          - List subscriptions
-GET    /api/v1/alerts                 - Get alerts
-PUT    /api/v1/alerts/{id}/read       - Mark alert as read
+POST   /api/subscriptions          - Create alert subscription
+GET    /api/subscriptions          - List subscriptions
+GET    /api/alerts                 - Get alerts
+PUT    /api/alerts/{id}/read       - Mark alert as read
 ```
 
 **Analytics:**
 ```
-GET    /api/v1/analytics/usage        - Usage statistics
-GET    /api/v1/analytics/accuracy     - Accuracy metrics
-GET    /api/v1/analytics/feedback     - User feedback summary
+GET    /api/analytics/usage        - Usage statistics
+GET    /api/analytics/accuracy     - Accuracy metrics
+GET    /api/analytics/feedback     - User feedback summary
 ```
 
 ### 4.2 API Request/Response Examples

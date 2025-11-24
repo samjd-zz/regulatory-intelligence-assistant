@@ -99,7 +99,7 @@ class RAGBatchRequest(BaseModel):
                     "Who is eligible for employment insurance?"
                 ],
                 "num_context_docs": 5,
-                "use_cache": true
+                "use_cache": True
             }
         }
 
@@ -118,8 +118,8 @@ class NLPBatchRequest(BaseModel):
                     "Can permanent residents apply for employment insurance?",
                     "What are the pension eligibility requirements?"
                 ],
-                "extract_entities": true,
-                "parse_query": true
+                "extract_entities": True,
+                "parse_query": True
             }
         }
 

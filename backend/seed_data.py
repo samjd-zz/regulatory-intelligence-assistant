@@ -4,7 +4,7 @@ Run this script to populate the database with initial data.
 """
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine
-from models.models import (
+from models import (
     User, Regulation, Section, Citation, Amendment,
     QueryHistory, WorkflowSession, WorkflowStep,
     AlertSubscription, Alert

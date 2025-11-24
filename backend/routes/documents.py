@@ -56,7 +56,7 @@ class DocumentDetail(BaseModel):
     effective_date: Optional[datetime]
     publication_date: Optional[datetime]
     status: DocumentStatus
-    metadata: dict = Field(alias="document_metadata")
+    doc_metadata: dict = Field(alias="metadata")
     is_processed: bool
     upload_date: datetime
     

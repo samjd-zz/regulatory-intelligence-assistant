@@ -122,6 +122,16 @@ build/
 *.env.test.local
 *.env.production.local
 
+# Vite specific
+frontend/dist/
+frontend/.vite/
+frontend/dist-ssr
+frontend/*.local
+
+# TypeScript
+*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
+
 # IDEs
 .vscode/
 .idea/

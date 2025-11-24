@@ -48,7 +48,7 @@ class FeatureFlagUpdate(BaseModel):
         json_schema_extra = {
             "example": {
                 "feature_name": "enable_query_suggestions",
-                "enabled": true
+                "enabled": True
             }
         }
 

@@ -14,7 +14,7 @@ from schemas.compliance_rules import (
     RequirementExtractionRequest, ExtractedRequirement, ComplianceRuleSet,
     SeverityLevel, RequirementType
 )
-from models.models import Regulation, Section
+from models import Regulation, Section
 from services.graph_service import GraphService
 
 
