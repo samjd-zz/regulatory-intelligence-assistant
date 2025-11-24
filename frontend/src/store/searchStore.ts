@@ -55,8 +55,22 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         limit: 20,
       })
 
+      // Transform SearchHit[] to SearchResult[] for UI
+      const transformedResults: SearchResult[] = response.hits.map((hit) => ({
+        id: hit.id,
+        title: hit.source.title,
+        snippet: hit.source.summary || hit.source.content?.substring(0, 300) || '',
+        citation: hit.source.citation || hit.source.legislation_name || 'N/A',
+        confidence: hit.score,
+        relevance_score: hit.score,
+        effective_date: hit.source.effective_date || '',
+        jurisdiction: hit.source.jurisdiction || 'N/A',
+        document_type: hit.source.document_type,
+        section_number: hit.source.section_number,
+      }))
+
       set({
-        results: response.results,
+        results: transformedResults,
         total: response.total,
         processingTime: response.processing_time_ms,
         loading: false,

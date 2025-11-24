@@ -14,7 +14,7 @@ from models.document_models import (
     Document, DocumentSection, DocumentSubsection, 
     DocumentClause, CrossReference, DocumentType
 )
-from models.regulation_models import Regulation, Section
+from models import Regulation, Section
 from utils.neo4j_client import Neo4jClient
 from services.document_parser import DocumentParser
 

@@ -17,7 +17,7 @@ from services.graph_service import GraphService
 from utils.neo4j_client import Neo4jClient
 
 
-router = APIRouter(prefix="/api/v1/compliance", tags=["compliance"])
+router = APIRouter(prefix="/api/compliance", tags=["compliance"])
 
 
 def get_compliance_checker(db: Session = Depends(get_db)) -> ComplianceChecker:
@@ -213,7 +213,7 @@ async def get_compliance_metrics(
         # This would query actual metrics from the database
         # For MVP, return placeholder data
         
-        from models.models import WorkflowSession
+        from models import WorkflowSession
         from sqlalchemy import func
         
         # Count workflow sessions

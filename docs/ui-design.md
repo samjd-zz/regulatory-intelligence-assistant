@@ -1448,7 +1448,7 @@ export default api;
 
 ```bash
 # .env.local
-REACT_APP_API_URL=http://localhost:8000/api/v1
+REACT_APP_API_URL=http://localhost:8000/api
 REACT_APP_ENABLE_ANALYTICS=false
 REACT_APP_ENVIRONMENT=development
 ```

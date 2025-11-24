@@ -12,7 +12,7 @@ import type {
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: '/api',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -52,7 +52,16 @@ api.interceptors.response.use(
 export async function searchRegulations(
   query: SearchQuery
 ): Promise<SearchResponse> {
-  const { data } = await api.post('/search', query)
+  // Use hybrid search for best results (combines keyword + semantic)
+  const { data } = await api.post('/search/hybrid', {
+    query: query.query,
+    filters: query.filters,
+    size: query.limit || 10,
+    from: 0,
+    parse_query: true,
+    keyword_weight: 0.6,
+    vector_weight: 0.4,
+  })
   return data
 }
 
@@ -68,7 +77,11 @@ export async function getSuggestions(query: string): Promise<string[]> {
 // ============================================================================
 
 export async function askQuestion(request: QARequest): Promise<QAResponse> {
-  const { data } = await api.post('/rag/ask', request)
+  const { data } = await api.post('/rag/ask', {
+    question: request.question,
+    context: request.context,
+    stream: false,
+  })
   return data
 }
 
@@ -93,7 +106,13 @@ export async function getRelatedRegulations(id: string): Promise<Regulation[]> {
 export async function checkCompliance(
   request: ComplianceCheckRequest
 ): Promise<ComplianceCheckResponse> {
-  const { data } = await api.post('/compliance/check', request)
+  const { data } = await api.post('/compliance/check', {
+    program_id: request.program_id,
+    workflow_type: request.workflow_type,
+    form_data: request.form_data,
+    user_context: request.user_context,
+    check_optional: request.check_optional,
+  })
   return data
 }
 

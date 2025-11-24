@@ -15,7 +15,7 @@ from schemas.compliance_rules import (
     FieldValidationRequest, RequirementExtractionRequest,
     ExtractedRequirement, SeverityLevel, RequirementType
 )
-from models.models import Regulation, Section
+from models import Regulation, Section
 
 
 class TestRuleEngine:

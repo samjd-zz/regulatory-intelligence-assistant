@@ -19,7 +19,7 @@ Created: 2025-11-22
 
 import asyncio
 import time
-from typing import List, Dict, Any, Callable, Optional, TypeVar, Generic
+from typing import List, Dict, Any, Callable, Optional, TypeVar, Generic, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
@@ -389,7 +389,7 @@ class AsyncBatchProcessor(Generic[T, R]):
     async def process_batch(
         self,
         items: List[T],
-        process_func: Callable[[T], asyncio.coroutine],
+        process_func: Callable[[T], Coroutine[Any, Any, R]],
         job_id: Optional[str] = None
     ) -> BatchResult[R]:
         """

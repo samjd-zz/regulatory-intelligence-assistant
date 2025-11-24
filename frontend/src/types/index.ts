@@ -38,6 +38,55 @@ export interface FilterState {
   programs?: string[]
 }
 
+// Backend search response structure (from /api/search/hybrid)
+export interface SearchHit {
+  id: string
+  score: number
+  source: {
+    title: string
+    content?: string
+    summary?: string
+    document_type: string
+    jurisdiction?: string
+    program?: string
+    legislation_name?: string
+    citation?: string
+    section_number?: string
+    effective_date?: string
+    status?: string
+    [key: string]: unknown
+  }
+  highlights?: {
+    [field: string]: string[]
+  }
+  score_breakdown?: {
+    keyword: number
+    vector: number
+    combined: number
+  }
+}
+
+export interface SearchResponse {
+  success: boolean
+  hits: SearchHit[]
+  total: number
+  max_score?: number
+  search_type: string
+  query_info?: {
+    intent: string
+    intent_confidence: number
+    keywords: string[]
+    entities?: Array<{
+      text: string
+      entity_type: string
+      normalized: string
+      confidence: number
+    }>
+  }
+  processing_time_ms: number
+}
+
+// Convenience type for display
 export interface SearchResult {
   id: string
   title: string
@@ -47,15 +96,8 @@ export interface SearchResult {
   relevance_score: number
   effective_date: string
   jurisdiction: string
-  document_type: 'act' | 'regulation' | 'policy'
+  document_type: string
   section_number?: string
-}
-
-export interface SearchResponse {
-  query_id: string
-  results: SearchResult[]
-  total: number
-  processing_time_ms: number
 }
 
 export interface Suggestion {
@@ -142,8 +184,11 @@ export interface QAResponse {
 // ============================================================================
 
 export interface ComplianceCheckRequest {
-  form_data: Record<string, unknown>
   program_id: string
+  workflow_type: string
+  form_data: Record<string, unknown>
+  user_context?: Record<string, unknown>
+  check_optional?: boolean
 }
 
 export interface ComplianceCheckResponse {
