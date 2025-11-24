@@ -219,8 +219,57 @@ This plan focuses **exclusively on MVP requirements** from docs/design.md. No ex
 
 ## Week 2: Testing & Deployment (3 Days)
 
-### Day 6: Integration Testing (Monday)
-**Goal:** Test all features work together
+### Day 6: E2E Testing with Playwright (Monday) ✅ COMPLETE
+**Goal:** Automated E2E testing infrastructure
+
+**Tasks:**
+1. ✅ Set up Playwright configuration
+   - Multi-browser testing (Chromium, Firefox, WebKit)
+   - Mobile and tablet viewports (Pixel 5, iPhone 12, iPad Pro)
+   - Auto-start dev server for tests
+   - Screenshot/video capture on failure
+
+2. ✅ Create test suites
+   - dashboard.spec.ts: 9 tests (navigation, responsive, keyboard)
+   - search.spec.ts: 8 tests (interface, filters, mobile)
+   - chat.spec.ts: 12 tests (messaging, states, interactions)
+
+3. ✅ Build test helpers
+   - 15 reusable test functions
+   - Accessibility checkers
+   - API mocking utilities
+   - Responsive testing helpers
+
+4. ✅ Add npm scripts
+   - `npm test` - Run all tests headless
+   - `npm run test:ui` - Interactive UI mode
+   - `npm run test:headed` - Run with browser visible
+   - `npm run test:debug` - Debug mode
+
+5. ✅ Documentation
+   - Updated TESTING.md with Playwright section
+   - Created e2e/README.md with best practices
+   - Comprehensive examples and patterns
+
+**Acceptance:**
+- [x] Playwright configured for 6 browser/device combinations
+- [x] 29 tests covering Dashboard, Search, and Chat pages
+- [x] Test helpers for common operations
+- [x] CI-ready configuration with retry logic
+- [x] Complete documentation
+
+**Files Created:**
+- ✅ `frontend/playwright.config.ts`
+- ✅ `frontend/e2e/dashboard.spec.ts`
+- ✅ `frontend/e2e/search.spec.ts`
+- ✅ `frontend/e2e/chat.spec.ts`
+- ✅ `frontend/e2e/helpers/test-helpers.ts`
+- ✅ `frontend/e2e/README.md`
+- ✅ `frontend/TESTING.md` (updated)
+- ✅ `frontend/package.json` (added test scripts)
+
+### Day 7: Integration Testing & Bug Fixes (Tuesday)
+**Goal:** Manual testing and bug fixes
 
 **Tasks:**
 1. Manual testing checklist
@@ -231,17 +280,18 @@ This plan focuses **exclusively on MVP requirements** from docs/design.md. No ex
    - [ ] Navigation works
    - [ ] No console errors
 
-2. Fix any bugs found
+2. Run Playwright E2E tests
+   - [ ] All tests passing
+   - [ ] Fix any failures
+   - [ ] Test with real backend
+
+3. Fix any bugs found
    - Priority: blocking bugs only
    - Nice-to-haves can wait
 
-3. Test with real backend
-   - Ensure API calls work
-   - Handle errors gracefully
-   - Test with sample data
-
 **Acceptance:**
 - [ ] All 4 pages functional
+- [ ] E2E tests passing
 - [ ] No critical bugs
 - [ ] Works with backend API
 

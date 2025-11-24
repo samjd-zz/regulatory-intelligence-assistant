@@ -202,11 +202,227 @@ Test in the following browsers:
 - [ ] Form inputs work with mobile keyboards
 - [ ] Dropdowns function on touch devices
 
-## 🤖 Automated Testing (Future)
+## 🤖 Automated Testing with Playwright
 
-### Unit Tests (Jest + React Testing Library)
+### Setup
+
+Playwright is already installed and configured. The test suite is ready to run.
+
 ```bash
-npm run test
+cd frontend
+npm test                 # Run all tests headless
+npm run test:ui          # Run with UI mode (interactive)
+npm run test:headed      # Run with browser visible
+npm run test:debug       # Run in debug mode
+npm run test:report      # View HTML test report
+```
+
+### Test Structure
+
+Tests are located in `frontend/e2e/`:
+- `dashboard.spec.ts` - Dashboard page tests
+- `search.spec.ts` - Search functionality tests
+- `chat.spec.ts` - Q&A chat interface tests
+- `helpers/test-helpers.ts` - Reusable test utilities
+
+### Writing Tests
+
+Example test structure:
+
+```typescript
+import { test, expect } from '@playwright/test';
+
+test.describe('Feature Name', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/path');
+  });
+
+  test('should do something', async ({ page }) => {
+    // Arrange
+    const button = page.getByRole('button', { name: /click me/i });
+    
+    // Act
+    await button.click();
+    
+    // Assert
+    await expect(page.getByText(/success/i)).toBeVisible();
+  });
+});
+```
+
+### Available Test Helpers
+
+Import helpers from `e2e/helpers/test-helpers.ts`:
+
+```typescript
+import { 
+  navigateAndWait,
+  fillFieldByLabel,
+  checkAccessibility,
+  waitForLoadingToComplete,
+  verifyConfidenceBadge,
+  testKeyboardNavigation
+} from './helpers/test-helpers';
+
+// Use in your tests
+await navigateAndWait(page, '/search');
+await checkAccessibility(page);
+```
+
+### Browser Configuration
+
+Tests run on multiple browsers:
+- **Chromium** (Chrome, Edge)
+- **Firefox**
+- **WebKit** (Safari)
+- **Mobile Chrome** (Pixel 5)
+- **Mobile Safari** (iPhone 12)
+- **Tablet** (iPad Pro)
+
+To run specific browser:
+```bash
+npx playwright test --project=chromium
+npx playwright test --project=firefox
+npx playwright test --project="Mobile Chrome"
+```
+
+### Test Reports
+
+After running tests, view the HTML report:
+```bash
+npm run test:report
+```
+
+Reports include:
+- Test results with pass/fail status
+- Screenshots on failure
+- Video recordings on failure
+- Execution traces for debugging
+
+### Debugging Tests
+
+**Interactive UI Mode:**
+```bash
+npm run test:ui
+```
+
+**Debug Mode (step through):**
+```bash
+npm run test:debug
+```
+
+**VS Code Debugging:**
+Install the Playwright extension and use built-in debugging.
+
+### Best Practices
+
+1. **Use Semantic Selectors:**
+   ```typescript
+   // Good - accessible and resilient
+   page.getByRole('button', { name: /submit/i })
+   page.getByLabel(/email address/i)
+   page.getByText(/welcome/i)
+   
+   // Avoid - brittle
+   page.locator('.submit-btn')
+   page.locator('#email')
+   ```
+
+2. **Wait for State Changes:**
+   ```typescript
+   // Wait for navigation
+   await page.waitForURL('/dashboard');
+   
+   // Wait for element
+   await expect(element).toBeVisible();
+   
+   // Wait for network
+   await page.waitForLoadState('networkidle');
+   ```
+
+3. **Test User Flows, Not Implementation:**
+   ```typescript
+   // Good - tests user behavior
+   test('user can search for regulations', async ({ page }) => {
+     await page.goto('/search');
+     await page.getByPlaceholder(/search/i).fill('employment');
+     await page.getByRole('button', { name: /search/i }).click();
+     await expect(page.getByText(/results/i)).toBeVisible();
+   });
+   
+   // Avoid - tests implementation
+   test('search store updates on button click', async ({ page }) => {
+     // Testing internal state instead of user experience
+   });
+   ```
+
+4. **Use beforeEach for Setup:**
+   ```typescript
+   test.describe('Search Page', () => {
+     test.beforeEach(async ({ page }) => {
+       await page.goto('/search');
+     });
+     
+     test('test 1', async ({ page }) => { /* ... */ });
+     test('test 2', async ({ page }) => { /* ... */ });
+   });
+   ```
+
+5. **Test Accessibility:**
+   ```typescript
+   import { checkAccessibility } from './helpers/test-helpers';
+   
+   test('page is accessible', async ({ page }) => {
+     await page.goto('/');
+     await checkAccessibility(page);
+   });
+   ```
+
+### CI/CD Integration
+
+Tests are configured for CI environments:
+- Retries on failure (2x in CI)
+- Single worker in CI (parallel locally)
+- HTML report artifacts
+- Video/screenshot capture on failure
+
+Example GitHub Actions:
+```yaml
+- name: Install dependencies
+  run: cd frontend && npm ci
+  
+- name: Install Playwright browsers
+  run: cd frontend && npx playwright install --with-deps
+  
+- name: Run E2E tests
+  run: cd frontend && npm test
+  
+- name: Upload test report
+  if: always()
+  uses: actions/upload-artifact@v3
+  with:
+    name: playwright-report
+    path: frontend/playwright-report/
+```
+
+### Coverage
+
+Current test coverage:
+- ✅ Dashboard navigation
+- ✅ Search interface
+- ✅ Chat/Q&A functionality  
+- ✅ Keyboard navigation
+- ✅ Mobile responsiveness
+- ⏳ Compliance form (pending)
+- ⏳ API integration (pending)
+- ⏳ Visual regression (pending)
+
+### Unit Tests (Future Enhancement)
+
+For component-level testing with Jest + React Testing Library:
+
+```bash
+npm run test:unit  # To be implemented
 ```
 
 - Component rendering tests
@@ -214,15 +430,12 @@ npm run test
 - Utility function tests
 - Form validation tests
 
-### Integration Tests
+### Integration Tests (Future)
+
 - API service integration
 - Store-component interaction
 - Multi-page workflows
-
-### End-to-End Tests (Playwright/Cypress)
-- Complete user journeys
-- Cross-browser testing
-- Visual regression testing
+- Error handling scenarios
 
 ## 📊 Performance Testing
 
