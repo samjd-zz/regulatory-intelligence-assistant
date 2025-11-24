@@ -1,0 +1,391 @@
+{
+  "name": "design-document-generic",
+  "version": "2.0.0",
+  "description": "Transform PRD.md into comprehensive technical design documents following the AI-TDD methodology for any project",
+  "purpose": "Transform PRD.md into comprehensive technical design documents by analyzing project context from README.md and CLAUDE.md",
+  "mcp_server_integration": {
+    "required_servers": [
+      "context7",
+      "angular",
+      "vaadin",
+      "frontend-mcp-server"
+    ],
+    "server_purposes": {
+      "context7": "Access up-to-date documentation for any library/framework via Upstash Context7",
+      "angular": "Angular-specific best practices, components, and patterns",
+      "vaadin": "Vaadin framework documentation, components, and styling for Java/React development",
+      "frontend-mcp-server": "AWS Labs React documentation covering essential knowledge, authentication, routing, customizing, and troubleshooting for modern React applications with AWS services"
+    },
+    "usage_priority": [
+      "First discover project's technology stack from README.md/CLAUDE.md",
+      "Use appropriate MCP server based on detected technologies",
+      "For React projects with AWS integration: Use frontend-mcp-server for AWS-specific React patterns",
+      "For general React: Use context7 to fetch React library documentation",
+      "For Angular: Use angular MCP for best practices and patterns",
+      "For Vaadin: Use vaadin MCP for Java/React component documentation",
+      "Fall back to context7 for framework-agnostic or new framework documentation"
+    ],
+    "framework_detection": {
+      "angular_indicators": [
+        "@angular/core",
+        "angular.json",
+        "ng serve",
+        "Angular",
+        "TypeScript with Angular"
+      ],
+      "vaadin_indicators": [
+        "com.vaadin",
+        "vaadin-core",
+        "Vaadin Flow",
+        "Java UI",
+        "@vaadin/react-components"
+      ],
+      "react_indicators": [
+        "react",
+        "next.js",
+        "create-react-app",
+        "React",
+        "JSX"
+      ],
+      "vue_indicators": [
+        "vue",
+        "nuxt",
+        "Vue.js",
+        "vue-cli"
+      ],
+      "other_frameworks": [
+        "Svelte",
+        "Solid",
+        "Qwik",
+        "Ember",
+        "Backbone"
+      ]
+    }
+  },
+  "project_context_discovery": {
+    "required_files": [
+      "./README.md",
+      "./CLAUDE.md"
+    ],
+    "analysis_instructions": [
+      "Read README.md to understand project architecture, technology stack, and system components",
+      "Read CLAUDE.md to understand coding patterns, design standards, and technical constraints",
+      "Identify existing design patterns, architectural decisions, and integration approaches",
+      "Extract API standards, database patterns, and UI framework requirements",
+      "Understand performance requirements, security considerations, and operational constraints"
+    ]
+  },
+  "capabilities": [
+    "Analyze PRD requirements and constraints for project-specific features",
+    "Design system architecture aligned with project's existing patterns and technology",
+    "Define API contracts and interfaces following project conventions",
+    "Create database schemas appropriate for project's data storage technology",
+    "Specify integration patterns consistent with project's architecture",
+    "Document technical decisions following project's coding standards",
+    "Design component interactions within project's system boundaries",
+    "Plan integration with project's existing systems and services",
+    "Ensure all generated documents stay under 300 lines",
+    "Create all diagrams using Mermaid format for better visualization and maintainability"
+  ],
+  "diagram_standards": {
+    "format": "mermaid",
+    "enforcement": "MANDATORY",
+    "prohibited_formats": ["ascii", "text-based", "plaintext"],
+    "guidelines": [
+      "All diagrams must use Mermaid syntax within markdown code blocks",
+      "Use appropriate Mermaid diagram types: flowchart, sequence, class, state, er, etc.",
+      "Include descriptive labels and clear relationships",
+      "Keep diagrams focused and readable",
+      "Use consistent styling and naming conventions"
+    ],
+    "common_diagram_types": {
+      "architecture": "flowchart TD or graph TD or C4Context",
+      "component_interaction": "sequenceDiagram or flowchart",
+      "data_flow": "flowchart TD",
+      "system_components": "graph TD or componentDiagram",
+      "state_transitions": "stateDiagram-v2",
+      "entity_relationships": "erDiagram",
+      "class_structure": "classDiagram",
+      "deployment": "graph TD or C4Deployment"
+    },
+    "example_syntax": "```mermaid\nflowchart TD\n    A[Start] --> B[Process]\n    B --> C[End]\n```"
+  },
+  "file_size_management": {
+    "max_lines": 300,
+    "enforcement": "STRICT",
+    "splitting_strategies": [
+      "Split large design documents into Part1.md, Part2.md, etc.",
+      "Create separate files for Architecture, Database, API sections",
+      "Use focused sections with clear boundaries",
+      "Maintain logical flow between document parts",
+      "Split by project system domains identified from README.md"
+    ]
+  },
+  "workflow": [
+    {
+      "step": 1,
+      "action": "read_project_context",
+      "description": "Read and analyze README.md and CLAUDE.md to understand project context",
+      "technical_focus": [
+        "Technology stack and framework versions",
+        "Architecture patterns and design principles",
+        "API standards and integration approaches",
+        "Database technology and data modeling patterns",
+        "UI framework and component patterns",
+        "Security and performance requirements"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "parse_prd_requirements",
+      "description": "Parse prd.md for functional and non-functional requirements",
+      "project_alignment": "Focus on requirements that align with project's technical capabilities and constraints"
+    },
+    {
+      "step": 3,
+      "action": "design_architecture",
+      "description": "Design high-level architecture for project integration",
+      "design_principles": "Follow project's existing architectural patterns and integration approaches"
+    },
+    {
+      "step": 4,
+      "action": "define_components",
+      "description": "Define component interactions within project ecosystem",
+      "component_focus": "Include integration with existing project services, APIs, and data systems"
+    },
+    {
+      "step": 5,
+      "action": "specify_data_models",
+      "description": "Specify data models and schemas for project's data technology",
+      "data_alignment": "Use project's database technology, naming conventions, and data modeling patterns"
+    },
+    {
+      "step": 6,
+      "action": "document_apis",
+      "description": "Document API endpoints and contracts following project standards",
+      "api_standards": "Follow project's API patterns, authentication, and integration approaches"
+    },
+    {
+      "step": 7,
+      "action": "generate_design_document",
+      "description": "Generate comprehensive design.md with project integration details"
+    }
+  ],
+  "commands": [
+    {
+      "name": "create_design_from_prd",
+      "description": "Create design document from PRD using project context from README.md and CLAUDE.md",
+      "parameters": {
+        "prd_file": {
+          "type": "string",
+          "required": true,
+          "default": "./ai-tdd-docs/[feature-name]/prd.md",
+          "description": "Path to the prd.md file to transform (in feature-specific folder)"
+        },
+        "output_path": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/[feature-name]/design.md",
+          "description": "Path where the design document should be created (in feature-specific folder)"
+        },
+        "project_systems": {
+          "type": "array",
+          "required": false,
+          "description": "Project systems to consider for integration (auto-detected from README.md)"
+        }
+      }
+    },
+    {
+      "name": "generate_technical_design",
+      "description": "Generate technical design for prd.md file using project analysis",
+      "parameters": {
+        "prd_path": {
+          "type": "string",
+          "required": true,
+          "description": "Path to the prd.md file to process"
+        },
+        "architecture_style": {
+          "type": "string",
+          "required": false,
+          "description": "Architecture style (auto-detected from project documentation)"
+        },
+        "technology_focus": {
+          "type": "array",
+          "required": false,
+          "description": "Technology components to focus on (auto-detected from README.md)"
+        }
+      }
+    },
+    {
+      "name": "design_architecture_from_requirements",
+      "description": "Design architecture from requirements aligned with project patterns",
+      "parameters": {
+        "feature_name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the feature being designed"
+        },
+        "integration_complexity": {
+          "type": "string",
+          "required": false,
+          "enum": ["low", "medium", "high"],
+          "default": "medium",
+          "description": "Expected complexity level of project system integration"
+        },
+        "system_integration": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Whether the feature involves integration with existing project systems"
+        }
+      }
+    }
+  ],
+  "template": {
+    "sections": [
+      "Technical Design Document: [Feature Name]",
+      "Architecture Overview",
+      "Project System Integration",
+      "Component Design",
+      "Data Model",
+      "API Design",
+      "Integration Points",
+      "Security Considerations",
+      "Performance Considerations",
+      "Error Handling"
+    ],
+    "component_structure": {
+      "name": "Component name",
+      "responsibility": "What it does in project context",
+      "interfaces": "How it interacts with project systems",
+      "dependencies": "Project services and external APIs it depends on"
+    },
+    "project_specific_sections": {
+      "system_integration": [
+        "Existing system integration points",
+        "Service layer integration patterns",
+        "Data flow and processing coordination",
+        "API integration and service communication",
+        "Authentication and authorization integration",
+        "Monitoring and logging integration"
+      ],
+      "data_model_considerations": [
+        "Database technology integration",
+        "Data modeling patterns and conventions",
+        "Schema migration and versioning",
+        "Data validation and constraints",
+        "Performance optimization and indexing",
+        "Backup and recovery considerations"
+      ]
+    },
+    "diagram_requirements": {
+      "mandatory_use": "All architecture, component, data model, and API diagrams must be in Mermaid format",
+      "placement": "Include relevant Mermaid diagrams in appropriate sections (architecture overview, component design, data model, API design, integration points)",
+      "quality": "Diagrams should be clear, well-labeled, technically accurate, and directly support the design documentation"
+    }
+  },
+  "execution": {
+    "prerequisite_analysis": {
+      "readme_analysis": [
+        "Extract technology stack and versions",
+        "Identify architectural patterns and design principles",
+        "Understand system components and integration approaches",
+        "Note API standards and communication patterns",
+        "Extract database technology and data modeling approaches"
+      ],
+      "claude_analysis": [
+        "Extract coding standards and design patterns",
+        "Identify testing and validation requirements",
+        "Understand build and deployment processes",
+        "Note performance and security requirements",
+        "Extract error handling and logging patterns"
+      ]
+    },
+    "input_format": "markdown",
+    "input_file": "PRD.md",
+    "output_format": "markdown",
+    "output_file": "design.md",
+    "quality_checks": [
+      "Architecture addresses all functional requirements from PRD",
+      "Component responsibilities align with project system patterns",
+      "API contracts follow project standards and conventions",
+      "Database schema supports project's data requirements and technology",
+      "Security considerations align with project's security standards",
+      "Performance requirements address project's scalability needs",
+      "Integration with existing project systems is clearly defined",
+      "Technical decisions follow project's coding standards from CLAUDE.md",
+      "All diagrams use Mermaid format (no ASCII or text-based diagrams)",
+      "Mermaid diagrams are syntactically correct and render properly",
+      "Diagrams effectively illustrate architecture, components, data models, APIs, or system integration"
+    ]
+  },
+  "design_pattern_discovery": {
+    "architectural_patterns": [
+      "MVC, MVP, MVVM patterns",
+      "Microservices, Monolithic, Serverless",
+      "Event-driven, Request-response",
+      "Repository, Service Layer patterns",
+      "Dependency Injection patterns"
+    ],
+    "integration_patterns": [
+      "REST API, GraphQL, RPC",
+      "Message Queues, Event Streaming",
+      "Database Integration patterns",
+      "External Service Integration",
+      "Authentication and Authorization"
+    ],
+    "data_patterns": [
+      "Relational Database (SQL)",
+      "Document Database (NoSQL)",
+      "Key-Value Store, Graph Database",
+      "Object-Relational Mapping (ORM)",
+      "Data Migration and Versioning"
+    ]
+  },
+  "technology_adaptation_framework": {
+    "backend_technologies": [
+      "Framework identification (Spring, Express, Django, etc.)",
+      "Language-specific patterns and conventions",
+      "Database integration approaches",
+      "API design and documentation standards",
+      "Testing and quality assurance practices"
+    ],
+    "frontend_technologies": [
+      "UI Framework identification (React, Vue, Angular, etc.)",
+      "Component architecture and state management",
+      "Styling and theming approaches",
+      "Build and deployment processes",
+      "Testing and accessibility practices"
+    ],
+    "infrastructure_considerations": [
+      "Deployment environment and containerization",
+      "Monitoring and logging infrastructure",
+      "Security and compliance requirements",
+      "Performance optimization strategies",
+      "Scaling and availability considerations"
+    ]
+  },
+  "project_integration_specifications": {
+    "system_boundaries": [
+      "Internal system integration points",
+      "External service dependencies",
+      "API gateway and service mesh considerations",
+      "Data flow and transformation requirements",
+      "Error handling and recovery strategies"
+    ],
+    "technical_constraints": [
+      "Performance and scalability limitations",
+      "Security and compliance requirements",
+      "Technology stack compatibility",
+      "Resource and infrastructure constraints",
+      "Operational and maintenance considerations"
+    ],
+    "quality_requirements": [
+      "Code quality and testing standards",
+      "Documentation and API specification requirements",
+      "Performance monitoring and alerting",
+      "Security scanning and vulnerability management",
+      "Deployment and rollback procedures"
+    ]
+  }
+}

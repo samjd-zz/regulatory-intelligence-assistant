@@ -1,0 +1,313 @@
+{
+  "name": "idea-generator-generic",
+  "version": "2.0.0",
+  "description": "Generate comprehensive idea.md documents for new features following the AI-TDD methodology for any project",
+  "purpose": "Generate comprehensive idea.md documents for new features following the AI-TDD methodology by analyzing project context from README.md and CLAUDE.md",
+  "mcp_server_integration": {
+    "required_servers": [
+      "context7",
+      "angular",
+      "vaadin",
+      "frontend-mcp-server"
+    ],
+    "server_purposes": {
+      "context7": "Access up-to-date documentation for any library/framework via Upstash Context7",
+      "angular": "Angular-specific best practices, components, and patterns",
+      "vaadin": "Vaadin framework documentation, components, and styling for Java/React development",
+      "frontend-mcp-server": "AWS Labs React documentation covering essential knowledge, authentication, routing, customizing, and troubleshooting for modern React applications with AWS services"
+    },
+    "usage_priority": [
+      "First discover project's technology stack from README.md/CLAUDE.md",
+      "Use appropriate MCP server based on detected technologies",
+      "For React projects with AWS integration: Use frontend-mcp-server for AWS-specific React patterns",
+      "For general React: Use context7 to fetch React library documentation",
+      "For Angular: Use angular MCP for best practices and patterns",
+      "For Vaadin: Use vaadin MCP for Java/React component documentation",
+      "Fall back to context7 for framework-agnostic or new framework documentation"
+    ],
+    "framework_detection": {
+      "angular_indicators": [
+        "@angular/core",
+        "angular.json",
+        "ng serve",
+        "Angular",
+        "TypeScript with Angular"
+      ],
+      "vaadin_indicators": [
+        "com.vaadin",
+        "vaadin-core",
+        "Vaadin Flow",
+        "Java UI",
+        "@vaadin/react-components"
+      ],
+      "react_indicators": [
+        "react",
+        "next.js",
+        "create-react-app",
+        "React",
+        "JSX"
+      ],
+      "vue_indicators": [
+        "vue",
+        "nuxt",
+        "Vue.js",
+        "vue-cli"
+      ],
+      "other_frameworks": [
+        "Svelte",
+        "Solid",
+        "Qwik",
+        "Ember",
+        "Backbone"
+      ]
+    }
+  },
+  "project_context_discovery": {
+    "required_files": [
+      "./README.md",
+      "./CLAUDE.md"
+    ],
+    "analysis_instructions": [
+      "Read README.md to understand project scope, technology stack, and core features",
+      "Read CLAUDE.md to understand coding standards, build commands, and project-specific patterns",
+      "Identify project architecture, key technologies, and development practices",
+      "Understand target users, use cases, and business domain",
+      "Extract quality requirements, testing standards, and deployment patterns"
+    ]
+  },
+  "capabilities": [
+    "Analyze project context from README.md and CLAUDE.md files",
+    "Generate feature ideas aligned with project's technology stack and patterns",
+    "Consider project-specific constraints and requirements",
+    "Create structured idea documents with clear goals",
+    "Include technical feasibility assessment for the specific project",
+    "Outline expected benefits aligned with project's user base",
+    "Provide initial scope boundaries considering project architecture",
+    "Ensure all generated documents stay under 300 lines",
+    "Create all diagrams using Mermaid format for better visualization and maintainability"
+  ],
+  "diagram_standards": {
+    "format": "mermaid",
+    "enforcement": "MANDATORY",
+    "prohibited_formats": ["ascii", "text-based", "plaintext"],
+    "guidelines": [
+      "All diagrams must use Mermaid syntax within markdown code blocks",
+      "Use appropriate Mermaid diagram types: flowchart, sequence, class, state, er, etc.",
+      "Include descriptive labels and clear relationships",
+      "Keep diagrams focused and readable",
+      "Use consistent styling and naming conventions"
+    ],
+    "common_diagram_types": {
+      "architecture": "flowchart TD or graph TD",
+      "workflow": "flowchart LR or sequenceDiagram",
+      "data_flow": "flowchart TD",
+      "system_components": "graph TD or C4Context",
+      "state_transitions": "stateDiagram-v2",
+      "entity_relationships": "erDiagram",
+      "class_structure": "classDiagram"
+    },
+    "example_syntax": "```mermaid\nflowchart TD\n    A[Start] --> B[Process]\n    B --> C[End]\n```"
+  },
+  "file_size_management": {
+    "max_lines": 300,
+    "enforcement": "STRICT",
+    "splitting_strategies": [
+      "Split large idea documents into focused sections",
+      "Create separate files for complex features (idea-part1.md, idea-part2.md)",
+      "Keep main idea.md concise with references to detailed appendices",
+      "Focus on core concept in main document",
+      "Split by project system domains identified from README.md"
+    ]
+  },
+  "workflow": [
+    {
+      "step": 1,
+      "action": "read_project_context",
+      "description": "Read and analyze README.md and CLAUDE.md to understand project context",
+      "required_analysis": [
+        "Extract technology stack and architecture",
+        "Identify coding standards and patterns",
+        "Understand target users and use cases",
+        "Note build/test commands and quality gates",
+        "Identify key project systems and components"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "understand_feature_request",
+      "description": "Understand the feature request in context of the project",
+      "project_alignment": "Consider how feature fits into project's architecture and user workflows"
+    },
+    {
+      "step": 3,
+      "action": "research_similar_features",
+      "description": "Research similar features in the project codebase",
+      "discovery_approach": "Check existing components, services, and integration patterns from project documentation"
+    },
+    {
+      "step": 4,
+      "action": "generate_idea_document",
+      "description": "Generate comprehensive idea.md with project-specific sections",
+      "customization": "Include project-specific integration points, technology considerations, and implementation patterns"
+    }
+  ],
+  "commands": [
+    {
+      "name": "generate_idea",
+      "description": "Generate idea.md for project feature after analyzing README.md and CLAUDE.md",
+      "parameters": {
+        "feature_description": {
+          "type": "string",
+          "required": true,
+          "description": "Description of the feature to generate an idea document for"
+        },
+        "output_path": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/[feature-name]/idea.md",
+          "description": "Path where the idea document should be created (use feature-specific folder)"
+        },
+        "project_focus": {
+          "type": "array",
+          "required": false,
+          "default": ["technology_integration", "user_experience", "architecture_alignment"],
+          "description": "Areas to focus on based on project context"
+        }
+      }
+    },
+    {
+      "name": "create_feature_concept",
+      "description": "Create feature idea document for a problem to solve within project context",
+      "parameters": {
+        "problem_statement": {
+          "type": "string",
+          "required": true,
+          "description": "Problem statement that needs to be solved within the project domain"
+        },
+        "context": {
+          "type": "string",
+          "required": false,
+          "description": "Additional context about the problem or desired solution"
+        },
+        "project_systems": {
+          "type": "array",
+          "required": false,
+          "description": "Project systems identified from README.md that might be involved"
+        }
+      }
+    },
+    {
+      "name": "document_new_feature",
+      "description": "Document new feature concept with project-specific integration",
+      "parameters": {
+        "feature_name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the feature to document"
+        },
+        "feature_overview": {
+          "type": "string",
+          "required": false,
+          "description": "Brief overview of what the feature should do for project users"
+        },
+        "project_impact": {
+          "type": "string",
+          "required": false,
+          "description": "Impact on existing project systems and workflows"
+        }
+      }
+    }
+  ],
+  "template": {
+    "sections": [
+      "Feature Idea: [Feature Name]",
+      "Overview",
+      "Problem Statement (Project Context)",
+      "Proposed Solution",
+      "Expected Benefits (Project User Impact)",
+      "Technical Considerations (Project Integration)",
+      "Project System Integration",
+      "Initial Scope",
+      "Success Criteria"
+    ],
+    "project_specific_sections": {
+      "technical_considerations": [
+        "Technology stack integration requirements",
+        "Architecture alignment and patterns",
+        "Database and data modeling considerations",
+        "API and service integration points",
+        "UI/UX framework integration",
+        "External service and dependency requirements",
+        "Performance and scalability considerations"
+      ],
+      "system_integration": [
+        "Existing system integration points",
+        "Service layer enhancements",
+        "Data flow and processing requirements",
+        "User interface integration",
+        "Authentication and authorization needs",
+        "Monitoring and logging integration"
+      ]
+    },
+    "diagram_requirements": {
+      "mandatory_use": "All architectural, workflow, and system diagrams must be in Mermaid format",
+      "placement": "Include relevant Mermaid diagrams in appropriate sections (architecture, data flow, system integration)",
+      "quality": "Diagrams should be clear, well-labeled, and directly support the documentation"
+    }
+  },
+  "execution": {
+    "prerequisite_analysis": {
+      "readme_analysis": [
+        "Extract project description and goals",
+        "Identify technology stack and dependencies",
+        "Understand target users and use cases",
+        "Note key features and architecture",
+        "Extract setup and deployment information"
+      ],
+      "claude_analysis": [
+        "Extract coding standards and conventions",
+        "Identify build and test commands",
+        "Understand quality gates and requirements",
+        "Note project-specific patterns and practices",
+        "Extract development workflow guidelines"
+      ]
+    },
+    "output_format": "markdown",
+    "output_file": "idea.md",
+    "quality_checks": [
+      "Problem statement aligns with project domain and user needs",
+      "Solution approach is technically feasible with project's technology stack",
+      "Benefits are measurable and realistic for project users",
+      "Scope is well-defined with clear project system boundaries",
+      "Integration with existing project systems is considered",
+      "Technical requirements align with project's coding standards",
+      "UI/UX considerations match project's framework and patterns",
+      "All diagrams use Mermaid format (no ASCII or text-based diagrams)",
+      "Mermaid diagrams are syntactically correct and render properly",
+      "Diagrams effectively illustrate architecture, workflows, or system components"
+    ]
+  },
+  "project_alignment_framework": {
+    "technology_assessment": [
+      "Compatibility with existing technology stack",
+      "Framework and library integration requirements",
+      "Database and storage considerations",
+      "API and service architecture alignment",
+      "Performance and scalability implications"
+    ],
+    "user_impact_analysis": [
+      "Alignment with target user needs (from README.md)",
+      "Integration with existing user workflows",
+      "User experience and interface considerations",
+      "Accessibility and usability requirements",
+      "Training and documentation needs"
+    ],
+    "implementation_feasibility": [
+      "Development complexity assessment",
+      "Resource and timeline considerations",
+      "Risk assessment and mitigation strategies",
+      "Dependencies and integration challenges",
+      "Testing and quality assurance requirements"
+    ]
+  }
+}

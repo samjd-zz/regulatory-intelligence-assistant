@@ -1,0 +1,383 @@
+{
+  "name": "code-implementer-generic",
+  "version": "2.0.0",
+  "description": "Execute implementation steps from plan.md following the AI-TDD methodology with continuous quality enforcement for any project",
+  "purpose": "Execute implementation steps from plan.md by analyzing project context from README.md and CLAUDE.md to follow project-specific development practices",
+  "mcp_server_integration": {
+    "required_servers": [
+      "context7",
+      "angular",
+      "vaadin",
+      "frontend-mcp-server"
+    ],
+    "server_purposes": {
+      "context7": "Access up-to-date documentation for any library/framework via Upstash Context7",
+      "angular": "Angular-specific best practices, components, and patterns",
+      "vaadin": "Vaadin framework documentation, components, and styling for Java/React development",
+      "frontend-mcp-server": "AWS Labs React documentation covering essential knowledge, authentication, routing, customizing, and troubleshooting for modern React applications with AWS services"
+    },
+    "usage_priority": [
+      "First discover project's technology stack from README.md/CLAUDE.md",
+      "Use appropriate MCP server based on detected technologies",
+      "For React projects with AWS integration: Use frontend-mcp-server for AWS-specific React patterns",
+      "For general React: Use context7 to fetch React library documentation",
+      "For Angular: Use angular MCP for best practices and patterns",
+      "For Vaadin: Use vaadin MCP for Java/React component documentation",
+      "Fall back to context7 for framework-agnostic or new framework documentation"
+    ],
+    "framework_detection": {
+      "angular_indicators": [
+        "@angular/core",
+        "angular.json",
+        "ng serve",
+        "Angular",
+        "TypeScript with Angular"
+      ],
+      "vaadin_indicators": [
+        "com.vaadin",
+        "vaadin-core",
+        "Vaadin Flow",
+        "Java UI",
+        "@vaadin/react-components"
+      ],
+      "react_indicators": [
+        "react",
+        "next.js",
+        "create-react-app",
+        "React",
+        "JSX"
+      ],
+      "vue_indicators": [
+        "vue",
+        "nuxt",
+        "Vue.js",
+        "vue-cli"
+      ],
+      "other_frameworks": [
+        "Svelte",
+        "Solid",
+        "Qwik",
+        "Ember",
+        "Backbone"
+      ]
+    }
+  },
+  "project_context_discovery": {
+    "required_files": [
+      "./README.md",
+      "./CLAUDE.md"
+    ],
+    "analysis_instructions": [
+      "Read README.md to understand project technology stack, architecture, and development setup",
+      "Read CLAUDE.md to understand coding standards, build commands, and quality requirements",
+      "Identify project-specific patterns, frameworks, and development practices",
+      "Extract build tools, testing frameworks, and deployment procedures",
+      "Understand project structure, file organization, and naming conventions"
+    ]
+  },
+  "capabilities": [
+    "Parse plan.md for current implementation step based on project context",
+    "Generate production-ready code following project's technology stack and patterns",
+    "Update plan status after each step according to project workflow",
+    "Run project-specific quality checks automatically",
+    "Commit code with meaningful messages following project conventions",
+    "Integrate with project's existing systems and development processes",
+    "Follow project's coding standards and best practices",
+    "Ensure all generated code files stay under 300 lines"
+  ],
+  "file_size_management": {
+    "max_lines": 300,
+    "enforcement": "STRICT",
+    "splitting_strategies": [
+      "Extract utility classes for complex logic",
+      "Create separate configuration classes",
+      "Split large services into multiple focused services",
+      "Use composition over large inheritance hierarchies",
+      "Extract constants into separate constant classes",
+      "Create separate helper/builder classes",
+      "Follow project-specific modularization patterns"
+    ]
+  },
+  "workflow": [
+    {
+      "step": 1,
+      "action": "read_project_context",
+      "description": "Read and analyze README.md and CLAUDE.md to understand project context",
+      "implementation_focus": [
+        "Technology stack and framework versions",
+        "Coding standards and conventions",
+        "Build and testing commands",
+        "Quality gates and validation requirements",
+        "Project structure and organization patterns"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "read_plan_md",
+      "description": "Read plan.md to identify current implementation step",
+      "step_analysis": "Understand step requirements in context of project architecture and standards"
+    },
+    {
+      "step": 3,
+      "action": "implement_code_step",
+      "description": "Implement the code for that step following project patterns",
+      "code_standards": "Follow project's coding standards, patterns, and architectural decisions"
+    },
+    {
+      "step": 4,
+      "action": "run_quality_checks",
+      "description": "Run project-specific tests and quality checks",
+      "quality_validation": "Use project's quality tools, testing frameworks, and validation processes"
+    },
+    {
+      "step": 5,
+      "action": "update_plan_status",
+      "description": "Update plan.md status according to project workflow",
+      "status_tracking": "Follow project's progress tracking and milestone approaches"
+    },
+    {
+      "step": 6,
+      "action": "commit_changes",
+      "description": "Commit changes with descriptive message following project conventions",
+      "commit_standards": "Use project's commit message format and version control practices"
+    },
+    {
+      "step": 7,
+      "action": "move_to_next_step",
+      "description": "Move to next step in implementation plan"
+    }
+  ],
+  "commands": [
+    {
+      "name": "implement_next_step",
+      "description": "Implement next step from plan using project context from README.md and CLAUDE.md",
+      "parameters": {
+        "plan_file": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/[feature-name]/plan.md",
+          "description": "Path to the plan.md file (in feature-specific folder)"
+        },
+        "auto_commit": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Automatically commit changes after successful implementation"
+        },
+        "project_validation": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Run project-specific validation and quality checks"
+        }
+      }
+    },
+    {
+      "name": "execute_step_by_number",
+      "description": "Execute specific step number from implementation plan using project context",
+      "parameters": {
+        "step_number": {
+          "type": "integer",
+          "required": true,
+          "description": "Step number to execute from plan"
+        },
+        "plan_path": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/[feature-name]/plan.md",
+          "description": "Path to the plan file (in feature-specific folder)"
+        },
+        "force_execution": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Force execution even if dependencies are not met"
+        }
+      }
+    },
+    {
+      "name": "continue_ai_tdd_cycle",
+      "description": "Continue AI-TDD implementation cycle using project standards",
+      "parameters": {
+        "max_steps": {
+          "type": "integer",
+          "required": false,
+          "default": 5,
+          "description": "Maximum number of steps to execute in one cycle"
+        },
+        "stop_on_failure": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Stop execution if any step fails project quality checks"
+        },
+        "project_integration": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include project system integration validation"
+        }
+      }
+    }
+  ],
+  "implementation_guidelines": {
+    "code_quality_rules": [
+      "NO placeholder code or TODOs",
+      "STRICT: Keep ALL generated files under 300 lines",
+      "If file exceeds 300 lines, split into multiple files/classes following project patterns",
+      "Use project's dependency injection and architectural patterns",
+      "Follow project coding standards and conventions",
+      "Include proper error handling using project's error handling patterns",
+      "Add comprehensive logging using project's logging framework"
+    ],
+    "project_adaptation": [
+      "Analyze project's technology stack and use appropriate frameworks",
+      "Follow project's architectural patterns and design principles",
+      "Use project's naming conventions and code organization",
+      "Integrate with project's existing services and components",
+      "Follow project's authentication and authorization patterns",
+      "Use project's data access and persistence technologies"
+    ]
+  },
+  "execution": {
+    "prerequisite_analysis": {
+      "readme_analysis": [
+        "Extract project technology stack and framework versions",
+        "Identify project architecture and design patterns",
+        "Understand project build and development processes",
+        "Note project dependencies and external integrations",
+        "Extract project setup and configuration requirements"
+      ],
+      "claude_analysis": [
+        "Extract coding standards and style guidelines",
+        "Identify quality tools and validation processes",
+        "Understand testing frameworks and coverage requirements",
+        "Note error handling and logging patterns",
+        "Extract project-specific development practices"
+      ]
+    },
+    "input_format": "markdown",
+    "input_file": "plan.md",
+    "output_format": "source_code",
+    "quality_checks": [
+      "Code compiles without errors using project build tools",
+      "All tests pass using project testing framework",
+      "Project quality gates are satisfied",
+      "Code follows project coding standards and conventions",
+      "Integration with project systems is functional",
+      "Plan.md is updated with progress",
+      "Commit message follows project convention"
+    ]
+  },
+  "quality_gate_integration": {
+    "build_validation": [
+      "Project builds successfully using documented build commands",
+      "No compilation errors or warnings",
+      "Dependencies resolve correctly",
+      "Build artifacts are generated successfully"
+    ],
+    "code_quality": [
+      "Code follows project style guidelines and conventions",
+      "Static analysis tools pass using project configuration",
+      "Code complexity metrics meet project standards",
+      "Security scans pass without critical issues"
+    ],
+    "testing_validation": [
+      "Unit tests pass using project testing framework",
+      "Test coverage meets project requirements",
+      "Integration tests verify system component interactions",
+      "End-to-end tests validate complete workflows"
+    ],
+    "integration_validation": [
+      "Integration with existing project systems is functional",
+      "API contracts and interfaces are maintained",
+      "Database operations execute successfully",
+      "External service integrations work correctly"
+    ]
+  },
+  "technology_integration": {
+    "backend_frameworks": [
+      "Spring Boot, Express.js, Django, Flask, Ruby on Rails",
+      "Follow framework-specific patterns and best practices",
+      "Use framework's dependency injection and configuration",
+      "Integrate with framework's testing and validation tools"
+    ],
+    "frontend_frameworks": [
+      "React, Vue.js, Angular, Svelte, Next.js",
+      "Follow component architecture and state management patterns",
+      "Use framework's styling and theming approaches",
+      "Integrate with framework's testing and build tools"
+    ],
+    "database_technologies": [
+      "PostgreSQL, MySQL, MongoDB, SQLite, Redis",
+      "Follow project's data modeling and migration patterns",
+      "Use project's ORM or database access layer",
+      "Implement appropriate indexing and optimization"
+    ],
+    "testing_frameworks": [
+      "JUnit, Jest, pytest, RSpec, Mocha",
+      "Follow project's testing patterns and conventions",
+      "Use project's mocking and assertion libraries",
+      "Integrate with project's coverage and reporting tools"
+    ]
+  },
+  "error_handling": {
+    "project_specific_patterns": [
+      "Use project's exception handling and error reporting",
+      "Follow project's logging and monitoring practices",
+      "Implement project's retry and fallback mechanisms",
+      "Use project's validation and sanitization approaches"
+    ],
+    "quality_recovery": [
+      "If quality checks fail, analyze and fix issues",
+      "Retry implementation with corrected approach",
+      "Document deviations and technical decisions",
+      "Update plan with lessons learned and adjustments"
+    ]
+  },
+  "git_workflow": {
+    "commit_patterns": [
+      "Follow project's commit message format and conventions",
+      "Use project's branching strategy and merge practices",
+      "Include appropriate tags and references",
+      "Follow project's code review and approval processes"
+    ],
+    "branch_strategy": [
+      "Create feature branches following project naming conventions",
+      "Integrate with project's CI/CD pipeline",
+      "Follow project's merge and deployment practices",
+      "Use project's version tagging and release processes"
+    ]
+  },
+  "status_updates": {
+    "format": "markdown_checkboxes",
+    "tracking_fields": [
+      "Status: [ ] Not Started / [x] In Progress / [x] Complete",
+      "Completion timestamp",
+      "Deviations or issues notes",
+      "Updated effort estimates",
+      "Project integration status",
+      "Quality validation results"
+    ],
+    "project_alignment": [
+      "Update status according to project milestone tracking",
+      "Include project-specific progress metrics",
+      "Note integration with project systems and dependencies",
+      "Document compliance with project quality standards"
+    ]
+  },
+  "continuous_improvement": {
+    "feedback_integration": [
+      "Learn from project-specific quality failures",
+      "Adapt to project coding patterns and preferences",
+      "Improve integration with project development workflow",
+      "Optimize for project performance and scalability requirements"
+    ],
+    "knowledge_accumulation": [
+      "Build understanding of project architecture over time",
+      "Learn project team preferences and practices",
+      "Adapt to project technology updates and changes",
+      "Improve estimation accuracy for project complexity"
+    ]
+  }
+}

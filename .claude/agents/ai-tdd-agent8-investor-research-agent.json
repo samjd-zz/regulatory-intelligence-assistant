@@ -1,0 +1,657 @@
+{
+  "name": "investor-research-agent",
+  "version": "1.0.0",
+  "description": "AI-powered investor research and warm intro generator that automates the entire investor research and outreach process for startup founders",
+  "purpose": "Automate investor research, matching, and personalized outreach generation by leveraging multi-source data aggregation, AI-powered scoring, and hyper-personalization at scale",
+  "mcp_server_integration": {
+    "required_servers": [
+      "firecrawl",
+      "supabase",
+      "context7"
+    ],
+    "server_purposes": {
+      "firecrawl": "Web scraping engine for extracting investor data from VC websites, AngelList, Crunchbase, blogs, and press releases with structured JSON output",
+      "supabase": "PostgreSQL database for storing pre-seeded investor data (200-300 investors), caching scraped results, and managing startup profiles",
+      "context7": "Access up-to-date documentation for LangGraph, Next.js, React, and other libraries/frameworks used in the agent workflow"
+    },
+    "usage_priority": [
+      "Use firecrawl MCP as primary scraping engine for live investor data",
+      "Cache all scraped results in Supabase to stay within free tier limits (~500 requests/month)",
+      "Use pre-seeded Supabase data as baseline, enrich with live scraping for high-priority investors",
+      "Use context7 for accessing LangGraph agent patterns, Next.js API routes, and React component documentation"
+    ],
+    "free_tier_strategy": {
+      "firecrawl_limits": "~500 API calls/month",
+      "approach": [
+        "Pre-seed Supabase with 200-300 investor profiles",
+        "Prioritize live scraping for 3-5 high-value sources per agent execution",
+        "Cache aggressively to avoid redundant scrapes",
+        "Fallback to pre-seeded data if API limits reached"
+      ],
+      "priority_sources": [
+        "VC firm websites (portfolio, team, thesis)",
+        "AngelList public profiles",
+        "Recent blog posts and press releases"
+      ]
+    }
+  },
+  "project_context_discovery": {
+    "required_files": [
+      "./README.md",
+      "./CLAUDE.md"
+    ],
+    "analysis_instructions": [
+      "Read README.md to understand project architecture (Next.js, LangGraph, Bolt.ai patterns)",
+      "Read CLAUDE.md to understand coding standards, API routes, and deployment requirements",
+      "Identify technology stack: Next.js 14+, React, LangGraph, Firecrawl, Supabase, Vercel",
+      "Understand agent workflow orchestration patterns",
+      "Extract data modeling requirements for investor and startup profiles"
+    ]
+  },
+  "capabilities": [
+    "Execute 5-step autonomous investor research workflow",
+    "Extract comprehensive startup profiles from user input",
+    "Aggregate investor data from multiple web sources using Firecrawl",
+    "Score and rank investors based on fit criteria",
+    "Generate hyper-personalized outreach messages at scale",
+    "Create pitch one-pagers with startup narrative",
+    "Cache and optimize data retrieval within free tier limits",
+    "Integrate with Next.js API routes and React frontend",
+    "Provide real-time progress updates during agent execution",
+    "Ensure all generated documents stay under 300 lines"
+  ],
+  "diagram_standards": {
+    "format": "mermaid",
+    "enforcement": "MANDATORY",
+    "prohibited_formats": ["ascii", "text-based", "plaintext"],
+    "guidelines": [
+      "All diagrams must use Mermaid syntax within markdown code blocks",
+      "Use flowchart for agent workflow and data pipeline",
+      "Use sequence diagrams for API interactions",
+      "Use ER diagrams for database schema",
+      "Include descriptive labels and clear relationships"
+    ],
+    "common_diagram_types": {
+      "agent_workflow": "flowchart TD - Shows 5-step agent execution flow",
+      "data_pipeline": "flowchart LR - Shows data aggregation from multiple sources",
+      "scoring_algorithm": "flowchart TD - Shows investor scoring logic",
+      "system_architecture": "graph TD - Shows Next.js, LangGraph, Firecrawl, Supabase integration",
+      "database_schema": "erDiagram - Shows investor, startup, and match entities"
+    }
+  },
+  "file_size_management": {
+    "max_lines": 300,
+    "enforcement": "STRICT",
+    "splitting_strategies": [
+      "Split agent steps into separate modules (extract, aggregate, score, personalize, generate)",
+      "Create separate API route handlers for each workflow step",
+      "Extract scoring algorithms into utility functions",
+      "Create separate React components for results dashboard",
+      "Use service layer pattern for data access"
+    ]
+  },
+  "agent_workflow": {
+    "overview": "Five-step autonomous pipeline that transforms startup info into ranked investor list with personalized outreach materials",
+    "steps": [
+      {
+        "step": 1,
+        "name": "startup_profile_extraction",
+        "description": "Extract comprehensive startup profile from user input",
+        "inputs": [
+          "Company name and description",
+          "Sector and vertical",
+          "Business model",
+          "Traction metrics (revenue, users, growth)",
+          "Geographic market",
+          "Round size and stage",
+          "Technology stack",
+          "Team information"
+        ],
+        "outputs": [
+          "Structured startup profile object",
+          "Sector classification",
+          "Stage classification (idea, MVP, pre-seed, seed, Series A)",
+          "Relevant keywords for matching"
+        ],
+        "implementation": "LangGraph node with Claude API for intelligent extraction and classification"
+      },
+      {
+        "step": 2,
+        "name": "data_aggregation",
+        "description": "Aggregate investor data from multiple sources using Firecrawl MCP",
+        "data_sources": [
+          "VC firm websites (portfolio pages, team bios, investment thesis)",
+          "AngelList public investor profiles",
+          "Public Crunchbase data (via web scraping)",
+          "VC blog posts and press releases",
+          "Portfolio company announcements"
+        ],
+        "firecrawl_usage": [
+          "Use firecrawl_scrape for single page content extraction",
+          "Use firecrawl_map to discover URLs on VC websites",
+          "Use firecrawl_search for finding recent investor activity",
+          "Return structured JSON for LangGraph processing",
+          "Handle JavaScript-rendered SPAs automatically"
+        ],
+        "caching_strategy": [
+          "Store all scraped data in Supabase with timestamp",
+          "Check cache before making new Firecrawl requests",
+          "Invalidate cache after 7 days for freshness",
+          "Track Firecrawl API usage to stay within limits"
+        ],
+        "outputs": [
+          "Enriched investor profiles with portfolio, thesis, recent activity",
+          "Investment focus areas and preferences",
+          "Check size ranges and stage preferences",
+          "Geographic focus",
+          "Recent investment activity signals"
+        ],
+        "implementation": "LangGraph node with Firecrawl MCP integration and Supabase caching"
+      },
+      {
+        "step": 3,
+        "name": "investor_profiling_and_scoring",
+        "description": "Profile and score investors based on startup fit",
+        "scoring_criteria": [
+          "Sector match: Does investor focus on startup's vertical?",
+          "Stage match: Does investor invest at startup's stage?",
+          "Check size match: Is round size within investor's range?",
+          "Geographic match: Does investor invest in startup's market?",
+          "Recent activity: Is investor actively deploying capital?",
+          "Portfolio similarity: Does investor have similar portfolio companies?",
+          "Thesis alignment: Does startup narrative align with investor thesis?"
+        ],
+        "scoring_algorithm": {
+          "sector_match": "40 points - Critical alignment factor",
+          "stage_match": "30 points - Must invest at current stage",
+          "check_size_match": "15 points - Deal size compatibility",
+          "geographic_match": "5 points - Location preference",
+          "recent_activity": "5 points - Active vs dormant",
+          "portfolio_similarity": "3 points - Pattern recognition",
+          "thesis_alignment": "2 points - Narrative fit",
+          "total": "100 points maximum"
+        },
+        "outputs": [
+          "Ranked list of investors with scores (0-100)",
+          "Detailed fit analysis per investor",
+          "Recommended top 20-30 investors to target"
+        ],
+        "implementation": "LangGraph node with scoring algorithm and Claude API for thesis alignment analysis"
+      },
+      {
+        "step": 4,
+        "name": "personalized_outreach_generation",
+        "description": "Generate hyper-personalized outreach messages for each high-scoring investor",
+        "personalization_inputs": [
+          "Investor's recent portfolio companies",
+          "Investor's stated thesis and focus areas",
+          "Recent blog posts or tweets",
+          "Specific portfolio companies similar to startup",
+          "Mutual connections (if available)",
+          "Recent fund announcements or news"
+        ],
+        "message_structure": {
+          "subject_line": "Attention-grabbing subject referencing specific investor interest",
+          "opening": "Personal connection point (portfolio company, thesis, recent activity)",
+          "startup_intro": "One-sentence compelling description",
+          "fit_explanation": "Why this investor specifically (not generic)",
+          "traction_highlight": "Key metric or milestone",
+          "ask": "Clear, specific call-to-action",
+          "close": "Professional sign-off"
+        },
+        "outputs": [
+          "Personalized email draft per investor (150-200 words)",
+          "Subject line variations",
+          "Personalization rationale and talking points"
+        ],
+        "implementation": "LangGraph node with Claude API for creative, personalized message generation"
+      },
+      {
+        "step": 5,
+        "name": "pitch_one_pager_creation",
+        "description": "Generate professional pitch one-pager for attachment",
+        "one_pager_sections": [
+          "Company name and tagline",
+          "Problem statement",
+          "Solution overview",
+          "Business model",
+          "Traction and metrics",
+          "Market opportunity",
+          "Team highlights",
+          "Fundraising details (round, use of funds)",
+          "Contact information"
+        ],
+        "outputs": [
+          "Markdown one-pager document",
+          "PDF-ready format (via Next.js server-side rendering)",
+          "Branded with startup information"
+        ],
+        "implementation": "LangGraph node with template generation and Claude API for narrative crafting"
+      }
+    ]
+  },
+  "workflow": [
+    {
+      "step": 1,
+      "action": "read_project_context",
+      "description": "Read README.md and CLAUDE.md to understand project architecture",
+      "focus_areas": [
+        "Next.js 14+ App Router patterns",
+        "LangGraph agent orchestration",
+        "Firecrawl MCP integration patterns",
+        "Supabase database schema and queries",
+        "Vercel deployment requirements"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "setup_agent_infrastructure",
+      "description": "Set up LangGraph agent with 5-step workflow",
+      "components": [
+        "Define StateGraph with startup and investor state",
+        "Create nodes for each workflow step",
+        "Define edges and conditional routing",
+        "Integrate Firecrawl MCP for data aggregation",
+        "Set up Supabase connection for caching"
+      ]
+    },
+    {
+      "step": 3,
+      "action": "implement_data_pipeline",
+      "description": "Implement Firecrawl-powered data aggregation",
+      "implementation": [
+        "Create Firecrawl service wrapper for MCP tools",
+        "Implement caching layer with Supabase",
+        "Add rate limiting and error handling",
+        "Pre-seed database with 200-300 investor profiles",
+        "Test scraping with priority sources"
+      ]
+    },
+    {
+      "step": 4,
+      "action": "implement_scoring_engine",
+      "description": "Build investor scoring and ranking algorithm",
+      "implementation": [
+        "Create scoring function with weighted criteria",
+        "Use Claude API for thesis alignment analysis",
+        "Generate fit explanation for each investor",
+        "Sort and filter top candidates"
+      ]
+    },
+    {
+      "step": 5,
+      "action": "implement_personalization_engine",
+      "description": "Build personalized outreach generation",
+      "implementation": [
+        "Create prompt templates for email generation",
+        "Use Claude API with investor context for personalization",
+        "Generate multiple message variations",
+        "Create one-pager template system"
+      ]
+    },
+    {
+      "step": 6,
+      "action": "build_nextjs_api_routes",
+      "description": "Create Next.js API routes for agent execution",
+      "routes": [
+        "/api/research/start - Initiate agent workflow",
+        "/api/research/status - Get execution progress",
+        "/api/research/results - Retrieve ranked investors and materials"
+      ]
+    },
+    {
+      "step": 7,
+      "action": "build_react_frontend",
+      "description": "Create React UI with shadcn/ui components",
+      "components": [
+        "Startup profile input form",
+        "Progress indicator during agent execution",
+        "Results dashboard with ranked investors",
+        "Outreach preview and export components"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "name": "generate_investor_research_feature",
+      "description": "Generate complete investor research agent feature following AI-TDD methodology",
+      "parameters": {
+        "output_directory": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/investor-research-agent/",
+          "description": "Directory for all generated documentation and implementation files"
+        },
+        "include_seed_data": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include pre-seeded investor database (200-300 profiles)"
+        },
+        "firecrawl_priority_count": {
+          "type": "integer",
+          "required": false,
+          "default": 5,
+          "description": "Number of high-priority sources to scrape per execution"
+        }
+      }
+    },
+    {
+      "name": "implement_agent_workflow",
+      "description": "Implement LangGraph agent with 5-step workflow",
+      "parameters": {
+        "workflow_steps": {
+          "type": "array",
+          "required": false,
+          "default": ["extract", "aggregate", "score", "personalize", "generate"],
+          "description": "Workflow steps to implement"
+        },
+        "enable_caching": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Enable Supabase caching for scraped data"
+        }
+      }
+    },
+    {
+      "name": "setup_firecrawl_integration",
+      "description": "Set up Firecrawl MCP integration with caching strategy",
+      "parameters": {
+        "cache_ttl_days": {
+          "type": "integer",
+          "required": false,
+          "default": 7,
+          "description": "Cache time-to-live in days"
+        },
+        "max_requests_per_run": {
+          "type": "integer",
+          "required": false,
+          "default": 10,
+          "description": "Maximum Firecrawl requests per agent execution"
+        }
+      }
+    },
+    {
+      "name": "create_investor_database_schema",
+      "description": "Create Supabase database schema for investor data",
+      "parameters": {
+        "include_seed_data": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include SQL for pre-seeding 200-300 investor profiles"
+        }
+      }
+    },
+    {
+      "name": "build_scoring_algorithm",
+      "description": "Implement investor scoring and ranking algorithm",
+      "parameters": {
+        "scoring_weights": {
+          "type": "object",
+          "required": false,
+          "description": "Custom weights for scoring criteria (sector, stage, check_size, etc.)"
+        }
+      }
+    }
+  ],
+  "template": {
+    "sections": [
+      "Investor Research Agent Implementation",
+      "Architecture Overview (Mermaid Diagram)",
+      "Agent Workflow (Mermaid Flowchart)",
+      "Data Pipeline (Firecrawl Integration)",
+      "Database Schema (Supabase)",
+      "Scoring Algorithm",
+      "Personalization Engine",
+      "API Routes (Next.js)",
+      "Frontend Components (React + shadcn/ui)",
+      "Deployment (Vercel)",
+      "Free Tier Optimization"
+    ],
+    "technology_stack": {
+      "frontend": [
+        "Next.js 14+ (App Router)",
+        "React",
+        "shadcn/ui + Tailwind CSS",
+        "@tanstack/react-query",
+        "zustand"
+      ],
+      "backend": [
+        "Next.js API Routes",
+        "LangGraph (agent orchestration)",
+        "Firecrawl MCP (web scraping)",
+        "Claude/OpenAI API (LLM)",
+        "Supabase (PostgreSQL + caching)"
+      ],
+      "deployment": [
+        "Vercel (free tier)",
+        "Vercel KV (Redis caching)",
+        "Environment variables for API keys"
+      ]
+    },
+    "database_schema": {
+      "investors_table": {
+        "id": "uuid PRIMARY KEY",
+        "name": "text NOT NULL",
+        "firm": "text",
+        "website": "text",
+        "email": "text",
+        "sector_focus": "text[]",
+        "stage_focus": "text[]",
+        "check_size_min": "integer",
+        "check_size_max": "integer",
+        "geographic_focus": "text[]",
+        "portfolio_companies": "jsonb",
+        "investment_thesis": "text",
+        "recent_activity": "jsonb",
+        "last_updated": "timestamp",
+        "data_source": "text",
+        "created_at": "timestamp"
+      },
+      "startups_table": {
+        "id": "uuid PRIMARY KEY",
+        "name": "text NOT NULL",
+        "description": "text",
+        "sector": "text",
+        "stage": "text",
+        "round_size": "integer",
+        "traction_metrics": "jsonb",
+        "team_info": "jsonb",
+        "technology_stack": "text[]",
+        "created_at": "timestamp"
+      },
+      "matches_table": {
+        "id": "uuid PRIMARY KEY",
+        "startup_id": "uuid REFERENCES startups(id)",
+        "investor_id": "uuid REFERENCES investors(id)",
+        "score": "integer",
+        "fit_analysis": "jsonb",
+        "personalized_message": "text",
+        "created_at": "timestamp"
+      },
+      "scrape_cache_table": {
+        "id": "uuid PRIMARY KEY",
+        "url": "text UNIQUE NOT NULL",
+        "content": "jsonb",
+        "scraped_at": "timestamp",
+        "expires_at": "timestamp"
+      }
+    }
+  },
+  "execution": {
+    "prerequisite_analysis": {
+      "readme_analysis": [
+        "Extract project architecture (Next.js, LangGraph, Bolt.ai)",
+        "Identify deployment target (Vercel free tier)",
+        "Understand technology stack and dependencies",
+        "Note API integration requirements"
+      ],
+      "claude_analysis": [
+        "Extract coding standards for Next.js and React",
+        "Identify testing requirements for agent workflow",
+        "Understand error handling patterns",
+        "Note environment variable management"
+      ]
+    },
+    "output_format": "Full-stack Next.js application with LangGraph agent",
+    "quality_checks": [
+      "Agent workflow executes all 5 steps successfully",
+      "Firecrawl integration returns structured investor data",
+      "Caching strategy keeps Firecrawl usage within free tier",
+      "Scoring algorithm produces reasonable rankings",
+      "Personalized messages are unique and contextual",
+      "React UI provides clear progress feedback",
+      "All API routes handle errors gracefully",
+      "Database schema supports efficient queries",
+      "All generated files stay under 300 lines",
+      "Deployment to Vercel succeeds with proper environment variables"
+    ]
+  },
+  "firecrawl_integration_details": {
+    "scraping_strategy": {
+      "vc_firm_websites": {
+        "tools": ["firecrawl_map", "firecrawl_scrape"],
+        "targets": ["Portfolio page", "Team page", "Investment thesis page"],
+        "approach": "Map site structure, then scrape priority pages",
+        "output": "Structured JSON with portfolio companies and thesis"
+      },
+      "angellist_profiles": {
+        "tools": ["firecrawl_scrape"],
+        "targets": ["Public investor profiles"],
+        "approach": "Direct scrape of profile pages",
+        "output": "Investor bio, focus areas, recent investments"
+      },
+      "recent_activity": {
+        "tools": ["firecrawl_search"],
+        "targets": ["Blog posts", "Press releases", "News articles"],
+        "approach": "Search for investor name + recent announcements",
+        "output": "Recent investment activity signals"
+      }
+    },
+    "rate_limiting": {
+      "max_requests_per_execution": 10,
+      "cache_first_strategy": true,
+      "fallback_to_database": true,
+      "error_handling": "Graceful degradation to pre-seeded data"
+    }
+  },
+  "langgraph_agent_structure": {
+    "state_schema": {
+      "startup_profile": "object",
+      "raw_investor_data": "array",
+      "enriched_investors": "array",
+      "scored_investors": "array",
+      "personalized_messages": "array",
+      "one_pager": "string",
+      "execution_status": "string",
+      "errors": "array"
+    },
+    "nodes": [
+      "extract_startup_profile",
+      "aggregate_investor_data",
+      "score_and_rank_investors",
+      "generate_personalized_outreach",
+      "create_pitch_one_pager"
+    ],
+    "edges": [
+      "START -> extract_startup_profile",
+      "extract_startup_profile -> aggregate_investor_data",
+      "aggregate_investor_data -> score_and_rank_investors",
+      "score_and_rank_investors -> generate_personalized_outreach",
+      "generate_personalized_outreach -> create_pitch_one_pager",
+      "create_pitch_one_pager -> END"
+    ],
+    "error_handling": "Each node has try-catch with state error array updates"
+  },
+  "personalization_techniques": {
+    "data_enrichment": [
+      "Recent portfolio company analysis",
+      "Investment thesis extraction and matching",
+      "Recent blog post or tweet analysis",
+      "Mutual connection identification",
+      "Recent fund or news mentions"
+    ],
+    "message_customization": [
+      "Reference specific portfolio company similar to startup",
+      "Quote from investor's recent blog post or thesis",
+      "Highlight shared market perspective or trend insight",
+      "Mention mutual connections or warm intro paths",
+      "Tailor value proposition to investor's stated interests"
+    ],
+    "quality_metrics": [
+      "Each message must reference specific investor context",
+      "No generic templates or mass email language",
+      "Clear connection between startup and investor thesis",
+      "Appropriate length (150-200 words)",
+      "Professional tone with personality"
+    ]
+  },
+  "deployment_configuration": {
+    "vercel_settings": {
+      "framework": "Next.js",
+      "build_command": "npm run build",
+      "output_directory": ".next",
+      "install_command": "npm install"
+    },
+    "environment_variables": [
+      "FIRECRAWL_API_KEY - Firecrawl MCP authentication",
+      "ANTHROPIC_API_KEY or OPENAI_API_KEY - LLM provider",
+      "SUPABASE_URL - Database connection",
+      "SUPABASE_ANON_KEY - Database authentication",
+      "NEXT_PUBLIC_APP_URL - Frontend URL"
+    ],
+    "free_tier_limits": {
+      "vercel": "Unlimited hobby projects",
+      "supabase": "500MB database, 50K monthly active users",
+      "firecrawl": "~500 API calls/month",
+      "strategy": "All services stay within free limits with caching"
+    }
+  },
+  "success_criteria": {
+    "functional_requirements": [
+      "Agent completes all 5 workflow steps autonomously",
+      "Produces ranked list of 20-30 investors with scores",
+      "Generates unique personalized messages for top investors",
+      "Creates professional pitch one-pager",
+      "Execution time under 5 minutes for typical run",
+      "UI provides real-time progress updates"
+    ],
+    "quality_requirements": [
+      "Investor scores reflect genuine fit based on criteria",
+      "Personalized messages reference specific investor context",
+      "No generic or template language in outreach",
+      "Data aggregation includes fresh signals when possible",
+      "Graceful fallback when API limits reached",
+      "Professional UI with clear results presentation"
+    ],
+    "technical_requirements": [
+      "Stays within all free tier limits",
+      "Handles errors gracefully without crashing",
+      "Caches effectively to minimize redundant API calls",
+      "Database queries are efficient with proper indexing",
+      "Code follows project conventions and best practices",
+      "All files under 300 lines with proper modularization"
+    ]
+  },
+  "future_enhancements": {
+    "phase_2_features": [
+      "Email send integration (SendGrid, Resend)",
+      "CRM integration (HubSpot, Airtable)",
+      "LinkedIn profile analysis",
+      "Warm intro path mapping",
+      "A/B testing for message variations",
+      "Follow-up sequence generation",
+      "Analytics dashboard for outreach performance"
+    ],
+    "scalability_considerations": [
+      "Move to paid Firecrawl tier for higher volume",
+      "Implement background job processing",
+      "Add webhook support for async execution",
+      "Multi-tenant architecture for multiple users",
+      "Advanced caching with Redis",
+      "Real-time collaboration features"
+    ]
+  }
+}

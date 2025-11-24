@@ -1,0 +1,418 @@
+{
+  "name": "plan-creator-generic",
+  "version": "2.0.0",
+  "description": "Transform design.md documents into detailed, actionable implementation plans following the AI-TDD methodology for any project",
+  "purpose": "Transform design.md documents into detailed, actionable implementation plans by analyzing project context from README.md and CLAUDE.md",
+  "mcp_server_integration": {
+    "required_servers": [
+      "context7",
+      "angular",
+      "vaadin",
+      "frontend-mcp-server"
+    ],
+    "server_purposes": {
+      "context7": "Access up-to-date documentation for any library/framework via Upstash Context7",
+      "angular": "Angular-specific best practices, components, and patterns",
+      "vaadin": "Vaadin framework documentation, components, and styling for Java/React development",
+      "frontend-mcp-server": "AWS Labs React documentation covering essential knowledge, authentication, routing, customizing, and troubleshooting for modern React applications with AWS services"
+    },
+    "usage_priority": [
+      "First discover project's technology stack from README.md/CLAUDE.md",
+      "Use appropriate MCP server based on detected technologies",
+      "For React projects with AWS integration: Use frontend-mcp-server for AWS-specific React patterns",
+      "For general React: Use context7 to fetch React library documentation",
+      "For Angular: Use angular MCP for best practices and patterns",
+      "For Vaadin: Use vaadin MCP for Java/React component documentation",
+      "Fall back to context7 for framework-agnostic or new framework documentation"
+    ],
+    "framework_detection": {
+      "angular_indicators": [
+        "@angular/core",
+        "angular.json",
+        "ng serve",
+        "Angular",
+        "TypeScript with Angular"
+      ],
+      "vaadin_indicators": [
+        "com.vaadin",
+        "vaadin-core",
+        "Vaadin Flow",
+        "Java UI",
+        "@vaadin/react-components"
+      ],
+      "react_indicators": [
+        "react",
+        "next.js",
+        "create-react-app",
+        "React",
+        "JSX"
+      ],
+      "vue_indicators": [
+        "vue",
+        "nuxt",
+        "Vue.js",
+        "vue-cli"
+      ],
+      "other_frameworks": [
+        "Svelte",
+        "Solid",
+        "Qwik",
+        "Ember",
+        "Backbone"
+      ]
+    }
+  },
+  "project_context_discovery": {
+    "required_files": [
+      "./README.md",
+      "./CLAUDE.md"
+    ],
+    "analysis_instructions": [
+      "Read README.md to understand project structure, build processes, and deployment requirements",
+      "Read CLAUDE.md to understand development workflow, quality gates, and testing standards",
+      "Identify project-specific development patterns, coding conventions, and best practices",
+      "Extract build commands, testing frameworks, and quality assurance tools",
+      "Understand project complexity, team structure, and delivery timelines"
+    ]
+  },
+  "capabilities": [
+    "Parse technical design specifications for project-specific features",
+    "Create numbered, sequential implementation steps aligned with project development practices",
+    "Define clear task boundaries following project coding standards and conventions",
+    "Assign effort estimates based on project complexity and development patterns",
+    "Include verification criteria using project's quality gates and testing standards",
+    "Track implementation progress using project's workflow and milestone approaches",
+    "Plan integration with project's existing systems and development processes",
+    "Ensure all generated documents stay under 300 lines",
+    "Create all diagrams using Mermaid format for better visualization and maintainability"
+  ],
+  "diagram_standards": {
+    "format": "mermaid",
+    "enforcement": "MANDATORY",
+    "prohibited_formats": ["ascii", "text-based", "plaintext"],
+    "guidelines": [
+      "All diagrams must use Mermaid syntax within markdown code blocks",
+      "Use appropriate Mermaid diagram types: flowchart, sequence, class, state, er, etc.",
+      "Include descriptive labels and clear relationships",
+      "Keep diagrams focused and readable",
+      "Use consistent styling and naming conventions"
+    ],
+    "common_diagram_types": {
+      "implementation_flow": "flowchart TD or flowchart LR",
+      "task_dependencies": "flowchart TD or gantt",
+      "system_integration": "graph TD or sequenceDiagram",
+      "deployment_pipeline": "flowchart LR",
+      "testing_workflow": "flowchart TD",
+      "data_flow": "flowchart TD",
+      "state_transitions": "stateDiagram-v2"
+    },
+    "example_syntax": "```mermaid\nflowchart TD\n    A[Start] --> B[Process]\n    B --> C[End]\n```"
+  },
+  "file_size_management": {
+    "max_lines": 300,
+    "enforcement": "STRICT",
+    "splitting_strategies": [
+      "Split large plans into phases (plan-phase1.md, plan-phase2.md, plan-phase3.md)",
+      "Create separate files for different implementation phases",
+      "Keep main plan.md concise with references to detailed phase documents",
+      "Focus on overview and current phase in main document",
+      "Split by project system implementation domains identified from README.md"
+    ]
+  },
+  "workflow": [
+    {
+      "step": 1,
+      "action": "read_project_context",
+      "description": "Read and analyze README.md and CLAUDE.md to understand project context",
+      "development_focus": [
+        "Development workflow and processes",
+        "Build and testing commands",
+        "Quality gates and validation requirements",
+        "Project structure and organization patterns",
+        "Deployment and operational procedures"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "analyze_design_document",
+      "description": "Analyze design.md for project components and dependencies",
+      "analysis_focus": "Focus on integration points, system dependencies, and technical implementation requirements"
+    },
+    {
+      "step": 3,
+      "action": "break_down_tasks",
+      "description": "Break down implementation into project-specific atomic tasks",
+      "task_alignment": "Consider project patterns, development practices, and quality standards"
+    },
+    {
+      "step": 4,
+      "action": "order_by_dependencies",
+      "description": "Order tasks by project system dependencies and logical implementation flow",
+      "dependency_analysis": "Consider project architecture, data dependencies, and integration requirements"
+    },
+    {
+      "step": 5,
+      "action": "add_verification_steps",
+      "description": "Add project verification steps after each implementation task",
+      "quality_integration": "Include project's quality gates, testing standards, and validation requirements"
+    },
+    {
+      "step": 6,
+      "action": "generate_implementation_plan",
+      "description": "Generate comprehensive plan.md with project-specific status tracking"
+    }
+  ],
+  "commands": [
+    {
+      "name": "create_implementation_plan",
+      "description": "Create implementation plan from design using project context from README.md and CLAUDE.md",
+      "parameters": {
+        "design_file": {
+          "type": "string",
+          "required": true,
+          "default": "./ai-tdd-docs/[feature-name]/design.md",
+          "description": "Path to the design.md file to transform (in feature-specific folder)"
+        },
+        "output_path": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/[feature-name]/plan.md",
+          "description": "Path where the plan document should be created (in feature-specific folder)"
+        },
+        "project_systems": {
+          "type": "array",
+          "required": false,
+          "description": "Project systems to include in implementation plan (auto-detected from README.md)"
+        }
+      }
+    },
+    {
+      "name": "generate_step_by_step_plan",
+      "description": "Generate step-by-step plan for design file using project analysis",
+      "parameters": {
+        "design_path": {
+          "type": "string",
+          "required": true,
+          "description": "Path to the design file to process"
+        },
+        "team_size": {
+          "type": "integer",
+          "required": false,
+          "default": 1,
+          "description": "Number of developers working on implementation"
+        },
+        "timeline": {
+          "type": "string",
+          "required": false,
+          "description": "Target timeline for feature completion (e.g., '2 weeks', '1 month')"
+        },
+        "project_complexity": {
+          "type": "string",
+          "required": false,
+          "enum": ["low", "medium", "high"],
+          "default": "medium",
+          "description": "Project system integration complexity level"
+        }
+      }
+    },
+    {
+      "name": "transform_design_to_tasks",
+      "description": "Transform design into actionable tasks aligned with project practices",
+      "parameters": {
+        "feature_name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the feature being planned"
+        },
+        "integration_scope": {
+          "type": "array",
+          "required": false,
+          "description": "Project systems involved in the implementation (auto-detected)"
+        },
+        "project_impact": {
+          "type": "string",
+          "required": false,
+          "enum": ["low", "medium", "high"],
+          "default": "medium",
+          "description": "Expected impact on project workflows and users"
+        }
+      }
+    }
+  ],
+  "template": {
+    "sections": [
+      "Implementation Plan: [Feature Name]",
+      "Overview",
+      "Project System Integration Summary",
+      "Pre-Implementation Checklist",
+      "Implementation Steps",
+      "Project Quality Gates",
+      "Testing Phase",
+      "Post-Implementation"
+    ],
+    "step_structure": {
+      "status": "[ ] Not Started / [ ] In Progress / [ ] Complete",
+      "effort": "Estimated hours considering project development patterns",
+      "description": "Detailed task description with project context",
+      "actions": "Specific action items following project standards",
+      "verification": "Project-specific verification criteria and tests",
+      "project_integration": "Integration points with project systems",
+      "dependencies": "Project system and external dependencies"
+    },
+    "project_specific_sections": {
+      "system_integration_summary": [
+        "Existing system integration points",
+        "Service and component dependencies",
+        "Data flow and processing requirements",
+        "API and interface integration needs",
+        "Authentication and authorization integration",
+        "Monitoring and logging requirements"
+      ],
+      "pre_implementation_checklist": [
+        "Development environment setup complete",
+        "Project dependencies and tools installed",
+        "Access to required services and APIs configured",
+        "Project coding standards and guidelines reviewed",
+        "Database and data access setup verified",
+        "Testing framework and tools configured",
+        "Quality gates and validation processes understood"
+      ]
+    },
+    "diagram_requirements": {
+      "mandatory_use": "All implementation flow, task dependency, and integration diagrams must be in Mermaid format",
+      "placement": "Include relevant Mermaid diagrams in appropriate sections (overview, implementation steps, testing phase, integration summary)",
+      "quality": "Diagrams should be clear, well-labeled, and directly support the implementation plan documentation"
+    }
+  },
+  "execution": {
+    "prerequisite_analysis": {
+      "readme_analysis": [
+        "Extract build and development commands",
+        "Identify project structure and organization",
+        "Understand deployment and operational procedures",
+        "Note project complexity and scale",
+        "Extract technology stack and framework versions"
+      ],
+      "claude_analysis": [
+        "Extract coding standards and conventions",
+        "Identify testing frameworks and quality gates",
+        "Understand development workflow and processes",
+        "Note performance and security requirements",
+        "Extract error handling and logging standards"
+      ]
+    },
+    "input_format": "markdown",
+    "input_file": "design.md",
+    "output_format": "markdown",
+    "output_file": "plan.md",
+    "quality_checks": [
+      "All tasks are actionable and specific to project development practices",
+      "Dependencies are properly sequenced for project systems and architecture",
+      "Effort estimates reflect project development patterns and complexity",
+      "Verification criteria include project's quality gates and testing standards",
+      "Progress tracking enables project development coordination and reporting",
+      "Integration with existing project systems is clearly planned and documented",
+      "Implementation steps follow project's coding standards and conventions",
+      "All diagrams use Mermaid format (no ASCII or text-based diagrams)",
+      "Mermaid diagrams are syntactically correct and render properly",
+      "Diagrams effectively illustrate implementation flow, task dependencies, or system integration"
+    ]
+  },
+  "planning_principles": {
+    "task_breakdown": [
+      "Keep tasks appropriately sized for project development velocity",
+      "Ensure tasks follow project coding patterns and conventions",
+      "Make project system dependencies explicit and well-documented",
+      "Include integration points with existing project components",
+      "Consider project-specific complexity and technical constraints",
+      "Plan for project quality assurance and testing requirements"
+    ],
+    "verification_types": [
+      "Unit tests pass using project testing framework",
+      "Code quality gates pass using project quality tools",
+      "Integration tests verify system component interactions",
+      "Performance tests meet project scalability requirements",
+      "Security tests validate project security standards",
+      "Documentation updated according to project standards"
+    ],
+    "status_tracking": [
+      "Not Started",
+      "In Progress",
+      "Complete",
+      "Blocked",
+      "Review Required",
+      "Quality Check Failed",
+      "Integration Pending"
+    ]
+  },
+  "effort_estimation_framework": {
+    "complexity_factors": [
+      "Project-specific code pattern complexity",
+      "System integration and coordination requirements",
+      "Database and data modeling complexity",
+      "UI/UX component and framework integration",
+      "External service and API integration requirements",
+      "Testing and quality assurance scope",
+      "Documentation and specification requirements"
+    ],
+    "estimation_guidelines": {
+      "simple_feature": "4-8 hours",
+      "moderate_feature": "1-3 days",
+      "complex_feature": "3-7 days",
+      "system_integration": "2-5 days",
+      "comprehensive_testing": "1-2 days per major component"
+    },
+    "project_complexity_multipliers": {
+      "low_complexity": "1.0x - Simple CRUD operations, basic UI changes",
+      "medium_complexity": "1.5x - Service integration, moderate business logic",
+      "high_complexity": "2.0x - Complex algorithms, multi-system integration",
+      "system_wide_changes": "2.5x - Architecture changes, cross-cutting concerns"
+    }
+  },
+  "quality_gate_framework": {
+    "development_gates": [
+      "Code compiles without errors or warnings",
+      "Unit tests pass with adequate coverage",
+      "Code follows project style and convention standards",
+      "Static analysis tools pass without critical issues",
+      "Documentation is complete and accurate"
+    ],
+    "integration_gates": [
+      "Integration tests pass for all affected components",
+      "API contracts and interfaces are validated",
+      "Database migrations execute successfully",
+      "Performance benchmarks meet requirements",
+      "Security scans pass without critical vulnerabilities"
+    ],
+    "deployment_gates": [
+      "Staging deployment successful and validated",
+      "User acceptance testing completed successfully",
+      "Monitoring and alerting configured and tested",
+      "Rollback procedures tested and documented",
+      "Production deployment checklist completed"
+    ]
+  },
+  "project_adaptation_strategies": {
+    "technology_stack_alignment": [
+      "Identify and use project-specific frameworks and libraries",
+      "Follow project's architectural patterns and design principles",
+      "Integrate with project's database and data access technologies",
+      "Use project's authentication and authorization mechanisms",
+      "Implement using project's UI framework and component libraries"
+    ],
+    "process_alignment": [
+      "Follow project's development workflow and branching strategy",
+      "Use project's testing framework and quality assurance tools",
+      "Integrate with project's CI/CD pipeline and deployment processes",
+      "Follow project's code review and approval processes",
+      "Use project's documentation and specification standards"
+    ],
+    "team_alignment": [
+      "Coordinate with project team members and stakeholders",
+      "Follow project's communication and collaboration practices",
+      "Align with project's timeline and milestone requirements",
+      "Consider project's resource constraints and availability",
+      "Support project's maintenance and operational requirements"
+    ]
+  }
+}

@@ -1,0 +1,352 @@
+{
+  "name": "prd-creator-generic",
+  "version": "2.0.0",
+  "description": "Transform idea.md documents into comprehensive Product Requirements Documents (PRDs) following the AI-TDD methodology for any project",
+  "purpose": "Transform idea.md documents into comprehensive Product Requirements Documents (PRDs) by analyzing project context from README.md and CLAUDE.md",
+  "mcp_server_integration": {
+    "required_servers": [
+      "context7",
+      "angular",
+      "vaadin",
+      "frontend-mcp-server"
+    ],
+    "server_purposes": {
+      "context7": "Access up-to-date documentation for any library/framework via Upstash Context7",
+      "angular": "Angular-specific best practices, components, and patterns",
+      "vaadin": "Vaadin framework documentation, components, and styling for Java/React development",
+      "frontend-mcp-server": "AWS Labs React documentation covering essential knowledge, authentication, routing, customizing, and troubleshooting for modern React applications with AWS services"
+    },
+    "usage_priority": [
+      "First discover project's technology stack from README.md/CLAUDE.md",
+      "Use appropriate MCP server based on detected technologies",
+      "For React projects with AWS integration: Use frontend-mcp-server for AWS-specific React patterns",
+      "For general React: Use context7 to fetch React library documentation",
+      "For Angular: Use angular MCP for best practices and patterns",
+      "For Vaadin: Use vaadin MCP for Java/React component documentation",
+      "Fall back to context7 for framework-agnostic or new framework documentation"
+    ],
+    "framework_detection": {
+      "angular_indicators": [
+        "@angular/core",
+        "angular.json",
+        "ng serve",
+        "Angular",
+        "TypeScript with Angular"
+      ],
+      "vaadin_indicators": [
+        "com.vaadin",
+        "vaadin-core",
+        "Vaadin Flow",
+        "Java UI",
+        "@vaadin/react-components"
+      ],
+      "react_indicators": [
+        "react",
+        "next.js",
+        "create-react-app",
+        "React",
+        "JSX"
+      ],
+      "vue_indicators": [
+        "vue",
+        "nuxt",
+        "Vue.js",
+        "vue-cli"
+      ],
+      "other_frameworks": [
+        "Svelte",
+        "Solid",
+        "Qwik",
+        "Ember",
+        "Backbone"
+      ]
+    }
+  },
+  "project_context_discovery": {
+    "required_files": [
+      "./README.md",
+      "./CLAUDE.md"
+    ],
+    "analysis_instructions": [
+      "Read README.md to understand project users, business domain, and core functionality",
+      "Read CLAUDE.md to understand development practices, quality standards, and constraints",
+      "Identify user personas, use cases, and success metrics from project context",
+      "Extract technical constraints, performance requirements, and integration patterns",
+      "Understand project's testing standards and deployment requirements"
+    ]
+  },
+  "capabilities": [
+    "Parse and analyze idea.md content in context of the specific project",
+    "Generate detailed user stories for project's target user base",
+    "Define acceptance criteria aligned with project workflows and standards",
+    "Create feature specifications for project's architecture and technology stack",
+    "Outline non-functional requirements specific to project constraints",
+    "Identify stakeholders based on project domain and user base",
+    "Define project system dependencies and integration points",
+    "Ensure all generated documents stay under 300 lines",
+    "Apply project coding standards and quality requirements from CLAUDE.md",
+    "Create all diagrams using Mermaid format for better visualization and maintainability"
+  ],
+  "diagram_standards": {
+    "format": "mermaid",
+    "enforcement": "MANDATORY",
+    "prohibited_formats": ["ascii", "text-based", "plaintext"],
+    "guidelines": [
+      "All diagrams must use Mermaid syntax within markdown code blocks",
+      "Use appropriate Mermaid diagram types: flowchart, sequence, class, state, er, etc.",
+      "Include descriptive labels and clear relationships",
+      "Keep diagrams focused and readable",
+      "Use consistent styling and naming conventions"
+    ],
+    "common_diagram_types": {
+      "architecture": "flowchart TD or graph TD",
+      "workflow": "flowchart LR or sequenceDiagram",
+      "data_flow": "flowchart TD",
+      "user_journey": "journey",
+      "system_components": "graph TD or C4Context",
+      "state_transitions": "stateDiagram-v2",
+      "entity_relationships": "erDiagram",
+      "class_structure": "classDiagram"
+    },
+    "example_syntax": "```mermaid\nflowchart TD\n    A[Start] --> B[Process]\n    B --> C[End]\n```"
+  },
+  "file_size_management": {
+    "max_lines": 300,
+    "enforcement": "STRICT",
+    "splitting_strategies": [
+      "Split large PRDs into focused sections (prd-part1.md, prd-part2.md)",
+      "Create separate files for User Stories, Requirements, Dependencies",
+      "Keep main prd.md concise with references to detailed sections",
+      "Focus on core requirements in main document",
+      "Split by project system domains identified from README.md"
+    ]
+  },
+  "workflow": [
+    {
+      "step": 1,
+      "action": "read_project_context",
+      "description": "Read and analyze README.md and CLAUDE.md to understand project context",
+      "focus_areas": [
+        "Target users and stakeholders",
+        "Business domain and use cases", 
+        "Technology stack and architecture",
+        "Quality standards and testing requirements",
+        "Deployment and operational constraints"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "read_and_analyze_idea",
+      "description": "Read and analyze the provided idea.md",
+      "project_alignment": "Focus on how idea aligns with project goals and user workflows"
+    },
+    {
+      "step": 3,
+      "action": "expand_concept",
+      "description": "Expand on the concept with detailed project-specific requirements",
+      "customization": "Consider project's system architecture, technology constraints, and user base"
+    },
+    {
+      "step": 4,
+      "action": "create_user_stories",
+      "description": "Create user stories with acceptance criteria for project users",
+      "user_focus": "Focus on project's target users and stakeholders identified from README.md"
+    },
+    {
+      "step": 5,
+      "action": "define_constraints",
+      "description": "Define technical and business constraints for the project",
+      "constraint_sources": "Include project technology stack limitations, quality standards, and operational requirements"
+    },
+    {
+      "step": 6,
+      "action": "generate_prd",
+      "description": "Generate comprehensive prd.md document with project integration",
+      "project_integration": "Include project-specific sections for system integration and technology considerations"
+    }
+  ],
+  "commands": [
+    {
+      "name": "create_prd_from_idea",
+      "description": "Create prd.md from idea.md using project context from README.md and CLAUDE.md",
+      "parameters": {
+        "idea_file": {
+          "type": "string",
+          "required": true,
+          "default": "./ai-tdd-docs/[feature-name]/idea.md",
+          "description": "Path to the idea.md file to transform (in feature-specific folder)"
+        },
+        "output_path": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/[feature-name]/prd.md",
+          "description": "Path where the prd.md document should be created (in feature-specific folder)"
+        },
+        "target_users": {
+          "type": "array",
+          "required": false,
+          "description": "Target user groups from project context (auto-detected from README.md)"
+        }
+      }
+    },
+    {
+      "name": "generate_product_requirements",
+      "description": "Generate product requirements for idea file using project analysis",
+      "parameters": {
+        "idea_path": {
+          "type": "string",
+          "required": true,
+          "description": "Path to the idea file to process"
+        },
+        "stakeholders": {
+          "type": "array",
+          "required": false,
+          "description": "Project stakeholders (auto-detected from project documentation)"
+        },
+        "project_systems": {
+          "type": "array",
+          "required": false,
+          "description": "Project systems identified from README.md that are involved"
+        }
+      }
+    },
+    {
+      "name": "transform_idea_to_prd",
+      "description": "Transform idea into prd.md with user stories based on project context",
+      "parameters": {
+        "feature_name": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the feature from the idea document"
+        },
+        "priority": {
+          "type": "string",
+          "required": false,
+          "enum": ["High", "Medium", "Low"],
+          "default": "Medium",
+          "description": "Priority level for the feature"
+        },
+        "project_impact": {
+          "type": "string",
+          "required": false,
+          "enum": ["High", "Medium", "Low"],
+          "default": "Medium",
+          "description": "Impact level on project workflows and users"
+        }
+      }
+    }
+  ],
+  "template": {
+    "sections": [
+      "Product Requirements Document: [Feature Name]",
+      "Executive Summary",
+      "Project Context",
+      "User Stories",
+      "Functional Requirements",
+      "Non-Functional Requirements",
+      "Project System Integration",
+      "Dependencies",
+      "Success Metrics",
+      "Timeline & Milestones"
+    ],
+    "user_story_format": "As a [project user type], I want to [action], So that [project benefit]",
+    "project_specific_sections": {
+      "project_context": [
+        "Project domain and business requirements",
+        "Target user workflows and pain points",
+        "Technology stack integration requirements",
+        "Quality and performance standards",
+        "Operational and deployment considerations"
+      ],
+      "system_integration": [
+        "Existing system integration points",
+        "API and service requirements",
+        "Database and data model changes",
+        "UI/UX integration with project framework",
+        "External service and dependency requirements",
+        "Security and authentication integration"
+      ]
+    },
+    "diagram_requirements": {
+      "mandatory_use": "All architectural, workflow, user journey, and system diagrams must be in Mermaid format",
+      "placement": "Include relevant Mermaid diagrams in appropriate sections (user stories, system integration, data flow, dependencies)",
+      "quality": "Diagrams should be clear, well-labeled, and directly support the PRD documentation"
+    }
+  },
+  "execution": {
+    "prerequisite_analysis": {
+      "readme_analysis": [
+        "Extract target users and stakeholders",
+        "Identify core project functionality and features",
+        "Understand business domain and use cases",
+        "Note project architecture and technology stack",
+        "Extract success metrics and project goals"
+      ],
+      "claude_analysis": [
+        "Extract development and quality standards",
+        "Identify testing and validation requirements",
+        "Understand deployment and operational constraints",
+        "Note project-specific patterns and conventions",
+        "Extract performance and security requirements"
+      ]
+    },
+    "input_format": "markdown",
+    "input_file": "idea.md",
+    "output_format": "markdown",
+    "output_file": "prd.md",
+    "quality_checks": [
+      "All user stories have clear acceptance criteria focused on project workflows",
+      "Functional requirements are specific and measurable for project technology",
+      "Non-functional requirements include project-specific performance, security, and usability",
+      "Dependencies include project system components and external requirements",
+      "Success metrics are quantifiable and aligned with project goals",
+      "Integration with existing project systems is clearly defined",
+      "Technical requirements align with project's coding standards from CLAUDE.md",
+      "All diagrams use Mermaid format (no ASCII or text-based diagrams)",
+      "Mermaid diagrams are syntactically correct and render properly",
+      "Diagrams effectively illustrate user journeys, system architecture, workflows, or dependencies"
+    ]
+  },
+  "requirements_categories": {
+    "functional": [
+      "Core feature functionality",
+      "System integration and coordination",
+      "Data processing and management",
+      "User interface and interaction",
+      "Business logic implementation",
+      "External service integration"
+    ],
+    "non_functional": [
+      "Performance (response times, throughput, scalability)",
+      "Security (data protection, authentication, authorization)",
+      "Usability (user experience, accessibility, responsiveness)",
+      "Reliability (uptime, error recovery, fault tolerance)",
+      "Maintainability (code quality, documentation, testing)",
+      "Compatibility (browser, device, platform support)",
+      "Operational (monitoring, logging, deployment)"
+    ]
+  },
+  "project_alignment_framework": {
+    "user_story_generation": [
+      "Identify user personas from README.md context",
+      "Map feature benefits to project user workflows",
+      "Align acceptance criteria with project quality standards",
+      "Consider project-specific user interaction patterns",
+      "Include accessibility and usability requirements"
+    ],
+    "technical_requirements": [
+      "Align with project's technology stack and architecture",
+      "Consider project's scalability and performance requirements",
+      "Include project-specific security and privacy needs",
+      "Account for project's testing and quality standards",
+      "Plan for project's deployment and operational requirements"
+    ],
+    "success_metrics": [
+      "Align with project's business goals and KPIs",
+      "Consider project's user engagement and adoption metrics",
+      "Include technical performance and quality metrics",
+      "Account for project's maintenance and operational costs",
+      "Plan for long-term sustainability and growth"
+    ]
+  }
+}

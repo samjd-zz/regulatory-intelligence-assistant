@@ -1,0 +1,631 @@
+{
+  "name": "ui-generator-generic",
+  "version": "1.0.0",
+  "description": "Generate comprehensive UI mockups and implementations following the AI-TDD methodology for any UI framework",
+  "purpose": "Generate UI mockups and implementations by analyzing project context from README.md, CLAUDE.md, and .clinerules to determine optimal UI framework and patterns",
+  "mcp_server_integration": {
+    "required_servers": [
+      "context7",
+      "angular",
+      "vaadin",
+      "frontend-mcp-server"
+    ],
+    "server_purposes": {
+      "context7": "Access up-to-date documentation for any UI library/framework via Upstash Context7",
+      "angular": "Angular-specific best practices, components, and patterns",
+      "vaadin": "Vaadin framework documentation, components, and styling for Java/React development",
+      "frontend-mcp-server": "AWS Labs React documentation covering essential knowledge, authentication, routing, customizing, and troubleshooting for modern React applications with AWS services"
+    },
+    "usage_priority": [
+      "First discover project's UI framework from README.md/CLAUDE.md/.clinerules",
+      "Use appropriate MCP server based on detected framework",
+      "For React projects with AWS integration: Use frontend-mcp-server for AWS-specific React patterns",
+      "For general React: Use context7 to fetch React library documentation",
+      "Fall back to context7 for framework-agnostic or new framework documentation"
+    ],
+    "framework_detection": {
+      "angular_indicators": [
+        "@angular/core",
+        "angular.json",
+        "ng serve",
+        "Angular",
+        "TypeScript with Angular"
+      ],
+      "vaadin_indicators": [
+        "com.vaadin",
+        "vaadin-core",
+        "Vaadin Flow",
+        "Java UI",
+        "@vaadin/react-components"
+      ],
+      "react_indicators": [
+        "react",
+        "next.js",
+        "create-react-app",
+        "React",
+        "JSX"
+      ],
+      "vue_indicators": [
+        "vue",
+        "nuxt",
+        "Vue.js",
+        "vue-cli"
+      ],
+      "other_frameworks": [
+        "Svelte",
+        "Solid",
+        "Qwik",
+        "Ember",
+        "Backbone"
+      ]
+    }
+  },
+  "project_context_discovery": {
+    "required_files": [
+      "./README.md",
+      "./CLAUDE.md",
+      "./.clinerules"
+    ],
+    "analysis_instructions": [
+      "Read README.md to identify UI framework, component library, and design system",
+      "Read CLAUDE.md to understand UI coding standards, styling patterns, and component conventions",
+      "Read .clinerules to understand project-specific UI rules and constraints",
+      "Identify UI framework (React, Angular, Vue, Vaadin, etc.) from dependencies and documentation",
+      "Extract styling approach (Tailwind, CSS Modules, styled-components, Vaadin themes, etc.)",
+      "Understand component architecture patterns (atomic design, feature-based, etc.)",
+      "Note accessibility requirements and responsive design patterns",
+      "Identify state management approach (Redux, Zustand, Context API, Vaadin Flow state, etc.)"
+    ],
+    "framework_selection_logic": {
+      "if_not_specified": [
+        "Analyze package.json or pom.xml for UI dependencies",
+        "Check existing frontend directory structure",
+        "Review build configuration files (webpack, vite, angular.json, etc.)",
+        "Examine component file extensions (.tsx, .vue, .java, etc.)",
+        "Default to project's existing framework if components exist",
+        "If no framework detected, recommend based on project requirements"
+      ],
+      "selection_criteria": [
+        "TypeScript projects → Angular or React with TypeScript",
+        "Java backend projects → Vaadin Flow for unified stack",
+        "Performance-critical → React or Svelte",
+        "Enterprise applications → Angular or Vaadin",
+        "Rapid prototyping → React with component libraries"
+      ]
+    }
+  },
+  "capabilities": [
+    "Analyze project context to determine optimal UI framework",
+    "Access framework-specific documentation via appropriate MCP servers",
+    "Generate UI mockups using Mermaid diagrams for wireframes",
+    "Create component specifications aligned with project patterns",
+    "Generate production-ready UI code in project's framework",
+    "Design responsive layouts following project's design system",
+    "Implement accessibility standards (WCAG 2.1)",
+    "Create interactive prototypes with proper state management",
+    "Integrate with project's styling approach (CSS/Tailwind/CSS-in-JS/Vaadin themes)",
+    "Generate component documentation and usage examples",
+    "Ensure all generated files stay under 300 lines",
+    "Create all diagrams using Mermaid format for better visualization"
+  ],
+  "diagram_standards": {
+    "format": "mermaid",
+    "enforcement": "MANDATORY",
+    "prohibited_formats": ["ascii", "text-based", "plaintext"],
+    "guidelines": [
+      "All diagrams must use Mermaid syntax within markdown code blocks",
+      "Use flowchart for UI component hierarchy and navigation flows",
+      "Use journey diagrams for user interaction flows",
+      "Use class diagrams for component relationships",
+      "Include descriptive labels and clear relationships",
+      "Keep diagrams focused and readable"
+    ],
+    "ui_specific_diagrams": {
+      "component_hierarchy": "flowchart TD - Shows component tree structure",
+      "user_flow": "journey - Shows user interaction paths",
+      "state_diagram": "stateDiagram-v2 - Shows UI state transitions",
+      "navigation": "flowchart LR - Shows page/route navigation",
+      "layout": "flowchart TD - Shows page layout structure"
+    },
+    "example_syntax": "```mermaid\nflowchart TD\n    A[App] --> B[Header]\n    A --> C[Main Content]\n    A --> D[Footer]\n```"
+  },
+  "file_size_management": {
+    "max_lines": 300,
+    "enforcement": "STRICT",
+    "splitting_strategies": [
+      "Split large components into smaller, focused components",
+      "Extract styles into separate style modules",
+      "Create custom hooks/composables for complex logic",
+      "Use component composition over large monolithic components",
+      "Extract constants and types into separate files",
+      "Create reusable utility components",
+      "Follow framework-specific code splitting patterns"
+    ]
+  },
+  "workflow": [
+    {
+      "step": 1,
+      "action": "read_project_context",
+      "description": "Read and analyze README.md, CLAUDE.md, and .clinerules",
+      "ui_focus": [
+        "Identify UI framework and version",
+        "Understand design system and styling approach",
+        "Extract component architecture patterns",
+        "Note accessibility and responsive design requirements",
+        "Identify state management strategy",
+        "Understand build and development workflow"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "detect_ui_framework",
+      "description": "Automatically detect UI framework or recommend based on requirements",
+      "detection_process": [
+        "Check package.json/pom.xml for UI dependencies",
+        "Examine project structure for framework indicators",
+        "Review existing components for framework patterns",
+        "If uncertain, ask user for framework preference",
+        "Document framework selection rationale"
+      ]
+    },
+    {
+      "step": 3,
+      "action": "access_framework_documentation",
+      "description": "Use appropriate MCP server to access framework documentation",
+      "mcp_usage": [
+        "For Angular: Use angular MCP for best practices and component APIs",
+        "For Vaadin: Use vaadin MCP for Java/React component documentation",
+        "For others: Use context7 MCP to fetch library documentation",
+        "Query for specific components, patterns, and best practices",
+        "Verify current version compatibility"
+      ]
+    },
+    {
+      "step": 4,
+      "action": "analyze_ui_requirements",
+      "description": "Parse PRD or feature requirements for UI specifications",
+      "analysis_scope": "Extract user stories, interaction patterns, visual requirements, and accessibility needs"
+    },
+    {
+      "step": 5,
+      "action": "create_ui_mockups",
+      "description": "Create wireframes and mockups using Mermaid diagrams",
+      "mockup_types": "Component hierarchy, user flows, state diagrams, navigation structure"
+    },
+    {
+      "step": 6,
+      "action": "design_component_architecture",
+      "description": "Design component structure and interactions",
+      "design_principles": "Follow project patterns, ensure reusability, maintain separation of concerns"
+    },
+    {
+      "step": 7,
+      "action": "generate_ui_code",
+      "description": "Generate production-ready UI code in project's framework",
+      "code_standards": "Follow framework conventions, implement accessibility, ensure responsive design"
+    },
+    {
+      "step": 8,
+      "action": "create_documentation",
+      "description": "Generate component documentation with usage examples",
+      "documentation_format": "Include props/inputs, events, styling, and integration guidelines"
+    }
+  ],
+  "commands": [
+    {
+      "name": "generate_ui_mockup",
+      "description": "Generate UI mockups from PRD using project context and framework documentation",
+      "parameters": {
+        "prd_file": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/[feature-name]/prd.md",
+          "description": "Path to PRD file with UI requirements"
+        },
+        "output_path": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/[feature-name]/ui-mockup.md",
+          "description": "Path for UI mockup documentation"
+        },
+        "framework": {
+          "type": "string",
+          "required": false,
+          "description": "UI framework (auto-detected from project)"
+        },
+        "include_wireframes": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include Mermaid wireframe diagrams"
+        }
+      }
+    },
+    {
+      "name": "implement_ui_components",
+      "description": "Implement UI components based on mockup using framework best practices",
+      "parameters": {
+        "mockup_file": {
+          "type": "string",
+          "required": true,
+          "description": "Path to UI mockup document"
+        },
+        "output_directory": {
+          "type": "string",
+          "required": false,
+          "description": "Directory for generated components (auto-detected from project)"
+        },
+        "component_style": {
+          "type": "string",
+          "required": false,
+          "enum": ["functional", "class", "composition"],
+          "description": "Component style (auto-detected from project patterns)"
+        },
+        "include_tests": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Generate component tests"
+        }
+      }
+    },
+    {
+      "name": "create_design_system_components",
+      "description": "Create reusable design system components",
+      "parameters": {
+        "component_types": {
+          "type": "array",
+          "required": true,
+          "description": "Types of components to create (Button, Input, Card, etc.)"
+        },
+        "design_tokens": {
+          "type": "object",
+          "required": false,
+          "description": "Design tokens (colors, spacing, typography)"
+        },
+        "framework": {
+          "type": "string",
+          "required": false,
+          "description": "UI framework (auto-detected from project)"
+        }
+      }
+    },
+    {
+      "name": "generate_responsive_layout",
+      "description": "Generate responsive layout structure for feature",
+      "parameters": {
+        "layout_type": {
+          "type": "string",
+          "required": true,
+          "enum": ["dashboard", "form", "list", "detail", "landing", "custom"],
+          "description": "Type of layout to generate"
+        },
+        "breakpoints": {
+          "type": "array",
+          "required": false,
+          "description": "Responsive breakpoints (auto-detected from project)"
+        },
+        "grid_system": {
+          "type": "string",
+          "required": false,
+          "description": "Grid system to use (CSS Grid, Flexbox, framework-specific)"
+        }
+      }
+    },
+    {
+      "name": "add_accessibility_features",
+      "description": "Add accessibility features to existing components",
+      "parameters": {
+        "component_paths": {
+          "type": "array",
+          "required": true,
+          "description": "Paths to components to enhance"
+        },
+        "wcag_level": {
+          "type": "string",
+          "required": false,
+          "default": "AA",
+          "enum": ["A", "AA", "AAA"],
+          "description": "WCAG compliance level to target"
+        }
+      }
+    }
+  ],
+  "template": {
+    "mockup_sections": [
+      "UI Mockup: [Feature Name]",
+      "Overview",
+      "Framework Selection & Rationale",
+      "Component Hierarchy (Mermaid Diagram)",
+      "User Flows (Mermaid Journey Diagram)",
+      "Wireframes (Mermaid Flowcharts)",
+      "Component Specifications",
+      "State Management Strategy",
+      "Styling Approach",
+      "Accessibility Considerations",
+      "Responsive Design Strategy",
+      "Implementation Notes"
+    ],
+    "component_specification": {
+      "name": "Component name and purpose",
+      "props_or_inputs": "Component inputs/props with types",
+      "events_or_outputs": "Events emitted or outputs",
+      "state": "Internal state management",
+      "styling": "Styling approach and classes",
+      "accessibility": "ARIA labels, keyboard navigation, screen reader support",
+      "responsiveness": "Breakpoint behavior and mobile adaptations"
+    },
+    "framework_specific_templates": {
+      "react": {
+        "component_structure": "Functional components with hooks",
+        "styling": "CSS Modules, Tailwind, or styled-components",
+        "state": "useState, useReducer, or external state management",
+        "routing": "React Router patterns"
+      },
+      "angular": {
+        "component_structure": "Standalone components or NgModule-based",
+        "styling": "Component styles with ViewEncapsulation",
+        "state": "Services with RxJS observables",
+        "routing": "Angular Router with lazy loading"
+      },
+      "vaadin": {
+        "java_flow": {
+          "component_structure": "Java classes extending Component",
+          "styling": "Lumo theme with CSS custom properties",
+          "state": "Java backend state with Binder",
+          "routing": "Route annotations and navigation"
+        },
+        "react": {
+          "component_structure": "React components with Vaadin components",
+          "styling": "Vaadin theme with React patterns",
+          "state": "React state with Vaadin data binding"
+        }
+      },
+      "vue": {
+        "component_structure": "Composition API or Options API",
+        "styling": "Scoped styles or CSS Modules",
+        "state": "Pinia or Vuex store",
+        "routing": "Vue Router with navigation guards"
+      }
+    },
+    "diagram_requirements": {
+      "mandatory_use": "All UI wireframes, component hierarchies, and user flows must be in Mermaid format",
+      "placement": "Include diagrams in Overview, Component Hierarchy, User Flows, and Wireframes sections",
+      "quality": "Diagrams should clearly show UI structure, navigation, and component relationships"
+    }
+  },
+  "execution": {
+    "prerequisite_analysis": {
+      "readme_analysis": [
+        "Extract UI framework and version",
+        "Identify component library and design system",
+        "Understand styling approach and tools",
+        "Note build and development commands",
+        "Extract responsive design requirements"
+      ],
+      "claude_analysis": [
+        "Extract UI coding standards and conventions",
+        "Identify component architecture patterns",
+        "Understand state management approach",
+        "Note accessibility requirements",
+        "Extract testing requirements for UI components"
+      ],
+      "clinerules_analysis": [
+        "Extract project-specific UI rules and constraints",
+        "Identify styling theme requirements (e.g., tactical green for Airhound)",
+        "Understand performance requirements",
+        "Note any prohibited patterns or approaches"
+      ]
+    },
+    "mcp_usage_workflow": [
+      "Detect framework from project context",
+      "Use angular MCP if Angular detected: get_best_practices, search_documentation",
+      "Use vaadin MCP if Vaadin detected: get_vaadin_primer, search_vaadin_docs, get_component_*_api",
+      "Use frontend-mcp-server MCP if React with AWS detected: GetReactDocsByTopic for essential-knowledge, troubleshooting",
+      "Use context7 MCP for other frameworks: resolve-library-id, get-library-docs",
+      "Cache documentation for efficient reuse",
+      "Validate component APIs against current versions"
+    ],
+    "output_format": "markdown (mockup) or framework-specific code files",
+    "quality_checks": [
+      "All diagrams use Mermaid format (no ASCII or text-based diagrams)",
+      "Mermaid diagrams are syntactically correct and render properly",
+      "Component hierarchy is logical and follows framework best practices",
+      "User flows cover all major interactions and edge cases",
+      "Wireframes clearly communicate layout and component placement",
+      "Component specifications include all necessary details",
+      "State management approach aligns with project patterns",
+      "Styling follows project's design system and conventions",
+      "Accessibility features meet WCAG 2.1 AA standards minimum",
+      "Responsive design works across all target breakpoints",
+      "Code follows framework-specific best practices from MCP documentation",
+      "All generated files stay under 300 lines"
+    ]
+  },
+  "framework_best_practices": {
+    "react": [
+      "Use functional components with hooks",
+      "Implement proper error boundaries",
+      "Optimize rendering with useMemo/useCallback",
+      "Use lazy loading for code splitting",
+      "Implement proper key props in lists",
+      "Follow component composition patterns"
+    ],
+    "angular": [
+      "Use standalone components for modern Angular",
+      "Implement OnPush change detection strategy",
+      "Use async pipe for observable subscriptions",
+      "Implement proper lifecycle hooks",
+      "Use dependency injection appropriately",
+      "Follow Angular style guide"
+    ],
+    "vaadin_java": [
+      "Use Vaadin Flow components appropriately",
+      "Implement Binder for form validation",
+      "Use @Route for navigation",
+      "Implement proper theme customization",
+      "Use Grid with data providers efficiently",
+      "Follow Vaadin security best practices"
+    ],
+    "vaadin_react": [
+      "Use @vaadin/react-components correctly",
+      "Implement proper theme integration",
+      "Use Vaadin components with React patterns",
+      "Follow both Vaadin and React best practices"
+    ],
+    "vue": [
+      "Use Composition API for complex logic",
+      "Implement proper reactivity patterns",
+      "Use scoped slots appropriately",
+      "Follow Vue style guide",
+      "Optimize with computed properties",
+      "Use Vue Router effectively"
+    ]
+  },
+  "accessibility_requirements": {
+    "wcag_2_1_aa_minimum": [
+      "Perceivable: Text alternatives, captions, adaptable content, distinguishable",
+      "Operable: Keyboard accessible, enough time, seizures and physical reactions, navigable",
+      "Understandable: Readable, predictable, input assistance",
+      "Robust: Compatible with assistive technologies"
+    ],
+    "implementation_checklist": [
+      "Semantic HTML elements (button, nav, main, etc.)",
+      "ARIA labels and roles where needed",
+      "Keyboard navigation support (Tab, Enter, Escape, Arrow keys)",
+      "Focus management and visible focus indicators",
+      "Screen reader testing and announcements",
+      "Color contrast ratios (4.5:1 for text, 3:1 for UI components)",
+      "Responsive text sizing and zoom support",
+      "Form labels and error messages",
+      "Skip links for keyboard navigation",
+      "Live regions for dynamic content updates"
+    ]
+  },
+  "responsive_design_strategy": {
+    "breakpoint_standards": {
+      "mobile": "< 640px",
+      "tablet": "640px - 1024px",
+      "desktop": "> 1024px",
+      "custom": "Project-specific breakpoints from design system"
+    },
+    "mobile_first_approach": [
+      "Design for mobile screens first",
+      "Enhance progressively for larger screens",
+      "Use relative units (rem, em, %) over fixed pixels",
+      "Implement touch-friendly target sizes (44x44px minimum)",
+      "Optimize images and assets for mobile bandwidth",
+      "Test on actual devices when possible"
+    ],
+    "layout_techniques": [
+      "CSS Grid for complex layouts",
+      "Flexbox for component-level layouts",
+      "Container queries for component responsiveness",
+      "CSS custom properties for theming",
+      "Media queries for breakpoint-specific styles"
+    ]
+  },
+  "state_management_patterns": {
+    "react": [
+      "Local state: useState for simple component state",
+      "Context API: For shared state across component tree",
+      "Redux/Zustand: For complex global state",
+      "React Query: For server state management",
+      "Jotai/Recoil: For atomic state management"
+    ],
+    "angular": [
+      "Component state: Properties and methods",
+      "Services: For shared state with dependency injection",
+      "RxJS: For reactive state management",
+      "NgRx: For Redux-like state management",
+      "Akita: For entity-based state management"
+    ],
+    "vaadin": [
+      "Java backend state: Server-side state management",
+      "Binder: For form state and validation",
+      "Session attributes: For user-specific state",
+      "Database: For persistent state"
+    ],
+    "vue": [
+      "Reactive data: For component state",
+      "Pinia: For modern Vue store",
+      "Vuex: For legacy Vue 2 applications",
+      "Composables: For reusable stateful logic"
+    ]
+  },
+  "styling_approaches": {
+    "css_modules": [
+      "Scoped styles per component",
+      "Compose styles from multiple modules",
+      "Use with CSS preprocessors (Sass, Less)"
+    ],
+    "tailwind_css": [
+      "Utility-first approach",
+      "Responsive design with mobile-first utilities",
+      "Custom theme configuration",
+      "Component extraction with @apply"
+    ],
+    "css_in_js": [
+      "styled-components for React",
+      "Emotion for React/Vue",
+      "Style encapsulation with component",
+      "Dynamic styling based on props"
+    ],
+    "vaadin_themes": [
+      "Lumo theme customization",
+      "CSS custom properties for theming",
+      "Component-specific styling",
+      "Dark mode support"
+    ],
+    "framework_styles": [
+      "Angular component styles with ViewEncapsulation",
+      "Vue scoped styles",
+      "Framework-specific style guides"
+    ]
+  },
+  "performance_optimization": {
+    "rendering_optimization": [
+      "Lazy load components and routes",
+      "Use virtual scrolling for long lists",
+      "Implement pagination for large datasets",
+      "Optimize images (WebP, lazy loading, responsive images)",
+      "Use CSS containment for layout isolation",
+      "Minimize re-renders with proper state management"
+    ],
+    "bundle_optimization": [
+      "Code splitting by routes and features",
+      "Tree shaking for unused code elimination",
+      "Minimize and compress assets",
+      "Use CDN for static assets",
+      "Implement proper caching strategies"
+    ],
+    "runtime_optimization": [
+      "Debounce and throttle event handlers",
+      "Use requestAnimationFrame for animations",
+      "Optimize CSS selectors",
+      "Minimize JavaScript execution time",
+      "Use Web Workers for heavy computations"
+    ]
+  },
+  "testing_strategy": {
+    "component_testing": [
+      "Unit tests for component logic",
+      "Snapshot tests for UI consistency",
+      "Integration tests for component interactions",
+      "Accessibility tests with jest-axe or similar",
+      "Visual regression tests with Percy or Chromatic"
+    ],
+    "framework_testing_tools": {
+      "react": "Jest + React Testing Library",
+      "angular": "Jasmine/Jest + Angular Testing Library",
+      "vaadin": "JUnit + Vaadin TestBench",
+      "vue": "Vitest + Vue Test Utils"
+    },
+    "e2e_testing": [
+      "Use Playwright, Cypress, or framework-specific tools",
+      "Test critical user flows",
+      "Test across different browsers and devices",
+      "Include accessibility testing"
+    ]
+  }
+}

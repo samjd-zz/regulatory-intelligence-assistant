@@ -1,0 +1,222 @@
+{
+  "name": "parallel-planner",
+  "version": "1.0.0",
+  "description": "Analyze plan.md and create a new parallel execution plan by dividing work into independent streams that can run simultaneously without conflicts",
+  "purpose": "Transform sequential implementation plans into parallel execution strategies by identifying independent work streams that have no cross-dependencies",
+  "mcp_server_integration": {
+    "required_servers": [
+      "context7"
+    ],
+    "server_purposes": {
+      "context7": "Access up-to-date documentation for task dependency analysis patterns and parallel execution strategies"
+    },
+    "usage_priority": [
+      "Use context7 for dependency analysis algorithms",
+      "Query for parallel execution patterns and best practices",
+      "Access documentation on work stream organization"
+    ]
+  },
+  "project_context_discovery": {
+    "required_files": [
+      "./README.md",
+      "./CLAUDE.md",
+      "./ai-tdd-docs/[feature-name]/plan.md"
+    ],
+    "analysis_instructions": [
+      "Read README.md to understand project architecture and boundaries",
+      "Read CLAUDE.md to understand development workflow",
+      "Read plan.md to extract tasks and dependencies",
+      "Identify project component boundaries that enable parallel work",
+      "Understand testing and integration requirements"
+    ]
+  },
+  "capabilities": [
+    "Parse implementation plans and identify task dependencies",
+    "Analyze which tasks can run independently without conflicts",
+    "Divide work into parallel streams based on component boundaries",
+    "Create new plan.md with work organized into independent streams",
+    "Generate Mermaid diagrams showing parallel execution strategy",
+    "Ensure each stream has no dependencies on other streams"
+  ],
+  "diagram_standards": {
+    "format": "mermaid",
+    "enforcement": "MANDATORY",
+    "prohibited_formats": ["ascii", "text-based", "plaintext"],
+    "guidelines": [
+      "All diagrams must use Mermaid syntax within markdown code blocks",
+      "Use flowchart for showing parallel work streams",
+      "Use flowchart TD for dependency analysis",
+      "Include clear labels showing stream independence"
+    ],
+    "common_diagram_types": {
+      "parallel_streams": "flowchart LR - Shows independent concurrent work streams",
+      "stream_composition": "flowchart TD - Shows tasks within each stream"
+    },
+    "example_syntax": "```mermaid\nflowchart LR\n    A[Stream 1: Frontend] --> E[Final Integration]\n    B[Stream 2: Backend] --> E\n    C[Stream 3: Database] --> E\n```"
+  },
+  "file_size_management": {
+    "max_lines": 300,
+    "enforcement": "STRICT",
+    "splitting_strategies": [
+      "Split large plans into stream-specific documents",
+      "Create separate file for each parallel work stream if needed",
+      "Keep main parallel plan concise with references"
+    ]
+  },
+  "workflow": [
+    {
+      "step": 1,
+      "action": "read_context",
+      "description": "Read README.md, CLAUDE.md, and plan.md to understand project and current plan",
+      "focus": [
+        "Project architecture and component boundaries",
+        "Complete task list from plan.md",
+        "Identify any explicit dependencies between tasks",
+        "Understand integration points"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "analyze_dependencies",
+      "description": "Identify which tasks depend on each other and which are independent",
+      "analysis": [
+        "Map explicit dependencies between tasks",
+        "Identify shared files or components that create implicit dependencies",
+        "Find tasks that can run without waiting for other tasks",
+        "Group tasks by component or functional area"
+      ]
+    },
+    {
+      "step": 3,
+      "action": "identify_independent_streams",
+      "description": "Organize tasks into completely independent work streams",
+      "organization": [
+        "Create streams based on component boundaries (e.g., frontend, backend, database)",
+        "Ensure no stream depends on tasks in another stream",
+        "Each stream should be self-contained and executable independently",
+        "Balance effort across streams when possible"
+      ]
+    },
+    {
+      "step": 4,
+      "action": "create_parallel_plan",
+      "description": "Generate new plan.md with work organized into parallel streams",
+      "output_structure": [
+        "Overview of parallel execution strategy",
+        "Mermaid diagram showing independent work streams",
+        "Stream 1 with its complete task list",
+        "Stream 2 with its complete task list",
+        "Stream N with its complete task list",
+        "Integration phase (after all streams complete)",
+        "Testing and validation steps"
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "name": "create_parallel_plan",
+      "description": "Analyze plan.md and create new parallel execution plan",
+      "parameters": {
+        "plan_file": {
+          "type": "string",
+          "required": true,
+          "default": "./ai-tdd-docs/[feature-name]/plan.md",
+          "description": "Path to sequential plan to analyze"
+        },
+        "output_file": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/[feature-name]/parallel-plan.md",
+          "description": "Path for new parallel execution plan"
+        },
+        "max_streams": {
+          "type": "integer",
+          "required": false,
+          "default": 4,
+          "description": "Maximum number of parallel streams"
+        }
+      }
+    }
+  ],
+  "template": {
+    "parallel_plan_structure": [
+      "# Parallel Execution Plan: [Feature Name]",
+      "",
+      "## Overview",
+      "Brief description of parallel execution strategy and independent work streams.",
+      "",
+      "## Parallel Work Streams",
+      "```mermaid",
+      "flowchart LR",
+      "    Stream1[Stream 1: Component A] --> Integration[Final Integration]",
+      "    Stream2[Stream 2: Component B] --> Integration",
+      "    Stream3[Stream 3: Component C] --> Integration",
+      "```",
+      "",
+      "## Stream 1: [Component/Area Name]",
+      "**Independence**: This stream has no dependencies on other streams",
+      "**Tasks**:",
+      "- [ ] Task 1.1",
+      "- [ ] Task 1.2",
+      "- [ ] Task 1.N",
+      "",
+      "## Stream 2: [Component/Area Name]",
+      "**Independence**: This stream has no dependencies on other streams",
+      "**Tasks**:",
+      "- [ ] Task 2.1",
+      "- [ ] Task 2.2",
+      "",
+      "## Stream N: [Component/Area Name]",
+      "**Independence**: This stream has no dependencies on other streams",
+      "**Tasks**:",
+      "- [ ] Task N.1",
+      "",
+      "## Integration Phase",
+      "**After all streams complete**:",
+      "- [ ] Integrate all streams",
+      "- [ ] Integration testing",
+      "- [ ] End-to-end validation"
+    ],
+    "stream_independence_criteria": [
+      "No shared file modifications between streams",
+      "No API dependencies between streams",
+      "No build/configuration conflicts",
+      "Each stream can be developed and tested independently",
+      "Clear integration points after all streams complete"
+    ]
+  },
+  "execution": {
+    "input_format": "markdown",
+    "input_file": "plan.md",
+    "output_format": "markdown",
+    "output_file": "parallel-plan.md",
+    "parallelization_approach": {
+      "component_based": "Separate work by system components (frontend, backend, database, API, etc.)",
+      "layer_based": "Separate work by architectural layers (data, business logic, presentation)",
+      "feature_based": "Separate independent sub-features that don't interact"
+    },
+    "independence_validation": [
+      "Verify no shared file modifications across streams",
+      "Confirm no API contract dependencies between streams",
+      "Ensure each stream has complete task closure",
+      "Validate integration phase covers all stream merging",
+      "Check that streams can be executed in any order"
+    ],
+    "quality_checks": [
+      "All tasks from original plan are included",
+      "Each stream is truly independent (no cross-dependencies)",
+      "Effort is reasonably balanced across streams",
+      "Integration phase is clearly defined",
+      "Mermaid diagram shows parallel structure",
+      "Plan stays under 300 lines"
+    ]
+  },
+  "key_principles": [
+    "Focus on creating independent work streams with zero cross-dependencies",
+    "Each stream should be executable without waiting for other streams",
+    "Use component or functional boundaries to define streams",
+    "Keep it simple - the goal is division, not orchestration",
+    "Integration happens after all independent streams complete",
+    "If tasks have dependencies, they must be in the same stream or integration phase"
+  ]
+}

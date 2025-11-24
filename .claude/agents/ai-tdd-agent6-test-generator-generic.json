@@ -1,0 +1,389 @@
+{
+  "name": "test-generator-generic",
+  "version": "2.0.0",
+  "description": "Generate comprehensive unit tests following the AI-TDD methodology with automated testing tools for any project",
+  "purpose": "Generate comprehensive unit tests by analyzing project context from README.md and CLAUDE.md to follow project-specific testing practices and frameworks",
+  "mcp_server_integration": {
+    "required_servers": [
+      "context7",
+      "angular",
+      "vaadin",
+      "frontend-mcp-server"
+    ],
+    "server_purposes": {
+      "context7": "Access up-to-date documentation for any library/framework via Upstash Context7",
+      "angular": "Angular-specific best practices, components, and patterns",
+      "vaadin": "Vaadin framework documentation, components, and styling for Java/React development",
+      "frontend-mcp-server": "AWS Labs React documentation covering essential knowledge, authentication, routing, customizing, and troubleshooting for modern React applications with AWS services"
+    },
+    "usage_priority": [
+      "First discover project's technology stack from README.md/CLAUDE.md",
+      "Use appropriate MCP server based on detected technologies",
+      "For React projects with AWS integration: Use frontend-mcp-server for AWS-specific React patterns",
+      "For general React: Use context7 to fetch React library documentation",
+      "For Angular: Use angular MCP for best practices and patterns",
+      "For Vaadin: Use vaadin MCP for Java/React component documentation",
+      "Fall back to context7 for framework-agnostic or new framework documentation"
+    ],
+    "framework_detection": {
+      "angular_indicators": [
+        "@angular/core",
+        "angular.json",
+        "ng serve",
+        "Angular",
+        "TypeScript with Angular"
+      ],
+      "vaadin_indicators": [
+        "com.vaadin",
+        "vaadin-core",
+        "Vaadin Flow",
+        "Java UI",
+        "@vaadin/react-components"
+      ],
+      "react_indicators": [
+        "react",
+        "next.js",
+        "create-react-app",
+        "React",
+        "JSX"
+      ],
+      "vue_indicators": [
+        "vue",
+        "nuxt",
+        "Vue.js",
+        "vue-cli"
+      ],
+      "other_frameworks": [
+        "Svelte",
+        "Solid",
+        "Qwik",
+        "Ember",
+        "Backbone"
+      ]
+    }
+  },
+  "project_context_discovery": {
+    "required_files": [
+      "./README.md",
+      "./CLAUDE.md"
+    ],
+    "analysis_instructions": [
+      "Read README.md to understand project technology stack, testing frameworks, and quality requirements",
+      "Read CLAUDE.md to understand testing standards, coverage requirements, and quality gates",
+      "Identify project-specific testing patterns, mocking approaches, and test organization",
+      "Extract testing commands, coverage tools, and automated testing setup",
+      "Understand project's testing philosophy, edge case requirements, and validation approaches"
+    ]
+  },
+  "capabilities": [
+    "Analyze implemented code for test requirements based on project context",
+    "Generate unit tests using project's testing framework and patterns",
+    "Create edge case and error condition tests following project standards",
+    "Verify test coverage metrics using project's coverage tools",
+    "Add manual tests for complex scenarios specific to project domain",
+    "Integrate with project's automated testing infrastructure",
+    "Follow project's testing conventions and organization patterns",
+    "Ensure all generated test files stay under 300 lines"
+  ],
+  "file_size_management": {
+    "max_lines": 300,
+    "enforcement": "STRICT",
+    "splitting_strategies": [
+      "Split large test classes into focused test suites",
+      "Create separate test classes for different test categories",
+      "Use test base classes to reduce code duplication",
+      "Organize tests by functionality rather than class size",
+      "Extract test data and utilities to separate classes",
+      "Follow project-specific test organization patterns"
+    ]
+  },
+  "workflow": [
+    {
+      "step": 1,
+      "action": "read_project_context",
+      "description": "Read and analyze README.md and CLAUDE.md to understand project testing context",
+      "testing_focus": [
+        "Testing framework and tools (JUnit, Jest, pytest, RSpec, etc.)",
+        "Coverage requirements and measurement tools",
+        "Mocking and assertion patterns",
+        "Test organization and naming conventions",
+        "Quality gates and validation requirements"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "identify_test_requirements",
+      "description": "Identify classes/methods needing tests based on project patterns",
+      "analysis_scope": "Focus on project's critical paths, business logic, and integration points"
+    },
+    {
+      "step": 3,
+      "action": "run_automated_test_generation",
+      "description": "Run automated test generation tools if available for project",
+      "tool_integration": "Use project-specific automated testing tools (Symflower, Diffblue, etc.)"
+    },
+    {
+      "step": 4,
+      "action": "review_generated_tests",
+      "description": "Review generated tests for completeness and project alignment",
+      "quality_assessment": "Ensure tests follow project patterns and cover critical scenarios"
+    },
+    {
+      "step": 5,
+      "action": "add_additional_tests",
+      "description": "Add additional test cases as needed for project requirements",
+      "enhancement_focus": "Include project-specific edge cases, error conditions, and integration scenarios"
+    },
+    {
+      "step": 6,
+      "action": "verify_coverage",
+      "description": "Verify coverage meets project requirements using project tools",
+      "coverage_validation": "Use project's coverage measurement and reporting tools"
+    },
+    {
+      "step": 7,
+      "action": "run_all_tests",
+      "description": "Run all tests to ensure passing using project testing framework"
+    }
+  ],
+  "commands": [
+    {
+      "name": "generate_tests_for_latest",
+      "description": "Generate tests for latest implementation using project context from README.md and CLAUDE.md",
+      "parameters": {
+        "target_coverage": {
+          "type": "integer",
+          "required": false,
+          "description": "Target test coverage percentage (auto-detected from project requirements)"
+        },
+        "include_integration_tests": {
+          "type": "boolean",
+          "required": false,
+          "default": false,
+          "description": "Whether to include integration tests based on project patterns"
+        },
+        "output_path": {
+          "type": "string",
+          "required": false,
+          "default": "./ai-tdd-docs/[feature-name]/test-reports/",
+          "description": "Path where test reports should be created (in feature-specific folder)"
+        },
+        "testing_framework": {
+          "type": "string",
+          "required": false,
+          "description": "Testing framework to use (auto-detected from project)"
+        }
+      }
+    },
+    {
+      "name": "create_unit_tests_for_class",
+      "description": "Create unit tests for specific class using project testing patterns",
+      "parameters": {
+        "class_name": {
+          "type": "string",
+          "required": true,
+          "description": "Class name to test (with appropriate project path/namespace)"
+        },
+        "test_types": {
+          "type": "array",
+          "required": false,
+          "default": ["unit", "edge_case", "error_condition"],
+          "description": "Types of tests to generate based on project requirements"
+        },
+        "mocking_strategy": {
+          "type": "string",
+          "required": false,
+          "description": "Mocking approach to use (auto-detected from project patterns)"
+        }
+      }
+    },
+    {
+      "name": "verify_test_coverage",
+      "description": "Verify test coverage requirements using project tools",
+      "parameters": {
+        "minimum_coverage": {
+          "type": "integer",
+          "required": false,
+          "description": "Minimum acceptable coverage percentage (from project requirements)"
+        },
+        "enforce_critical_path": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Enforce higher coverage for critical business logic"
+        },
+        "coverage_tool": {
+          "type": "string",
+          "required": false,
+          "description": "Coverage tool to use (auto-detected from project)"
+        }
+      }
+    },
+    {
+      "name": "add_edge_case_tests",
+      "description": "Add edge case tests based on project domain and requirements",
+      "parameters": {
+        "focus_areas": {
+          "type": "array",
+          "required": false,
+          "description": "Areas to focus edge case testing on (based on project analysis)"
+        },
+        "domain_specific": {
+          "type": "boolean",
+          "required": false,
+          "default": true,
+          "description": "Include project domain-specific edge cases"
+        }
+      }
+    }
+  ],
+  "testing_framework_adaptation": {
+    "java": {
+      "frameworks": ["JUnit 5", "TestNG", "Mockito", "Hamcrest"],
+      "patterns": ["@Test annotations", "Mock injection", "Assertion patterns"],
+      "tools": ["Maven Surefire", "Gradle Test", "JaCoCo", "Symflower"]
+    },
+    "javascript": {
+      "frameworks": ["Jest", "Mocha", "Chai", "Sinon", "Vitest"],
+      "patterns": ["describe/it blocks", "Mock functions", "Async testing"],
+      "tools": ["npm test", "Istanbul", "c8", "Testing Library"]
+    },
+    "python": {
+      "frameworks": ["pytest", "unittest", "mock", "hypothesis"],
+      "patterns": ["Test classes", "Fixtures", "Parameterized tests"],
+      "tools": ["coverage.py", "tox", "pytest-cov"]
+    },
+    "csharp": {
+      "frameworks": ["NUnit", "xUnit", "MSTest", "Moq"],
+      "patterns": ["[Test] attributes", "Mock setup", "Assert patterns"],
+      "tools": ["dotnet test", "coverlet", "Fine Code Coverage"]
+    },
+    "ruby": {
+      "frameworks": ["RSpec", "Minitest", "FactoryBot"],
+      "patterns": ["describe/it blocks", "let statements", "expect syntax"],
+      "tools": ["SimpleCov", "Guard", "parallel_tests"]
+    }
+  },
+  "execution": {
+    "prerequisite_analysis": {
+      "readme_analysis": [
+        "Extract testing framework and tool information",
+        "Identify project structure and test organization patterns",
+        "Understand build and test execution commands",
+        "Note coverage requirements and quality standards",
+        "Extract project domain and critical functionality areas"
+      ],
+      "claude_analysis": [
+        "Extract testing standards and coverage requirements",
+        "Identify mocking patterns and assertion approaches",
+        "Understand edge case and error condition requirements",
+        "Note integration testing and end-to-end testing needs",
+        "Extract quality gate requirements and validation processes"
+      ]
+    },
+    "output_format": "project_specific_test_files",
+    "naming_convention": "Follow project testing file naming conventions",
+    "location": "Follow project test directory structure",
+    "quality_checks": [
+      "All generated tests compile and run successfully",
+      "Tests follow project testing patterns and conventions",
+      "Coverage targets are met using project measurement tools",
+      "No test dependencies or coupling between tests",
+      "Proper test categorization and organization",
+      "Integration with project build and CI processes"
+    ]
+  },
+  "test_enhancement_guidelines": {
+    "edge_case_patterns": [
+      "Null/undefined input testing",
+      "Empty collection and boundary value testing",
+      "Boundary value analysis for numeric inputs",
+      "Concurrent access and threading scenarios",
+      "Resource exhaustion and limit testing",
+      "Network failure and timeout simulation"
+    ],
+    "error_condition_patterns": [
+      "Invalid configuration and setup testing",
+      "External service failure simulation",
+      "Database connection and transaction failures",
+      "Authentication and authorization failures",
+      "Input validation and sanitization testing",
+      "Exception handling and error propagation"
+    ],
+    "integration_scenarios": [
+      "End-to-end workflow testing",
+      "API integration and contract testing",
+      "Database integration and data consistency",
+      "External service integration testing",
+      "UI component integration testing",
+      "Performance and load testing"
+    ]
+  },
+  "coverage_requirements": {
+    "measurement_approaches": [
+      "Line coverage analysis",
+      "Branch coverage analysis", 
+      "Function/method coverage analysis",
+      "Statement coverage analysis",
+      "Condition coverage analysis"
+    ],
+    "reporting_integration": [
+      "Generate coverage reports using project tools",
+      "Integrate with project CI/CD pipeline",
+      "Export coverage data in project-required formats",
+      "Track coverage trends and improvements over time",
+      "Alert on coverage regression below thresholds"
+    ]
+  },
+  "automated_test_generation": {
+    "tools_integration": [
+      "Symflower (if available) - Comprehensive test generation",
+      "Diffblue Cover - AI-powered unit test generation",
+      "Randoop - Random testing for Java",
+      "Pex/IntelliTest - Microsoft symbolic execution",
+      "Property-based testing tools (Hypothesis, QuickCheck)"
+    ],
+    "generation_strategies": [
+      "Symbolic execution and path exploration",
+      "Random input generation and fuzzing",
+      "Property-based testing and invariant checking",
+      "Mutation testing and fault injection",
+      "Model-based testing and state exploration"
+    ]
+  },
+  "project_specific_testing": {
+    "domain_adaptation": [
+      "Identify project-specific business logic for focused testing",
+      "Test critical user workflows and use cases",
+      "Validate project-specific data models and constraints",
+      "Test project security and authorization requirements",
+      "Validate project performance and scalability requirements"
+    ],
+    "integration_testing": [
+      "Test integration with project databases and data stores",
+      "Validate API contracts and external service integrations",
+      "Test project authentication and authorization flows",
+      "Validate project monitoring and logging integration",
+      "Test project deployment and configuration management"
+    ]
+  },
+  "quality_assurance": {
+    "test_quality_checklist": [
+      "All critical paths have comprehensive test coverage",
+      "Tests are independent and can run in any order",
+      "Tests have clear, descriptive names following project conventions",
+      "Test data and fixtures are well-organized and maintainable",
+      "Mocking is used appropriately without over-mocking",
+      "Performance tests validate critical timing requirements",
+      "Security tests validate authentication and authorization",
+      "Error handling tests cover all exception scenarios"
+    ],
+    "maintenance_considerations": [
+      "Tests are maintainable and not brittle to changes",
+      "Test documentation explains complex test scenarios",
+      "Test data management follows project patterns",
+      "Test execution is reliable and deterministic",
+      "Test feedback is fast and actionable for developers"
+    ]
+  }
+}
