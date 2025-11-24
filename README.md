@@ -469,6 +469,36 @@ open http://localhost:7474
 
 ## 🧪 Testing
 
+### Frontend E2E Testing (Playwright) ✅
+- **Framework**: Playwright with TypeScript
+- **Coverage**: Dashboard, Search, and Chat pages
+- **Browsers**: Chromium, Firefox, WebKit + Mobile (Pixel 5, iPhone 12) + Tablet (iPad Pro)
+- **Test Suites**:
+  - `dashboard.spec.ts`: 9 tests (navigation, responsive design, keyboard accessibility)
+  - `search.spec.ts`: 8 tests (search interface, filters, mobile layout)
+  - `chat.spec.ts`: 12 tests (messaging, button states, interactions)
+- **Test Helpers**: 15 reusable functions for common operations
+- **Commands**:
+  ```bash
+  cd frontend
+  npm test              # Run all tests headless
+  npm run test:ui       # Interactive UI mode
+  npm run test:headed   # Run with browser visible
+  npm run test:debug    # Debug mode
+  ```
+
+### Backend Unit & Integration Testing
+- **Framework**: pytest
+- **Total Tests**: 285 tests (227 passing, 32 skipped, 26 failing)
+- **Coverage**:
+  - ✅ Compliance Tests: 24 tests (100% pass rate)
+  - ✅ Document Parser: 27 tests
+  - ✅ Query Parser: 44 tests (100% pass rate)
+  - ✅ Legal NLP: 50+ tests (100% pass rate)
+  - ✅ RAG Service: 25 tests (100% pass rate)
+  - ✅ Search Service: 30+ unit tests
+  - ⏳ Integration tests (require GEMINI_API_KEY, Elasticsearch data)
+
 ### Search Quality Testing
 - Precision@10 metrics
 - Legal expert evaluation
