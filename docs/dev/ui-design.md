@@ -123,6 +123,9 @@ flowchart TD
     Main --> CompliancePage[Compliance Page]
     Main --> WorkflowsPage[Workflows Page]
     Main --> RegDetailPage[Regulation Detail Page]
+    Main --> UpdatesPage[Regulatory Updates Page]
+    Main --> ExpertPage[Expert Validation Page]
+    Main --> SettingsPage[Settings/Preferences Page]
     
     DashboardPage --> StatsCards[Statistics Cards]
     DashboardPage --> RecentActivity[Recent Activity Feed]
@@ -434,6 +437,174 @@ flowchart TD
     style RegDetail fill:#f9fafb
     style Content fill:#ffffff
     style Sidebar fill:#f3f4f6
+```
+
+### Regulatory Updates/Change Monitoring Page
+
+```mermaid
+flowchart TD
+    subgraph UpdatesPage["Regulatory Updates Page"]
+        Header["Regulatory Change Monitoring"]
+        
+        subgraph Filters["Filter Bar (Full Width)"]
+            F1["Jurisdiction: [All ▼]"]
+            F2["Time Period: [Last 30 Days ▼]"]
+            F3["Impact Level: [All ▼]"]
+            F4["My Subscriptions Only: ☑"]
+        end
+        
+        subgraph Content["Main Content Area"]
+            subgraph Timeline["Change Timeline (8 cols)"]
+                T1["📅 November 20, 2025<br/>━━━━━━━━━━━━━━━━<br/>⚠️ HIGH IMPACT<br/>Employment Insurance Act<br/>Amendment to Section 7(2)<br/>New hours requirement: 420 → 450<br/><br/>Affected Programs: 3<br/>Affected Cases: ~150<br/><br/>[View Details] [Impact Assessment]"]
+                
+                T2["📅 November 15, 2025<br/>━━━━━━━━━━━━━━━━<br/>ℹ️ MEDIUM IMPACT<br/>IRPA Regulations<br/>New work permit category added<br/><br/>Affected Programs: 1<br/><br/>[View Details]"]
+                
+                More["... older changes<br/>[Load More]"]
+            end
+            
+            subgraph Sidebar["Subscriptions (4 cols)"]
+                S1["📬 My Subscriptions<br/>━━━━━━━━━━━━━━━━"]
+                S2["• Employment Insurance<br/>  Federal | 12 updates"]
+                S3["• Immigration Programs<br/>  Federal | 8 updates"]
+                S4["• Tax Benefits<br/>  Federal | 5 updates"]
+                S5["<br/>[Manage Subscriptions]"]
+                
+                Stats["<br/>📊 Update Statistics<br/>━━━━━━━━━━━━━━━━<br/>This Week: 8<br/>This Month: 25<br/>High Impact: 3"]
+            end
+        end
+        
+        Header --> Filters
+        Filters --> Content
+    end
+    
+    style UpdatesPage fill:#f9fafb
+    style Timeline fill:#ffffff
+    style Sidebar fill:#f3f4f6
+```
+
+### Expert Validation Interface
+
+```mermaid
+flowchart TD
+    subgraph ExpertPage["Expert Validation Interface"]
+        Header["AI Recommendation Review Queue"]
+        
+        subgraph Queue["Review Queue (5 cols)"]
+            Q1["Pending Reviews (12)<br/>━━━━━━━━━━━━━━━━"]
+            
+            Q2["🔴 High Priority (3)<br/>Complex interpretation needed<br/>[Review]"]
+            
+            Q3["🟡 Medium Priority (5)<br/>Edge case validation<br/>[Review]"]
+            
+            Q4["🟢 Low Priority (4)<br/>Standard recommendation<br/>[Review]"]
+            
+            Stats["<br/>This Month:<br/>✅ Approved: 45<br/>✏️ Modified: 12<br/>❌ Rejected: 3"]
+        end
+        
+        subgraph ReviewPanel["Active Review (7 cols)"]
+            Case["Case: EI Eligibility for Part-time Worker<br/>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"]
+            
+            Query["Original Query:<br/>'Can a part-time worker with 380 hours<br/>qualify for EI benefits?'"]
+            
+            AI["AI Recommendation:<br/>No - requires 420 hours minimum<br/>Citation: EI Act s. 7(2)(b)<br/>🎯 Confidence: High (0.89)"]
+            
+            Expert["Expert Review:<br/>☑ Correct interpretation<br/>☐ Partially correct<br/>☐ Incorrect<br/><br/>Additional Notes:<br/>[Text area for comments]<br/><br/>Knowledge Base Article:<br/>☑ Create article from this case"]
+            
+            Actions["[Approve] [Approve with Notes]<br/>[Request Revision] [Reject]"]
+        end
+        
+        Header --> Queue
+        Header --> ReviewPanel
+    end
+    
+    style ExpertPage fill:#f9fafb
+    style Queue fill:#f3f4f6
+    style ReviewPanel fill:#ffffff
+```
+
+### Knowledge Graph Visualization
+
+```mermaid
+flowchart TD
+    subgraph GraphPage["Knowledge Graph Visualization"]
+        Header["Regulation Network: Employment Insurance Act"]
+        
+        subgraph Controls["Control Panel (3 cols)"]
+            C1["View Options<br/>━━━━━━━━━━━━━━━━<br/>Layout: [Force-Directed ▼]<br/>Depth: [2 Levels ▼]<br/>Node Size: [Importance ▼]"]
+            
+            C2["<br/>Filters<br/>━━━━━━━━━━━━━━━━<br/>☑ References<br/>☑ Amendments<br/>☑ Programs<br/>☐ Conflicts"]
+            
+            C3["<br/>Legend<br/>━━━━━━━━━━━━━━━━<br/>🔵 Acts<br/>🟢 Sections<br/>🟣 Programs<br/>🔴 Conflicts"]
+        end
+        
+        subgraph GraphViz["Interactive Graph (9 cols)"]
+            Central["Central Node:<br/>Employment Insurance Act<br/><br/>Connected to:<br/>• 12 Sections<br/>• 3 Related Acts<br/>• 5 Programs<br/>• 2 Amendments"]
+            
+            Nav["<br/>[Zoom In] [Zoom Out] [Reset View]<br/>[Export PNG] [Export Data]"]
+            
+            Info["<br/>Click node to view details<br/>Drag to explore connections<br/>Double-click to focus"]
+        end
+        
+        Header --> Controls
+        Header --> GraphViz
+    end
+    
+    style GraphPage fill:#f9fafb
+    style Controls fill:#f3f4f6
+    style GraphViz fill:#ffffff
+```
+
+### Notification Center
+
+```mermaid
+flowchart TD
+    subgraph NotificationCenter["Notification Center Dropdown"]
+        Header["🔔 Notifications (8 unread)"]
+        
+        Tabs["[All] [Unread] [Updates] [Mentions]"]
+        
+        subgraph List["Notification List"]
+            N1["🔴 NEW<br/>Employment Insurance Act amended<br/>Section 7(2) hours requirement changed<br/>2 hours ago<br/>[View] [Dismiss]"]
+            
+            N2["🔵 UPDATE<br/>Compliance check result ready<br/>Application #1234<br/>5 hours ago<br/>[View] [Dismiss]"]
+            
+            N3["📌 @mention<br/>Sarah Chen mentioned you in Expert Review<br/>Case #567<br/>1 day ago<br/>[View] [Dismiss]"]
+            
+            More["... 5 more notifications<br/>[View All]"]
+        end
+        
+        Footer["[Mark All Read] [Settings]"]
+        
+        Header --> Tabs
+        Tabs --> List
+        List --> Footer
+    end
+    
+    style NotificationCenter fill:#ffffff
+```
+
+### Settings/Preferences Page
+
+```mermaid
+flowchart TD
+    subgraph SettingsPage["Settings & Preferences"]
+        Nav["Profile | Notifications | Display | Subscriptions | Privacy"]
+        
+        subgraph Content["Settings Content"]
+            Section1["Notification Preferences<br/>━━━━━━━━━━━━━━━━━━━━━━<br/>☑ Email notifications<br/>☑ Browser notifications<br/>☐ SMS notifications (Premium)<br/><br/>Frequency:<br/>○ Real-time<br/>● Daily digest<br/>○ Weekly summary"]
+            
+            Section2["<br/>Display Settings<br/>━━━━━━━━━━━━━━━━━━━━━━<br/>Theme: [Auto ▼]<br/>Language: [English ▼]<br/>Date Format: [YYYY-MM-DD ▼]<br/>Results per page: [20 ▼]"]
+            
+            Section3["<br/>Default Filters<br/>━━━━━━━━━━━━━━━━━━━━━━<br/>Jurisdiction: [Federal, Provincial]<br/>My Department: [Employment & Social Dev]<br/>Confidence Threshold: [Medium+]"]
+            
+            Actions["<br/>[Save Changes] [Reset to Defaults]"]
+        end
+        
+        Nav --> Content
+    end
+    
+    style SettingsPage fill:#f9fafb
+    style Content fill:#ffffff
 ```
 
 ---
@@ -1397,4 +1568,4 @@ All components MUST stay under 300 lines. If a component exceeds this:
 ---
 
 **Document Status:** Complete - Ready for Implementation  
-**Last Updated:** November 24, 2025  
+**Last Updated:** November 24, 2025
