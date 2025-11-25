@@ -441,6 +441,157 @@ open http://localhost:7474
 - **Neo4j Browser**: http://localhost:7474 - Visual graph exploration (neo4j/password123)
 - **Elasticsearch**: http://localhost:9200 - Search engine status and indices
 
+## 📥 Data Ingestion Pipeline
+
+### Overview
+The data ingestion pipeline processes Canadian federal regulations and loads them into all three backend systems (PostgreSQL, Neo4j, Elasticsearch). The MVP includes 10 sample Canadian federal acts.
+
+### Quick Start: Load Sample Data
+
+```bash
+# Navigate to backend directory
+cd backend
+
+# Activate your virtual environment
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Run the data ingestion pipeline
+python -m ingestion.data_pipeline data/regulations/canadian_laws --validate
+
+# This will:
+# 1. Parse XML files from Justice Laws Canada format
+# 2. Load regulations and sections into PostgreSQL
+# 3. Build knowledge graph in Neo4j
+# 4. Index documents in Elasticsearch
+# 5. Generate validation report
+```
+
+### What Gets Loaded
+
+The pipeline ingests **10 Canadian Federal Acts** with full text and structure:
+
+1. Canada Labour Code
+2. Canada Pension Plan
+3. Citizenship Act
+4. Employment Equity Act
+5. Employment Insurance Act
+6. Excise Tax Act
+7. Financial Administration Act
+8. Immigration and Refugee Protection Act
+9. Income Tax Act
+10. Old Age Security Act
+
+**Total Content:**
+- 10 regulations
+- 70 sections (average 7 per act)
+- 10 amendments tracked
+- 40 cross-references
+- ~10 KB indexed in Elasticsearch
+
+### Expected Output
+
+```
+INFO:__main__:Found 10 XML files in data/regulations/canadian_laws
+INFO:__main__:[1/10] Processing income-tax-act.xml
+INFO:__main__:Storing in PostgreSQL: Income Tax Act
+INFO:__main__:Building knowledge graph for: Income Tax Act
+INFO:__main__:Indexing in Elasticsearch: Income Tax Act
+INFO:__main__:Successfully ingested: Income Tax Act
+...
+INFO:__main__:INGESTION COMPLETE
+INFO:__main__:Statistics:
+  Total files: 10
+  Successful: 10
+  Regulations created: 10
+  Sections created: 70
+  Graph nodes: 14
+  Graph relationships: 10
+  ES documents indexed: 10
+
+Validation Report:
+{
+  "postgres": {
+    "regulations": 10,
+    "sections": 70,
+    "amendments": 10
+  },
+  "neo4j": {
+    "nodes": { "Regulation": 10, "Section": 70 },
+    "relationships": { "HAS_SECTION": 70, "REFERENCES": 40 }
+  },
+  "elasticsearch": {
+    "document_count": 10,
+    "size_in_bytes": 10412
+  }
+}
+```
+
+### Pipeline Features
+
+✅ **Automatic Deduplication**: Skips already-loaded regulations using SHA-256 hashing  
+✅ **Multi-Database**: Loads into PostgreSQL, Neo4j, and Elasticsearch simultaneously  
+✅ **Progress Tracking**: Real-time logging of ingestion progress  
+✅ **Error Resilience**: Continues on individual file failures  
+✅ **Validation Report**: Comprehensive post-ingestion validation  
+
+### Advanced Options
+
+```bash
+# Test with limited files
+python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 5 --validate
+
+# Re-run ingestion (already-loaded files will be skipped)
+python -m ingestion.data_pipeline data/regulations/canadian_laws --validate
+
+# View pipeline help
+python -m ingestion.data_pipeline --help
+```
+
+### Troubleshooting
+
+**Issue**: `Directory not found: backend/data/regulations/canadian_laws`  
+**Solution**: Make sure you're running from the `backend/` directory, not the project root.
+
+**Issue**: `Cannot connect to Neo4j` or `Cannot connect to Elasticsearch`  
+**Solution**: Ensure Docker services are running: `docker-compose ps`
+
+**Issue**: `All files skipped`  
+**Solution**: Data already loaded! This is normal. To reload, clear databases first:
+```bash
+# Clear PostgreSQL
+psql -h localhost -U postgres -d regulatory_db -c "TRUNCATE regulations, sections, amendments, citations CASCADE;"
+
+# Clear Neo4j (in Neo4j Browser at http://localhost:7474)
+MATCH (n) DETACH DELETE n
+
+# Clear Elasticsearch
+curl -X DELETE "localhost:9200/regulatory_documents"
+```
+
+### Documentation
+
+For complete documentation on the data ingestion system, see:
+- **[Data Ingestion Complete Guide](./docs/DATA_INGESTION_MVP_COMPLETE.md)** - Full pipeline documentation
+- **[Ingestion README](./backend/ingestion/README.md)** - Technical implementation details
+- **[Canadian Law XML Parser](./backend/ingestion/canadian_law_xml_parser.py)** - Parser documentation
+
+### Next Steps After Ingestion
+
+Once data is loaded, you can:
+
+1. **Search Regulations**: Use the frontend search interface at http://localhost:3000
+2. **Query Knowledge Graph**: Run Cypher queries in Neo4j Browser at http://localhost:7474
+3. **Test Search API**: Try the search endpoints at http://localhost:8000/docs
+4. **Ask Questions**: Use the RAG Q&A system via the Chat page
+
+Example API test:
+```bash
+# Search for "employment insurance"
+curl -X POST "http://localhost:8000/api/search/keyword" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "employment insurance", "size": 5}'
+```
+
 ## 👥 Team Structure (4 People)
 
 - **Developer 1**: Full-Stack (React + Python/FastAPI)
@@ -736,6 +887,8 @@ For questions or support, please refer to the project documentation or contact t
 
 **Test Coverage Summary:**
 - ✅ **Compliance Tests**: 24 tests, 100% pass rate
+- ✅ **Graph Builder Tests**: 12 tests, 100% pass rate
+- ✅ **Graph Service Tests**: 14 tests, 100% pass rate
 - ✅ **Document Parser Tests**: 27 tests, 22 passing, 5 skipped (PDF/BeautifulSoup mocking)
 - ✅ **Query Parser Tests**: 44 tests, 100% pass rate
 - ✅ **Legal NLP Tests**: 50+ tests, 100% pass rate
