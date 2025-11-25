@@ -73,6 +73,20 @@ This project addresses the challenge of navigating complex regulatory environmen
 - **Smart Forms**: Auto-fill and validation
 - **Decision Trees**: Guide users through eligibility
 
+### Data Ingestion Pipeline
+- **Canadian Law XML Parser**: Specialized parser for Justice Laws Canada XML format
+  - Parses sections, subsections, amendments, cross-references
+  - Handles namespaced XML and multiple act types (S.C., R.S.C., S.O.)
+  - Automatic cross-reference extraction using regex patterns
+- **Complete Pipeline Orchestration**: End-to-end data flow
+  - PostgreSQL: Full-text storage with SHA-256 deduplication
+  - Neo4j: Automatic knowledge graph construction
+  - Elasticsearch: Hybrid search indexing
+  - Gemini API: RAG document corpus preparation
+- **Sample Data Generation**: Creates 50 priority Canadian federal acts for testing
+- **Comprehensive Testing**: 23 unit tests with 100% pass rate
+- **📚 Documentation**: See [Data Ingestion README](./backend/ingestion/README.md) for complete guide
+
 ## 🏗️ Architecture
 
 ### Tech Stack
