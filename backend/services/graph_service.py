@@ -481,6 +481,15 @@ class GraphService:
             "relationships": {item['type']: item['count'] for item in rel_counts}
         }
     
+    def get_graph_stats(self) -> Dict[str, Any]:
+        """
+        Get graph statistics (alias for get_graph_overview).
+        
+        Returns:
+            Graph statistics with node and relationship counts
+        """
+        return self.get_graph_overview()
+    
     # ============================================
     # BATCH OPERATIONS
     # ============================================

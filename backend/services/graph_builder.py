@@ -672,6 +672,129 @@ class GraphBuilder:
         base = re.sub(r'\b(Act|Regulations?|Amendment)\b', '', base)
         return base.strip().lower()
     
+    def build_regulation_subgraph(self, regulation_id: str) -> Dict[str, Any]:
+        """
+        Build graph for a regulation from the Regulation model.
+        This is a simplified version for regulations ingested via data pipeline.
+        
+        Args:
+            regulation_id: Regulation UUID as string
+            
+        Returns:
+            Statistics about graph construction
+        """
+        logger.info(f"Building graph for regulation {regulation_id}")
+        
+        # Reset stats
+        self.stats = {
+            "nodes_created": 0,
+            "relationships_created": 0,
+            "errors": []
+        }
+        
+        # Fetch regulation from database
+        regulation = self.db.query(Regulation).filter_by(id=uuid.UUID(regulation_id)).first()
+        if not regulation:
+            raise ValueError(f"Regulation {regulation_id} not found")
+        
+        try:
+            # Create Regulation node
+            reg_properties = {
+                "id": str(regulation.id),
+                "title": regulation.title,
+                "jurisdiction": regulation.jurisdiction,
+                "authority": regulation.authority or "",
+                "status": regulation.status,
+                "created_at": datetime.utcnow().isoformat()
+            }
+            
+            if regulation.effective_date:
+                reg_properties["effective_date"] = regulation.effective_date.isoformat()
+            
+            if regulation.extra_metadata:
+                reg_properties["metadata"] = regulation.extra_metadata
+            
+            # Create Regulation node
+            self.neo4j.create_node("Regulation", reg_properties)
+            self.stats["nodes_created"] += 1
+            
+            # Create Section nodes
+            sections = self.db.query(Section).filter_by(regulation_id=regulation.id).all()
+            
+            for section in sections:
+                sec_properties = {
+                    "id": str(section.id),
+                    "section_number": section.section_number or "",
+                    "content": section.content,
+                    "created_at": datetime.utcnow().isoformat()
+                }
+                
+                if section.title:
+                    sec_properties["title"] = section.title
+                
+                if section.extra_metadata:
+                    sec_properties["metadata"] = section.extra_metadata
+                    if "level" in section.extra_metadata:
+                        sec_properties["level"] = section.extra_metadata["level"]
+                
+                # Create Section node
+                self.neo4j.create_node("Section", sec_properties)
+                self.stats["nodes_created"] += 1
+                
+                # Create HAS_SECTION relationship
+                query = """
+                MATCH (r:Regulation {id: $reg_id})
+                MATCH (s:Section {id: $sec_id})
+                MERGE (r)-[rel:HAS_SECTION]->(s)
+                SET rel.created_at = datetime()
+                RETURN rel
+                """
+                
+                self.neo4j.execute_write(
+                    query,
+                    {
+                        "reg_id": str(regulation.id),
+                        "sec_id": str(section.id)
+                    }
+                )
+                self.stats["relationships_created"] += 1
+            
+            # Create citation relationships
+            from models.models import Citation
+            citations = self.db.query(Citation).join(
+                Section, Citation.section_id == Section.id
+            ).filter(Section.regulation_id == regulation.id).all()
+            
+            for citation in citations:
+                query = """
+                MATCH (source:Section {id: $source_id})
+                MATCH (target:Section {id: $target_id})
+                MERGE (source)-[r:REFERENCES]->(target)
+                SET r.citation_text = $citation_text
+                SET r.created_at = datetime()
+                RETURN r
+                """
+                
+                self.neo4j.execute_write(
+                    query,
+                    {
+                        "source_id": str(citation.section_id),
+                        "target_id": str(citation.cited_section_id),
+                        "citation_text": citation.citation_text or ""
+                    }
+                )
+                self.stats["relationships_created"] += 1
+            
+            logger.info(f"Graph built successfully for {regulation.title}")
+            logger.info(f"Created {self.stats['nodes_created']} nodes, {self.stats['relationships_created']} relationships")
+            
+            return self.stats
+            
+        except Exception as e:
+            logger.error(f"Error building graph for regulation {regulation_id}: {e}", exc_info=True)
+            self.stats["errors"].append(str(e))
+            raise
+    
     def get_stats(self) -> Dict[str, Any]:
         """Get current statistics."""
         return self.stats

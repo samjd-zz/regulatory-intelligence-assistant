@@ -344,8 +344,8 @@ class DataIngestionPipeline:
         
         graph_builder = GraphBuilder(self.graph_service, self.db)
         
-        # Build regulation subgraph
-        result = await graph_builder.build_regulation_subgraph(str(regulation.id))
+        # Build regulation subgraph (this is a synchronous method)
+        result = graph_builder.build_regulation_subgraph(str(regulation.id))
         
         logger.info(f"Created {result.get('nodes_created', 0)} nodes, "
                    f"{result.get('relationships_created', 0)} relationships")
@@ -368,20 +368,24 @@ class DataIngestionPipeline:
         
         # Index the full regulation
         doc = {
+            'id': str(regulation.id),
             'regulation_id': str(regulation.id),
             'title': regulation.title,
             'content': regulation.full_text,
+            'document_type': 'regulation',
             'jurisdiction': regulation.jurisdiction,
             'authority': regulation.authority,
             'effective_date': regulation.effective_date.isoformat() if regulation.effective_date else None,
             'status': regulation.status,
-            'chapter': parsed_reg.chapter,
-            'act_type': parsed_reg.act_type,
-            'metadata': parsed_reg.metadata
+            'metadata': {
+                'chapter': parsed_reg.chapter,
+                'act_type': parsed_reg.act_type,
+                **parsed_reg.metadata
+            }
         }
         
-        await self.search_service.index_document(
-            index='regulations',
+        # index_document is synchronous
+        self.search_service.index_document(
             doc_id=str(regulation.id),
             document=doc
         )
@@ -393,18 +397,19 @@ class DataIngestionPipeline:
         
         for section in sections:
             section_doc = {
+                'id': str(section.id),
                 'regulation_id': str(regulation.id),
                 'section_id': str(section.id),
                 'section_number': section.section_number,
                 'title': section.title or regulation.title,
                 'content': section.content,
+                'document_type': 'section',
                 'jurisdiction': regulation.jurisdiction,
                 'regulation_title': regulation.title,
-                'metadata': section.extra_metadata
+                'metadata': section.extra_metadata or {}
             }
             
-            await self.search_service.index_document(
-                index='sections',
+            self.search_service.index_document(
                 doc_id=str(section.id),
                 document=section_doc
             )
@@ -448,11 +453,11 @@ class DataIngestionPipeline:
         section_count = self.db.query(Section).count()
         amendment_count = self.db.query(Amendment).count()
         
-        # Check Neo4j
-        graph_stats = await self.graph_service.get_graph_stats()
+        # Check Neo4j (get_graph_stats is synchronous)
+        graph_stats = self.graph_service.get_graph_stats()
         
         # Check Elasticsearch
-        # es_stats = await self.search_service.get_index_stats()
+        es_stats = self.search_service.get_index_stats() if self.search_service else {}
         
         validation = {
             'postgres': {
@@ -461,6 +466,7 @@ class DataIngestionPipeline:
                 'amendments': amendment_count
             },
             'neo4j': graph_stats,
+            'elasticsearch': es_stats,
             'ingestion_stats': self.stats
         }
         
@@ -491,6 +497,8 @@ async def main():
     from database import SessionLocal
     db = SessionLocal()
     
+    neo4j_client = None
+    
     try:
         # Initialize services
         from utils.neo4j_client import Neo4jClient
@@ -498,10 +506,13 @@ async def main():
         neo4j_client = Neo4jClient()
         graph_service = GraphService(neo4j_client)
         
-        # Note: SearchService requires async initialization
-        # For now, we'll create a placeholder
-        # TODO: Properly initialize SearchService with Elasticsearch client
-        search_service = None
+        # Initialize SearchService
+        logger.info("Initializing SearchService...")
+        search_service = SearchService()
+        
+        # Create Elasticsearch index if it doesn't exist
+        if not search_service.create_index(force_recreate=False):
+            logger.warning("Failed to create Elasticsearch index, continuing anyway")
         
         # Create pipeline
         pipeline = DataIngestionPipeline(
