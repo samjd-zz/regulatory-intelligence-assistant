@@ -589,7 +589,21 @@ This is a G7 GovAI Challenge submission. For collaboration inquiries, please con
 
 ## 📄 License
 
-To be determined based on challenge requirements.
+**Proprietary License with G7 GovAI Challenge Grant**
+
+Copyright © 2025 Regulatory Intelligence Assistant Team. All rights reserved.
+
+This software is proprietary and closed source. The Team grants the G7 GovAI Challenge organizer a limited, worldwide, royalty-free license to use non-executable portions (screenshots, videos, demos, documentation) solely for:
+- Promoting and publicizing the G7 GovAI Challenge
+- Evaluating and judging submissions
+- Showcasing challenge results
+- Educational and non-commercial purposes
+
+The Team acknowledges the Organizer's encouragement to release participant-authored portions under open source licenses (MIT, Apache 2.0, or Open Government Licence Canada v2.0) and reserves the right to consider open source licensing for future releases.
+
+For full license terms, see the [LICENSE](./LICENSE) file.
+
+**Contact:** For licensing inquiries or permissions beyond the scope of this license, please contact the Regulatory Intelligence Assistant Team.
 
 ## 🏆 G7 Challenge Information
 
