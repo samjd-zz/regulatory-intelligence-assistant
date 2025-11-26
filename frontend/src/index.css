@@ -1,7 +1,234 @@
 @import "tailwindcss";
 
 body {
-  font-family: Inter, system-ui, sans-serif;
-  color: #111827;
-  background-color: #f9fafb;
+  font-family: "Inter", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: #f8fafc; /* Slate-50 */
+  color: #0f172a; /* Slate-900 */
+}
+
+/* --- Animations & Transitions --- */
+
+a,
+button,
+input,
+select,
+.group {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes growBar {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Animation Utilities */
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.4s ease-out both;
+}
+
+/* Staggered Delays */
+.delay-100 {
+  animation-delay: 100ms;
+}
+.delay-200 {
+  animation-delay: 200ms;
+}
+.delay-300 {
+  animation-delay: 300ms;
+}
+.delay-500 {
+  animation-delay: 500ms;
+}
+
+/* Chart Animation */
+.chart-bar {
+  animation: growBar 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: bottom;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* --- Components --- */
+
+.nav-btn {
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding-bottom: 0.25rem;
+  border-bottom: 2px solid transparent;
+  color: #64748b;
+  position: relative;
+}
+
+.nav-btn::after {
+  content: "";
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0%;
+  height: 2px;
+  background-color: #0d9488;
+  transition: width 0.3s ease;
+}
+
+.nav-btn:hover {
+  color: #334155;
+}
+.nav-btn:hover::after {
+  width: 30%;
+}
+.nav-btn.active {
+  color: #0d9488;
+  border-bottom-color: #0d9488;
+}
+.nav-btn.active::after {
+  width: 100%;
+}
+
+.input-minimal {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0.75rem 0;
+  font-size: 0.95rem;
+  color: #0f172a;
+  outline: none;
+  border-radius: 0;
+}
+
+.input-minimal:focus {
+  border-bottom-color: #0d9488;
+  padding-left: 0.5rem;
+}
+.input-minimal::placeholder {
+  color: #94a3b8;
+  transition: color 0.3s;
+}
+.input-minimal:focus::placeholder {
+  color: #cbd5e1;
+}
+
+.checkbox-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+}
+
+.checkbox-custom {
+  appearance: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 2px;
+  display: grid;
+  place-content: center;
+  transition: all 0.2s;
+}
+
+.checkbox-custom::before {
+  content: "";
+  width: 0.65rem;
+  height: 0.65rem;
+  transform: scale(0);
+  background-color: #0d9488;
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.checkbox-custom:checked {
+  border-color: #0d9488;
+}
+.checkbox-custom:checked::before {
+  transform: scale(1);
+}
+.checkbox-wrapper:hover .checkbox-custom {
+  border-color: #0d9488;
+}
+
+.label-kpi {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 0.5rem;
+}
+
+.value-kpi {
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+}
+
+/* Message bubble styling */
+.message-bubble {
+  @apply rounded-tl-xl rounded-bl-xl rounded-tr-sm rounded-br-xl shadow-sm hover:shadow-md transition-shadow;
+}
+
+.message-bubble-assistant {
+  @apply rounded-tr-xl rounded-br-xl rounded-tl-sm rounded-bl-xl;
 }

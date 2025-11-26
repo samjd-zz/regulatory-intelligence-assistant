@@ -1,16 +1,16 @@
-import { Header } from './Header'
+import { Header } from "./Header";
 
 interface MainLayoutProps {
-  children: React.ReactNode
+	children: React.ReactNode;
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
-    </div>
-  )
+	return (
+		<div className="min-h-screen flex items-center justify-center p-6 md:p-12 bg-slate-50 animate-fade-in">
+			<div className="w-full max-w-6xl bg-white border border-slate-200 shadow-xl shadow-slate-200/50 min-h-[800px] flex flex-col relative overflow-hidden transition-all duration-500">
+				<Header />
+				<main className="flex-1 relative">{children}</main>
+			</div>
+		</div>
+	);
 }
