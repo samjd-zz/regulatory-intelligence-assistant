@@ -1,6 +1,7 @@
 """
 Database configuration and session management for PostgreSQL.
 """
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -13,7 +14,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/regulatory_db")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/regulatory_db"
+)
 
 # Create SQLAlchemy engine
 # Using NullPool for better connection management in async environments
@@ -40,7 +43,7 @@ def get_db() -> Generator:
     """
     Dependency function to get database session.
     Use this in FastAPI route dependencies.
-    
+
     Example:
         @app.get("/users")
         def get_users(db: Session = Depends(get_db)):
@@ -58,7 +61,8 @@ def init_db() -> None:
     Initialize database - create all tables.
     This should be called on application startup.
     """
-    from backend.models import models  # Import all models
+    import models  # Import all models to register with Base
+
     Base.metadata.create_all(bind=engine)
 
 
@@ -68,6 +72,7 @@ def reset_db() -> None:
     USE WITH CAUTION - This will delete all data!
     Only for development/testing.
     """
-    from backend.models import models  # Import all models
+    import models  # Import all models to register with Base
+
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
