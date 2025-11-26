@@ -107,7 +107,7 @@ LOG_LEVEL=INFO
 ```bash
 # From project root
 cd ..
-docker-compose up -d postgres neo4j elasticsearch redis
+docker compose up -d postgres neo4j elasticsearch redis
 ```
 
 ### 5. Initialize Database
@@ -347,10 +347,10 @@ kill -9 <PID>
 curl http://localhost:9200
 
 # Restart Elasticsearch
-docker-compose restart elasticsearch
+docker compose restart elasticsearch
 
 # Check logs
-docker-compose logs elasticsearch
+docker compose logs elasticsearch
 ```
 
 #### 3. Gemini API Rate Limit

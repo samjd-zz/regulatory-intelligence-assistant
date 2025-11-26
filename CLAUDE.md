@@ -1,9 +1,11 @@
 # CLAUDE.md - Regulatory Intelligence Assistant
 
 ## Project Context
+
 You are working on the **Regulatory Intelligence Assistant for Public Service**, an AI-powered platform that helps public servants and citizens navigate complex laws, policies, and regulations with consistent interpretation and reduced cognitive load.
 
 ## Project Goals
+
 - **G7 GovAI Challenge**: Statement 2 - Navigating Complex Regulations
 - **Mission**: Streamline interpretation and application of rules to increase consistency and compliance
 - **Timeline**: 2-week MVP for competition (Nov 17 - Dec 1, 2025)
@@ -12,6 +14,7 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 ## Key Architecture Components
 
 ### 1. Regulatory Knowledge Graph
+
 - Structured representation of legislation, regulations, policies
 - Semantic relationships (references, amendments, dependencies, conflicts)
 - Cross-jurisdictional mapping
@@ -19,6 +22,7 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 - Temporal versioning for changes
 
 ### 2. Legal NLP Engine
+
 - Query parsing and entity extraction
 - Intent classification (search, compliance, interpretation)
 - Named entity recognition (programs, jurisdictions, person types)
@@ -26,6 +30,7 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 - Plain language generation
 
 ### 3. RAG System with Gemini API
+
 - Upload regulatory documents to Gemini
 - Semantic search across legal corpus
 - Answer questions with source citations
@@ -33,6 +38,7 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 - Multi-document reasoning
 
 ### 4. Semantic Search Engine
+
 - Natural language queries
 - Hybrid search (keyword + semantic + graph)
 - Faceted filtering and relevance ranking
@@ -40,6 +46,7 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 - Similar regulation discovery
 
 ### 5. Compliance Checking Engine
+
 - Form validation against regulations
 - Requirement extraction and checking
 - Real-time compliance feedback
@@ -47,6 +54,7 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 - Confidence scoring
 
 ### 6. Guided Workflows
+
 - Step-by-step processes for common scenarios
 - Decision trees for complex regulations
 - Dynamic questionnaires
@@ -54,16 +62,50 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 - Escalation triggers for edge cases
 
 ## Technology Stack
+
 - **Frontend**: React with accessible UI
 - **Backend**: Python FastAPI for legal processing
 - **AI**: Fine-tuned BERT/RoBERTa, Gemini API for RAG
-- **Knowledge Graph**: Neo4j for relationships
+- **Knowledge Graph**: Neo4j 5.15 (custom Docker image with APOC + GDS plugins)
 - **Search**: Elasticsearch + Pinecone/Weaviate for vectors
 - **Database**: PostgreSQL (metadata), Redis (caching)
+
+## Docker Infrastructure
+
+### Neo4j Configuration
+
+The project uses a custom Neo4j Docker image located at `backend/neo4j/`:
+
+- **Base Image**: `neo4j:5.15-community`
+- **Pre-installed Plugins**: APOC (from labs), Graph Data Science 2.6.9
+- **Custom Entrypoint**: `docker-entrypoint-wrapper.sh` handles:
+  - Stale PID file cleanup on container restart
+  - Skipping password setup on subsequent starts
+  - Graceful restart without data loss
+
+### Key Docker Commands
+
+```bash
+# Start all services
+docker compose up -d
+
+# Rebuild Neo4j after Dockerfile changes
+docker compose build neo4j --no-cache
+docker compose up -d neo4j
+
+# Safe restart (data preserved)
+docker compose restart neo4j
+
+# Full reset (WARNING: deletes all data)
+docker compose down
+docker volume rm regulatory-intelligence-assistant_neo4j_data
+docker compose up -d
+```
 
 ## Critical Requirements
 
 ### Legal Accuracy
+
 - All interpretations must cite authoritative sources
 - Confidence scores for every recommendation
 - Alternative interpretations for ambiguous cases
@@ -71,6 +113,7 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 - Complete audit trails
 
 ### Source Authority
+
 - Only official government legal sources
 - Cryptographic verification of content
 - Version tracking for all regulations
@@ -78,6 +121,7 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 - Precedent database maintenance
 
 ### Explainability
+
 - Cite specific sections, clauses, subsections
 - Show reasoning chain with legal references
 - Flag regulatory conflicts
@@ -85,6 +129,7 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 - Explain uncertainty clearly
 
 ### Performance
+
 - Search response <3 seconds (p95)
 - Q&A response <5 seconds (p95)
 - Support 100+ concurrent users
@@ -94,6 +139,7 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 ## Development Approach
 
 ### AI-TDD Process
+
 1. Create expert-labeled test dataset
 2. Establish accuracy baselines
 3. Implement with continuous validation
@@ -101,14 +147,16 @@ You are working on the **Regulatory Intelligence Assistant for Public Service**,
 5. Iterative refinement with feedback
 
 ### Legal Processing Pipeline
+
 ```
-User Query → NLP Processing → Entity Extraction → 
-Intent Classification → Knowledge Graph Query → 
-Document Retrieval → RAG Generation → Citation Verification → 
+User Query → NLP Processing → Entity Extraction →
+Intent Classification → Knowledge Graph Query →
+Document Retrieval → RAG Generation → Citation Verification →
 Confidence Scoring → Response with Sources
 ```
 
 ### Testing Strategy
+
 - Expert-validated test queries (20-30 scenarios)
 - Precision/recall testing on legal Q&A
 - Citation accuracy verification (100% requirement)
@@ -118,6 +166,7 @@ Confidence Scoring → Response with Sources
 ## Common Scenarios to Handle
 
 ### Regulatory Search Query
+
 ```
 User: "Can a temporary resident apply for employment insurance?"
 - Extract entities: person type (temporary resident), program (EI)
@@ -129,6 +178,7 @@ User: "Can a temporary resident apply for employment insurance?"
 ```
 
 ### Compliance Checking
+
 ```
 Input: Application form for program
 - Extract program requirements from regulations
@@ -140,6 +190,7 @@ Input: Application form for program
 ```
 
 ### Regulatory Change Impact
+
 ```
 Event: Amendment to legislation
 - Identify affected regulations and programs
@@ -150,6 +201,7 @@ Event: Amendment to legislation
 ```
 
 ## Available Documentation
+
 - `idea.md`: Complete feature proposal and architecture
 - `prd.md`: Product requirements and specifications
 - `design.md`: Technical design details
@@ -157,6 +209,7 @@ Event: Amendment to legislation
 - `README.md`: Project overview
 
 ## Key Metrics to Track
+
 - Search precision/recall (target: >75%)
 - Response time (target: <3s for 95% of queries)
 - Citation accuracy (target: 100% verifiable)
@@ -167,6 +220,7 @@ Event: Amendment to legislation
 - Expert validation rate
 
 ## What Makes This Project Unique
+
 - **Legal Intelligence**: Specialized for government regulations
 - **Graph-Based Reasoning**: Relationships between laws, not just text
 - **Explainable AI**: Every answer backed by legal citations
@@ -176,6 +230,7 @@ Event: Amendment to legislation
 ## When Coding
 
 ### Always Consider
+
 - Is this citing authoritative sources?
 - What's the confidence level?
 - Are there alternative interpretations?
@@ -184,6 +239,7 @@ Event: Amendment to legislation
 - Is there an audit trail?
 
 ### Never Do
+
 - Provide legal advice without citations
 - Claim certainty when regulations are ambiguous
 - Skip version control for regulations
@@ -192,7 +248,9 @@ Event: Amendment to legislation
 - Mix AI interpretations with official sources without clear distinction
 
 ## Gemini API Integration
+
 This project uses Gemini API's file search for regulatory RAG:
+
 - Upload federal legislation and regulations
 - Automatic semantic indexing
 - Context-aware legal Q&A
@@ -201,6 +259,7 @@ This project uses Gemini API's file search for regulatory RAG:
 - See: https://ai.google.dev/gemini-api/docs/file-search
 
 ## Legal NLP Best Practices
+
 1. **Preserve Legal Language**: Don't oversimplify technical terms
 2. **Citation Format**: Use official format (e.g., "S.C. 1996, c. 23, s. 7(1)")
 3. **Temporal Awareness**: Track effective dates and amendments
@@ -209,13 +268,16 @@ This project uses Gemini API's file search for regulatory RAG:
 6. **Plain Language Bridge**: Explain legal concepts accessibly without losing accuracy
 
 ## Knowledge Graph Design
+
 - **Nodes**: Legislation, sections, regulations, policies, programs
 - **Edges**: references, amends, implements, conflicts_with, applies_to
 - **Properties**: effective_date, jurisdiction, authority, version
 - **Queries**: Find applicable laws, trace amendments, detect conflicts
 
 ## Questions to Ask
+
 When implementing features, ask:
+
 1. Is this citing the correct authoritative source?
 2. What happens if the regulation is ambiguous?
 3. How do we handle conflicting regulations?
@@ -225,7 +287,9 @@ When implementing features, ask:
 7. Are we tracking all regulatory changes?
 
 ## Success Looks Like
+
 A system where public servants can:
+
 - Find relevant regulations in seconds, not hours
 - Get consistent interpretations across employees
 - Understand complex legal concepts in plain language

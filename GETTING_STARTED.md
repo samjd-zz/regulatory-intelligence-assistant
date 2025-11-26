@@ -3,6 +3,7 @@
 ## Quick Start Guide
 
 This guide will help you set up and run the Regulatory Intelligence Assistant system, which includes:
+
 - ✅ Document Parser & Ingestion (PostgreSQL)
 - ✅ Neo4j Knowledge Graph
 - ✅ REST API
@@ -12,7 +13,7 @@ This guide will help you set up and run the Regulatory Intelligence Assistant sy
 
 - Python 3.12+
 - PostgreSQL 14+
-- Neo4j 5.16+
+- Neo4j 5.15 (Community Edition, provided via Docker)
 - Docker & Docker Compose (recommended)
 
 ## Step 1: Start Services
@@ -21,13 +22,14 @@ This guide will help you set up and run the Regulatory Intelligence Assistant sy
 
 ```bash
 # Start PostgreSQL, Neo4j, Redis, and Elasticsearch
-docker-compose up -d
+docker compose up -d
 
 # Verify services are running
-docker-compose ps
+docker compose ps
 ```
 
 Expected output:
+
 ```
 NAME                     STATUS       PORTS
 postgres                 Up           5432->5432
@@ -37,9 +39,11 @@ elasticsearch            Up           9200->9200
 ```
 
 ### Access Neo4j Browser
+
 Open http://localhost:7474 in your browser.
 
 Default credentials:
+
 - Username: `neo4j`
 - Password: `password123`
 
@@ -97,12 +101,14 @@ alembic upgrade head
 ```
 
 You should see:
+
 ```
 INFO  [alembic.runtime.migration] Running upgrade  -> 001_initial_schema
 INFO  [alembic.runtime.migration] Running upgrade 001_initial_schema -> 002_document_models
 ```
 
 This creates:
+
 - ✅ 6 document tables (documents, sections, subsections, clauses, cross_references, metadata)
 - ✅ ENUMs for document types and statuses
 - ✅ Indexes for performance
@@ -118,6 +124,7 @@ python scripts/init_neo4j.py
 ```
 
 This creates:
+
 - ✅ 6 node types (Legislation, Section, Regulation, Policy, Program, Situation)
 - ✅ 9 relationship types (HAS_SECTION, REFERENCES, IMPLEMENTS, etc.)
 - ✅ Constraints and indexes
@@ -133,6 +140,7 @@ python scripts/seed_graph_data.py
 ```
 
 This adds:
+
 - ✅ 15 legislation documents (EI Act, CPP, OAS, IRPA, etc.)
 - ✅ 2 regulations
 - ✅ 5 programs
@@ -149,6 +157,7 @@ python scripts/verify_graph.py
 ```
 
 Expected output:
+
 ```
 ✅ Graph structure verified!
 📊 Node counts:
@@ -171,6 +180,7 @@ uvicorn main:app --reload --port 8000
 ```
 
 You should see:
+
 ```
 INFO:     Uvicorn running on http://127.0.0.1:8000
 INFO:     Application startup complete.
@@ -183,6 +193,7 @@ INFO:     Application startup complete.
 Open http://localhost:8000/docs in your browser.
 
 This provides:
+
 - ✅ Interactive API testing
 - ✅ Request/response schemas
 - ✅ Authentication testing
@@ -198,6 +209,7 @@ python scripts/test_document_api.py
 ```
 
 This will:
+
 - ✅ Upload a sample Employment Insurance Act document
 - ✅ Extract sections, subsections, and clauses
 - ✅ Detect cross-references
@@ -275,33 +287,33 @@ LIMIT 50;
 
 ### Document Management
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/documents/upload` | Upload and parse a document |
-| GET | `/documents/{id}` | Get document details |
-| GET | `/documents` | List all documents |
-| DELETE | `/documents/{id}` | Delete a document |
+| Method | Endpoint            | Description                 |
+| ------ | ------------------- | --------------------------- |
+| POST   | `/documents/upload` | Upload and parse a document |
+| GET    | `/documents/{id}`   | Get document details        |
+| GET    | `/documents`        | List all documents          |
+| DELETE | `/documents/{id}`   | Delete a document           |
 
 ### Document Structure
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/documents/{id}/sections` | Get all sections |
-| GET | `/documents/{id}/cross-references` | Get cross-references |
+| Method | Endpoint                           | Description          |
+| ------ | ---------------------------------- | -------------------- |
+| GET    | `/documents/{id}/sections`         | Get all sections     |
+| GET    | `/documents/{id}/cross-references` | Get cross-references |
 
 ### Search & Analytics
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/documents/search` | Search documents |
-| GET | `/documents/statistics/summary` | Get statistics |
+| Method | Endpoint                        | Description      |
+| ------ | ------------------------------- | ---------------- |
+| POST   | `/documents/search`             | Search documents |
+| GET    | `/documents/statistics/summary` | Get statistics   |
 
 ### Compliance (Neo4j)
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/compliance/check` | Check compliance rules |
-| GET | `/compliance/rules` | List all rules |
+| Method | Endpoint            | Description            |
+| ------ | ------------------- | ---------------------- |
+| POST   | `/compliance/check` | Check compliance rules |
+| GET    | `/compliance/rules` | List all rules         |
 
 ## Common Tasks
 
@@ -366,32 +378,38 @@ for doc in documents:
 
 ```bash
 # Check if PostgreSQL is running
-docker-compose ps postgres
+docker compose ps postgres
 
 # View logs
-docker-compose logs postgres
+docker compose logs postgres
 
 # Restart the service
-docker-compose restart postgres
+docker compose restart postgres
 ```
 
 ### Neo4j Connection Errors
 
 ```bash
 # Check if Neo4j is running
-docker-compose ps neo4j
+docker compose ps neo4j
 
 # View logs
-docker-compose logs neo4j
+docker compose logs neo4j
 
-# Restart Neo4j
-docker-compose restart neo4j
+# Restart Neo4j (safe - container handles restarts gracefully)
+docker compose restart neo4j
+
+# Rebuild Neo4j image (if Dockerfile changes)
+docker compose build neo4j --no-cache
+docker compose up -d neo4j
 
 # Clear Neo4j data (WARNING: deletes all data)
-docker-compose down neo4j
+docker compose down
 docker volume rm regulatory-intelligence-assistant_neo4j_data
-docker-compose up -d neo4j
+docker compose up -d
 ```
+
+> **Note**: The Neo4j container uses a custom Docker image (`backend/neo4j/Dockerfile`) with pre-installed APOC and Graph Data Science plugins. The container is designed to handle restarts gracefully without losing data or requiring reconfiguration.
 
 ### Migration Errors
 
@@ -487,6 +505,7 @@ pytest --cov=. --cov-report=html
 ## Support
 
 For issues or questions:
+
 1. Check the troubleshooting section above
 2. Review the documentation in `docs/dev/`
 3. Check the test files for usage examples

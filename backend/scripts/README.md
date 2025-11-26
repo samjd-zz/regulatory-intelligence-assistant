@@ -5,16 +5,21 @@ This directory contains scripts for initializing, populating, and managing the N
 ## Prerequisites
 
 1. **Neo4j Running**: Ensure Neo4j is running via Docker:
+
    ```bash
-   docker-compose up -d neo4j
+   docker compose up -d neo4j
    ```
 
+   > **Note**: The project uses a custom Neo4j Docker image (`backend/neo4j/Dockerfile`) with pre-installed APOC and Graph Data Science plugins. The container handles restarts gracefully.
+
 2. **Environment Variables**: Copy `.env.example` to `.env` and configure:
+
    ```bash
    cp .env.example .env
    ```
-   
+
    Verify these settings:
+
    ```
    NEO4J_URI=bolt://localhost:7687
    NEO4J_USER=neo4j
@@ -29,26 +34,31 @@ This directory contains scripts for initializing, populating, and managing the N
 ## Scripts Overview
 
 ### 1. `init_graph.cypher`
+
 Cypher script defining the graph schema (constraints, indexes, full-text search).
 
 **Purpose:** Sets up the foundational schema for the knowledge graph.
 
 **Contains:**
+
 - Unique constraints on all node IDs
 - Performance indexes on frequently queried properties
 - Full-text search indexes for legislation and sections
 - Documentation of node and relationship types
 
 ### 2. `init_neo4j.py`
+
 Python script that initializes the Neo4j database with schema and sample data.
 
 **Usage:**
+
 ```bash
 cd backend
 python scripts/init_neo4j.py
 ```
 
 **What it does:**
+
 - Executes the Cypher schema from `init_graph.cypher`
 - Creates 4 sample legislation documents
 - Creates sections for each legislation
@@ -57,6 +67,7 @@ python scripts/init_neo4j.py
 - Displays a summary of created nodes
 
 **Expected Output:**
+
 ```
 ============================================================
 Neo4j Knowledge Graph Initialization
@@ -74,15 +85,18 @@ Populating sample data...
 ```
 
 ### 3. `seed_graph_data.py`
+
 Comprehensive data seeding script with 15+ regulations.
 
 **Usage:**
+
 ```bash
 cd backend
 python scripts/seed_graph_data.py
 ```
 
 **What it does:**
+
 - Creates 15+ federal legislation documents covering:
   - Employment & Labor (EI Act, Labour Code, Employment Equity)
   - Pension & Retirement (CPP, OAS)
@@ -101,6 +115,7 @@ python scripts/seed_graph_data.py
 - Creates cross-references between sections
 
 **Expected Output:**
+
 ```
 ============================================================
 Neo4j Knowledge Graph - Comprehensive Data Seeding
@@ -125,15 +140,18 @@ Situations created: 5
 ```
 
 ### 4. `verify_graph.py`
+
 Verification and diagnostic script for the knowledge graph.
 
 **Usage:**
+
 ```bash
 cd backend
 python scripts/verify_graph.py
 ```
 
 **What it does:**
+
 - Tests Neo4j connectivity
 - Displays schema information (constraints and indexes)
 - Shows node counts by type
@@ -143,6 +161,7 @@ python scripts/verify_graph.py
 - Provides useful Cypher queries for exploration
 
 **Expected Output:**
+
 ```
 ======================================================================
                 Neo4j Knowledge Graph Verification
@@ -173,12 +192,13 @@ Node Counts by Label:
 ## Typical Workflow
 
 ### Initial Setup (First Time)
+
 ```bash
 # 1. Start Neo4j
-docker-compose up -d neo4j
+docker compose up -d neo4j
 
 # 2. Wait for Neo4j to be ready (check logs)
-docker-compose logs -f neo4j
+docker compose logs -f neo4j
 
 # 3. Initialize schema and create sample data
 cd backend
@@ -189,6 +209,7 @@ python scripts/verify_graph.py
 ```
 
 ### Adding More Data
+
 ```bash
 # Run the comprehensive seeding script
 cd backend
@@ -199,6 +220,7 @@ python scripts/verify_graph.py
 ```
 
 ### Resetting the Database
+
 If you need to start fresh:
 
 ```bash
@@ -206,10 +228,10 @@ If you need to start fresh:
 # Navigate to http://localhost:7474 and run:
 # MATCH (n) DETACH DELETE n
 
-# Option 2: Stop and remove Neo4j container
-docker-compose down
+# Option 2: Stop and remove Neo4j container/volume
+docker compose down
 docker volume rm regulatory-intelligence-assistant_neo4j_data
-docker-compose up -d neo4j
+docker compose up -d neo4j
 
 # Then re-initialize
 cd backend
@@ -219,6 +241,7 @@ python scripts/init_neo4j.py
 ## Exploring the Graph
 
 ### Neo4j Browser
+
 1. Open http://localhost:7474
 2. Login with:
    - Username: `neo4j`
@@ -227,11 +250,13 @@ python scripts/init_neo4j.py
 ### Useful Cypher Queries
 
 **View all nodes (limited):**
+
 ```cypher
 MATCH (n) RETURN n LIMIT 50
 ```
 
 **View legislation with sections:**
+
 ```cypher
 MATCH (l:Legislation)-[:HAS_SECTION]->(s:Section)
 RETURN l, s
@@ -239,12 +264,14 @@ LIMIT 25
 ```
 
 **View regulations implementing legislation:**
+
 ```cypher
 MATCH (r:Regulation)-[:IMPLEMENTS]->(l:Legislation)
 RETURN r, l
 ```
 
 **Find sections relevant for a situation:**
+
 ```cypher
 MATCH (s:Section)-[r:RELEVANT_FOR]->(sit:Situation)
 WHERE sit.description CONTAINS 'retirement'
@@ -252,6 +279,7 @@ RETURN s, r, sit
 ```
 
 **Search legislation by title:**
+
 ```cypher
 MATCH (l:Legislation)
 WHERE l.title CONTAINS 'Employment'
@@ -259,6 +287,7 @@ RETURN l
 ```
 
 **Get graph statistics:**
+
 ```cypher
 // Node counts
 MATCH (n)
@@ -274,6 +303,7 @@ ORDER BY Count DESC
 ## Troubleshooting
 
 ### "Module not found" errors
+
 ```bash
 # Ensure you're running from the backend directory
 cd backend
@@ -285,26 +315,28 @@ python -m backend.scripts.init_neo4j
 ```
 
 ### "Connection refused" errors
+
 ```bash
 # Check if Neo4j is running
-docker-compose ps
+docker compose ps
 
 # Check Neo4j logs
-docker-compose logs neo4j
+docker compose logs neo4j
 
-# Restart Neo4j
-docker-compose restart neo4j
+# Restart Neo4j (safe - handles restarts gracefully)
+docker compose restart neo4j
 ```
 
 ### "Authentication failed" errors
+
 ```bash
 # Verify credentials in .env file
 cat .env | grep NEO4J
 
-# Reset Neo4j password via Docker
-docker-compose down
+# Reset Neo4j password via Docker (WARNING: deletes all data)
+docker compose down
 docker volume rm regulatory-intelligence-assistant_neo4j_data
-docker-compose up -d neo4j
+docker compose up -d neo4j
 # Wait 30 seconds, then try again
 ```
 

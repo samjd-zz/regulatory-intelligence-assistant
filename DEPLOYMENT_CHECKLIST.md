@@ -44,7 +44,7 @@ pip install -r requirements.txt
 ### 2. Start Services ⏳
 ```bash
 # From project root
-docker-compose up -d
+docker compose up -d
 ```
 
 **Verify:**
@@ -158,19 +158,19 @@ alembic revision --autogenerate -m "description"
 ### Docker Operations
 ```bash
 # View logs
-docker-compose logs -f postgres
-docker-compose logs -f neo4j
+docker compose logs -f postgres
+docker compose logs -f neo4j
 
 # Restart service
-docker-compose restart postgres
-docker-compose restart neo4j
+docker compose restart postgres
+docker compose restart neo4j
 
 # Stop all services
-docker-compose down
+docker compose down
 
 # Clean restart (removes data)
-docker-compose down -v
-docker-compose up -d
+docker compose down -v
+docker compose up -d
 ```
 
 ### Testing
@@ -211,17 +211,17 @@ pip install PyPDF2 beautifulsoup4 lxml
 
 **Issue: `Connection refused` to PostgreSQL**
 ```bash
-docker-compose restart postgres
+docker compose restart postgres
 # Check logs
-docker-compose logs postgres
+docker compose logs postgres
 ```
 
 **Issue: `Connection refused` to Neo4j**
 ```bash
-docker-compose restart neo4j
+docker compose restart neo4j
 # Wait 30 seconds for Neo4j to start
 # Check logs
-docker-compose logs neo4j
+docker compose logs neo4j
 ```
 
 **Issue: Alembic can't find models**

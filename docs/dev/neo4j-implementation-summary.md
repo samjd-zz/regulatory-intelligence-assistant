@@ -228,7 +228,7 @@ Complete schema documentation with:
 ### Quick Start
 ```bash
 # 1. Start Neo4j
-docker-compose up -d neo4j
+docker compose up -d neo4j
 
 # 2. Initialize with comprehensive data
 cd backend

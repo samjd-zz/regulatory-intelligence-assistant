@@ -9,9 +9,11 @@ AI-powered regulatory intelligence system that helps public servants and citizen
 This project addresses the challenge of navigating complex regulatory environments by creating an intelligent system that combines knowledge graphs, semantic search, and AI-powered Q&A to make regulations accessible and actionable.
 
 ### Challenge Statement
+
 **"Navigate complex regulations efficiently and accurately"**
 
 ### Target Impact
+
 - 60-80% reduction in time to find relevant regulations
 - 50-70% reduction in compliance errors
 - 40-60% faster application processing
@@ -21,6 +23,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 ## ✨ Key Features
 
 ### Regulatory Knowledge Graph
+
 - **Neo4j Graph Database**: Interconnected regulations, policies, and precedents
 - **Automatic Relationship Extraction**: Links between regulations
 - **Entity Linking**: Programs, situations, and affected parties
@@ -28,6 +31,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - **Visual Exploration**: Interactive graph visualization
 
 ### Semantic Search
+
 - **Natural Language Queries**: Ask questions in plain language
 - **Hybrid Search**: Combines keyword (BM25) + vector (semantic) search
 - **Graph Traversal**: Find related regulations automatically
@@ -35,6 +39,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - **Relevance Ranking**: ML-powered result ordering
 
 ### AI-Powered Q&A
+
 - **RAG System**: Retrieval-Augmented Generation with Gemini API
 - **Citation Support**: Links to specific sections in responses
 - **Confidence Scoring**: Reliability indicators for answers
@@ -42,6 +47,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - **Plain Language**: Translates legalese into clear explanations
 
 ### Compliance Checking
+
 - **Requirement Extraction**: Automatically identify requirements from regulatory text using pattern matching
   - 4 pattern types: mandatory, prohibited, conditional, eligibility
   - Confidence scoring for extracted requirements
@@ -67,6 +73,7 @@ This project addresses the challenge of navigating complex regulatory environmen
   - `/cache/{program_id}`: Cache management
 
 ### Guided Workflows
+
 - **Step-by-Step Assistance**: Walk users through complex processes
 - **Contextual Help**: Relevant information at each step
 - **Progress Tracking**: Visual workflow completion status
@@ -74,6 +81,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - **Decision Trees**: Guide users through eligibility
 
 ### Data Ingestion Pipeline
+
 - **Canadian Law XML Parser**: Specialized parser for Justice Laws Canada XML format
   - Parses sections, subsections, amendments, cross-references
   - Handles namespaced XML and multiple act types (S.C., R.S.C., S.O.)
@@ -90,16 +98,18 @@ This project addresses the challenge of navigating complex regulatory environmen
 ## 🏗️ Architecture
 
 ### Tech Stack
+
 - **Frontend**: React 19 + TypeScript 5.9 + Vite 7 + Tailwind CSS v4
 - **State Management**: Zustand 5.0 + TanStack Query v5
 - **Backend**: FastAPI (Python 3.11+)
-- **Graph Database**: Neo4j (Community Edition)
+- **Graph Database**: Neo4j 5.15 (Community Edition with APOC + GDS plugins)
 - **Search**: Elasticsearch (keyword + vector)
 - **Relational DB**: PostgreSQL
 - **Cache**: Redis
 - **AI Services**: Gemini API (RAG + embeddings)
 
 ### System Components
+
 ```
 ┌─────────────────┐
 │  React Frontend │
@@ -144,6 +154,9 @@ regulatory-intelligence-assistant/
 │   │   └── templates/                # Config templates
 │   │       ├── development.json
 │   │       └── production.json
+│   ├── neo4j/                        # Custom Neo4j Docker image
+│   │   ├── Dockerfile                # Neo4j 5.15 with APOC + GDS plugins
+│   │   └── docker-entrypoint-wrapper.sh  # Restart-safe entrypoint
 │   ├── evaluation/                   # Quality evaluation
 │   │   ├── BAITMAN_test_queries.json # Test query dataset
 │   │   ├── evaluate_search_quality.py  # Search quality metrics
@@ -284,7 +297,7 @@ regulatory-intelligence-assistant/
 ├── .gitignore                        # Git ignore rules
 ├── CLAUDE.md                         # Claude AI context
 ├── DEPLOYMENT_CHECKLIST.md           # Production deployment checklist
-├── docker-compose.yml                # Service orchestration
+├── docker compose.yml                # Service orchestration
 ├── GETTING_STARTED.md                # Getting started guide
 └── README.md                         # This file
 ```
@@ -304,6 +317,7 @@ regulatory-intelligence-assistant/
 ## 📚 Documentation
 
 ### Planning & Architecture
+
 - **[Idea Document](./docs/idea.md)**: Initial concept and vision
 - **[PRD](./docs/prd.md)**: Comprehensive product requirements
 - **[Design Document](./docs/design.md)**: Technical architecture and implementation details
@@ -311,17 +325,20 @@ regulatory-intelligence-assistant/
 - **[Parallel Execution Plan](./docs/parallel-plan.md)**: Optimized parallel work streams for 4-developer team
 
 ### Technical Documentation
+
 - **[Neo4j Knowledge Graph](./docs/dev/neo4j-knowledge-graph.md)**: Complete graph schema, query patterns, and API usage
 - **[Neo4j MCP Setup](./docs/dev/neo4j-mcp-setup.md)**: MCP server configuration for AI-powered graph operations
 - **[Database Management](./docs/dev/database-management.md)**: PostgreSQL schema, models, and migrations guide
 - **[Compliance Engine](./docs/dev/compliance-engine.md)**: Comprehensive compliance checking system with validation types, API reference, and integration guide
 
 ### Development Guides
+
 - **[Developer Assignments](./docs/developer-assignments.md)**: Team member responsibilities and work streams
 
 ## 🚀 Quick Start (MVP)
 
 ### Prerequisites
+
 - Python 3.11+ or 3.12
 - Node.js 18+
 - Docker & Docker Compose
@@ -342,16 +359,16 @@ cp backend/.env.example backend/.env
 # Edit backend/.env with your database credentials and API keys
 
 # Start all services with Docker Compose
-docker-compose up -d
+docker compose up -d
 
 # This starts:
 # - PostgreSQL (port 5432) - Relational database
-# - Neo4j (ports 7474, 7687) - Knowledge graph database
+# - Neo4j (ports 7474, 7687) - Knowledge graph (custom image with APOC + GDS plugins)
 # - Elasticsearch (port 9200) - Search engine
 # - Redis (port 6379) - Cache layer
 
 # Wait ~30 seconds for services to be ready, then verify:
-docker ps
+docker compose ps
 
 # Set up backend environment
 cd backend
@@ -435,6 +452,7 @@ open http://localhost:7474
 ```
 
 ### Access Points
+
 - **Frontend**: http://localhost:3000 - Modern React UI with search, chat, and compliance
 - **Backend API**: http://localhost:8000 - RESTful API with 50+ endpoints
 - **API Docs**: http://localhost:8000/docs - Interactive Swagger documentation
@@ -444,6 +462,7 @@ open http://localhost:7474
 ## 📥 Data Ingestion Pipeline
 
 ### Overview
+
 The data ingestion pipeline processes Canadian federal regulations and loads them into all three backend systems (PostgreSQL, Neo4j, Elasticsearch). The MVP includes 10 sample Canadian federal acts.
 
 ### Quick Start: Load Sample Data
@@ -482,6 +501,7 @@ The pipeline ingests **10 Canadian Federal Acts** with full text and structure:
 10. Old Age Security Act
 
 **Total Content:**
+
 - 10 regulations
 - 70 sections (average 7 per act)
 - 10 amendments tracked
@@ -532,7 +552,7 @@ Validation Report:
 ✅ **Multi-Database**: Loads into PostgreSQL, Neo4j, and Elasticsearch simultaneously  
 ✅ **Progress Tracking**: Real-time logging of ingestion progress  
 ✅ **Error Resilience**: Continues on individual file failures  
-✅ **Validation Report**: Comprehensive post-ingestion validation  
+✅ **Validation Report**: Comprehensive post-ingestion validation
 
 ### Advanced Options
 
@@ -553,10 +573,11 @@ python -m ingestion.data_pipeline --help
 **Solution**: Make sure you're running from the `backend/` directory, not the project root.
 
 **Issue**: `Cannot connect to Neo4j` or `Cannot connect to Elasticsearch`  
-**Solution**: Ensure Docker services are running: `docker-compose ps`
+**Solution**: Ensure Docker services are running: `docker compose ps`
 
 **Issue**: `All files skipped`  
 **Solution**: Data already loaded! This is normal. To reload, clear databases first:
+
 ```bash
 # Clear PostgreSQL
 psql -h localhost -U postgres -d regulatory_db -c "TRUNCATE regulations, sections, amendments, citations CASCADE;"
@@ -571,6 +592,7 @@ curl -X DELETE "localhost:9200/regulatory_documents"
 ### Documentation
 
 For complete documentation on the data ingestion system, see:
+
 - **[Data Ingestion Complete Guide](./docs/DATA_INGESTION_MVP_COMPLETE.md)** - Full pipeline documentation
 - **[Ingestion README](./backend/ingestion/README.md)** - Technical implementation details
 - **[Canadian Law XML Parser](./backend/ingestion/canadian_law_xml_parser.py)** - Parser documentation
@@ -585,6 +607,7 @@ Once data is loaded, you can:
 4. **Ask Questions**: Use the RAG Q&A system via the Chat page
 
 Example API test:
+
 ```bash
 # Search for "employment insurance"
 curl -X POST "http://localhost:8000/api/search/keyword" \
@@ -604,11 +627,13 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 **2-Week MVP Sprint** (November 17 - December 1, 2025)
 
 ### Week 1: Foundation & Knowledge
+
 - Days 1-2: Setup, Neo4j graph, database schema
 - Days 3-4: Document ingestion, graph population, legal NLP
 - Days 5-7: Elasticsearch, hybrid search, Gemini RAG
 
 ### Week 2: Features & Demo
+
 - Days 8-10: Compliance checking, React UI, workflows
 - Days 11-12: Testing, quality evaluation, bug fixes
 - Days 13-14: Demo preparation, documentation
@@ -616,15 +641,17 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 ## 🎯 MVP Scope
 
 ### In Scope
+
 ✅ Regulatory knowledge graph with 50-100 regulations  
 ✅ Neo4j graph database for relationships  
 ✅ Semantic search with Elasticsearch  
 ✅ Q&A system using Gemini API RAG  
 ✅ Compliance checking for basic scenarios  
 ✅ Simple web interface for search and Q&A  
-✅ Demo video showing regulatory search and compliance  
+✅ Demo video showing regulatory search and compliance
 
 ### Future Enhancements
+
 - Change monitoring and alerting
 - Multi-jurisdiction support
 - Advanced workflow engine
@@ -635,6 +662,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 ## 🧪 Testing
 
 ### Frontend E2E Testing (Playwright) ✅
+
 - **Framework**: Playwright with TypeScript
 - **Coverage**: Dashboard, Search, and Chat pages
 - **Browsers**: Chromium, Firefox, WebKit + Mobile (Pixel 5, iPhone 12) + Tablet (iPad Pro)
@@ -653,6 +681,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
   ```
 
 ### Backend Unit & Integration Testing
+
 - **Framework**: pytest
 - **Total Tests**: 285 tests (227 passing, 32 skipped, 26 failing)
 - **Coverage**:
@@ -665,21 +694,25 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
   - ⏳ Integration tests (require GEMINI_API_KEY, Elasticsearch data)
 
 ### Search Quality Testing
+
 - Precision@10 metrics
 - Legal expert evaluation
 - User testing with caseworkers
 
 ### RAG Accuracy Testing
+
 - Answer quality ratings
 - Citation accuracy verification
 - Legal expert validation
 
 ### Compliance Testing
+
 - Test scenarios for various regulations
 - False positive/negative rates
 - Edge case handling
 
 ### Quality Metrics
+
 - Search Precision@10: >80%
 - RAG answer quality: >4/5
 - Citation accuracy: >95%
@@ -689,6 +722,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 ## 🔍 Knowledge Graph Structure
 
 ### Node Types
+
 - **Legislation**: Acts, laws, statutes
 - **Section**: Individual sections and subsections
 - **Regulation**: Regulatory provisions
@@ -697,6 +731,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 - **Situation**: Applicable scenarios
 
 ### Relationship Types
+
 - **HAS_SECTION**: Legislation → Section
 - **REFERENCES**: Section → Section (cross-references)
 - **AMENDED_BY**: Section → Section (amendments)
@@ -707,6 +742,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 ## 🤖 RAG System
 
 ### How It Works
+
 1. User asks a question in natural language
 2. System performs hybrid search to find relevant regulations
 3. Top results sent to Gemini API with the question
@@ -715,11 +751,13 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 6. Response returned with confidence score
 
 ### Example
+
 **Question**: "Can a temporary resident apply for employment insurance?"
 
 **Answer**: "Yes, temporary residents can apply for employment insurance if they have a valid work permit. According to Section 7(1) of the Employment Insurance Act, benefits are payable to insured persons who meet the eligibility requirements, which include being authorized to work in Canada."
 
-**Citations**: 
+**Citations**:
+
 - Employment Insurance Act, S.C. 1996, c. 23, s. 7(1)
 - Confidence: High
 
@@ -737,12 +775,14 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 ## 📊 Success Metrics
 
 ### Time Savings
+
 - Search time: -60-80%
 - Application processing: -40-60%
 - Research time: -50-70%
 - Staff time freed: 30-40%
 
 ### Quality Improvements
+
 - Compliance errors: -50-70%
 - Application accuracy: +40-60%
 - User confidence: +80%
@@ -769,24 +809,28 @@ Copyright © 2025 Regulatory Intelligence Assistant Team
 ## 💡 Use Cases
 
 ### Caseworkers
+
 - Quickly find applicable regulations
 - Understand eligibility criteria
 - Check application compliance
 - Get guided workflows for complex cases
 
 ### Policy Analysts
+
 - Research regulatory landscape
 - Find related regulations and precedents
 - Track regulatory changes
 - Analyze policy impacts
 
 ### Citizens
+
 - Understand government requirements
 - Self-assess eligibility
 - Get step-by-step guidance
 - Access plain language explanations
 
 ### Legal Researchers
+
 - Search across jurisdictions
 - Find cross-references and relationships
 - Track amendments and versions
@@ -804,8 +848,9 @@ For questions or support, please refer to the project documentation or contact t
 ### Current Progress Summary
 
 **Full-Stack Application: 95% Complete** ✅
+
 - ✅ Phase 1: Foundation (Days 1-2) - COMPLETE
-- ✅ Phase 2: Document Processing (Days 3-4) - COMPLETE  
+- ✅ Phase 2: Document Processing (Days 3-4) - COMPLETE
 - ✅ Phase 3: Search & RAG (Days 5-7) - COMPLETE
 - ✅ Phase 4A: Compliance Engine (Days 8-9) - COMPLETE
 - ✅ Phase 4B: Frontend Development (Days 10-11) - COMPLETE
@@ -814,11 +859,11 @@ For questions or support, please refer to the project documentation or contact t
 ### Detailed Progress
 
 **Phase 1: Foundation ✅ COMPLETE**
+
 - ✅ Stream 1A: Backend Setup & Database (Developer 1)
   - PostgreSQL database with 10 models and Alembic migrations
   - FastAPI server with comprehensive health checks for all services
   - Docker Compose orchestration (PostgreSQL, Neo4j, Elasticsearch, Redis)
-  
 - ✅ Stream 1B: Neo4j Knowledge Graph Setup (Developer 3)
   - Complete graph schema with 6 node types and 9 relationship types
   - Neo4j client with connection pooling and JSON serialization
@@ -826,13 +871,13 @@ For questions or support, please refer to the project documentation or contact t
   - Sample data: 4 Acts, 4 Sections, 1 Regulation, 3 Programs, 2 Situations
 
 **Phase 2: Document Processing ✅ COMPLETE**
+
 - ✅ Stream 2A: Document Parsing & Graph Population (Developer 3)
   - Document parser supporting PDF, HTML, XML, and TXT formats
   - Structured extraction: sections, subsections, clauses, cross-references
   - Document models with 6 types (Act, Regulation, Policy, etc.)
   - Document upload API with 9 endpoints
   - Graph population pipeline for automatic node/relationship creation
-  
 - ✅ Stream 2B: Legal NLP Processing (Developer 2)
   - Legal entity extraction with 8 entity types (89% accuracy)
   - Query parser with 8 intent types (87.5% accuracy)
@@ -841,6 +886,7 @@ For questions or support, please refer to the project documentation or contact t
   - 50+ unit tests, all passing
 
 **Phase 3: Search & RAG ✅ COMPLETE**
+
 - ✅ Stream 3A: Hybrid Search System (Developer 2)
   - Elasticsearch with 3 custom legal analyzers
   - Keyword search (BM25) with <100ms latency
@@ -848,7 +894,6 @@ For questions or support, please refer to the project documentation or contact t
   - Hybrid search combining both approaches
   - 11 REST API endpoints for search operations
   - 30+ comprehensive unit tests
-  
 - ✅ Stream 3B: Gemini RAG System (Developer 2)
   - RAG service combining search retrieval + LLM generation
   - Citation extraction with 2 pattern types
@@ -858,6 +903,7 @@ For questions or support, please refer to the project documentation or contact t
   - 25+ unit tests covering all functionality
 
 **Phase 4: Compliance & Frontend ✅ COMPLETE**
+
 - ✅ Stream 4A: Compliance Checking Engine (Developer 1) - COMPLETE
   - 3-tier architecture: RequirementExtractor → RuleEngine → ComplianceChecker
   - Pattern-based requirement extraction (4 pattern types)
@@ -866,7 +912,6 @@ For questions or support, please refer to the project documentation or contact t
   - 6 REST API endpoints for compliance operations
   - 24 unit tests with 100% pass rate
   - Sub-50ms field validation, sub-200ms full compliance check
-  
 - ✅ Stream 4B: Frontend Development (Developer 4) - COMPLETE
   - React 19 with TypeScript 5.9 and Vite 7.2
   - Tailwind CSS v4 with custom legal theme
@@ -880,12 +925,14 @@ For questions or support, please refer to the project documentation or contact t
   - Comprehensive documentation (README.md, TESTING.md)
 
 **API Coverage:**
+
 - ✅ 10 routers registered in FastAPI
 - ✅ 50+ REST API endpoints operational
 - ✅ Comprehensive health checks for all services
 - ✅ 285 unit and integration tests (227 passing, 32 skipped, 26 failing)
 
 **Test Coverage Summary:**
+
 - ✅ **Compliance Tests**: 24 tests, 100% pass rate
 - ✅ **Graph Builder Tests**: 12 tests, 100% pass rate
 - ✅ **Graph Service Tests**: 14 tests, 100% pass rate
@@ -898,6 +945,7 @@ For questions or support, please refer to the project documentation or contact t
 - ⏳ **E2E Workflow Tests**: 14 tests (9 failures due to missing test data/API keys)
 
 **Frontend Coverage:**
+
 - ✅ React 19 + TypeScript with modern tooling
 - ✅ 4 fully functional pages (Dashboard, Search, Chat, Compliance)
 - ✅ Zustand stores for state management
@@ -907,6 +955,7 @@ For questions or support, please refer to the project documentation or contact t
 - ✅ Comprehensive documentation
 
 **Test Coverage Progress:**
+
 - ✅ Unit tests for all core services (compliance, document parser, query parser, NLP, RAG, search)
 - ✅ Integration tests for NLP pipeline
 - ✅ Integration tests for RAG system (requires GEMINI_API_KEY for full testing)
@@ -914,6 +963,7 @@ For questions or support, please refer to the project documentation or contact t
 - ⏳ Search service integration tests (25/32 passing, Elasticsearch needs seeding)
 
 **Next Steps:**
+
 - ⏳ Add sample regulatory dataset for integration testing
 - ⏳ Configure valid GEMINI_API_KEY for RAG tests
 - ⏳ Fix E2E workflow tests with proper test data

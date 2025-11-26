@@ -448,7 +448,7 @@ pip install --upgrade beautifulsoup4 lxml
 ### Database Connection Errors
 ```bash
 # Check PostgreSQL is running
-docker-compose ps postgres
+docker compose ps postgres
 
 # Verify DATABASE_URL in .env
 echo $DATABASE_URL

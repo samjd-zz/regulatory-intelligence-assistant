@@ -8,7 +8,7 @@ This module provides end-to-end ingestion of Canadian regulatory data from XML f
 
 1. **PostgreSQL** - Full-text storage and metadata
 2. **Neo4j** - Knowledge graph relationships
-3. **Elasticsearch** - Hybrid search indexing  
+3. **Elasticsearch** - Hybrid search indexing
 4. **Gemini API** - RAG document corpus
 
 ## 🏗️ Architecture
@@ -47,6 +47,7 @@ This module provides end-to-end ingestion of Canadian regulatory data from XML f
 Specialized XML parser for Canadian Justice Laws format.
 
 **Features:**
+
 - Parses official Canadian legal XML structure
 - Extracts sections, subsections, and clauses
 - Identifies cross-references automatically
@@ -54,6 +55,7 @@ Specialized XML parser for Canadian Justice Laws format.
 - Supports namespaced XML
 
 **Example:**
+
 ```python
 from ingestion.canadian_law_xml_parser import CanadianLawXMLParser
 
@@ -70,6 +72,7 @@ print(f"Cross-references: {len(regulation.cross_references)}")
 Main ingestion pipeline orchestrator.
 
 **Pipeline Stages:**
+
 1. Parse XML → Structured data
 2. Store in PostgreSQL → Full-text + metadata
 3. Build knowledge graph → Neo4j relationships
@@ -77,6 +80,7 @@ Main ingestion pipeline orchestrator.
 5. Upload to Gemini → RAG context
 
 **Example:**
+
 ```python
 from ingestion.data_pipeline import DataIngestionPipeline
 
@@ -97,12 +101,14 @@ await pipeline.ingest_from_directory(
 Data download and sample generation tool.
 
 **Features:**
+
 - Creates sample XML files for testing
 - Documents real data sources
 - Manages 50 priority Canadian federal acts
 - Validates file structure
 
 **Example:**
+
 ```bash
 # Create sample data for testing
 python backend/ingestion/download_canadian_laws.py --limit 10
@@ -116,12 +122,14 @@ python backend/ingestion/download_canadian_laws.py --show-instructions
 ### Prerequisites
 
 1. **Services Running:**
+
 ```bash
-docker-compose up -d
-# Starts: PostgreSQL, Neo4j, Elasticsearch, Redis
+docker compose up -d
+# Starts: PostgreSQL, Neo4j (with APOC + GDS plugins), Elasticsearch, Redis
 ```
 
 2. **Database Initialized:**
+
 ```bash
 cd backend
 alembic upgrade head
@@ -129,6 +137,7 @@ python scripts/init_neo4j.py
 ```
 
 3. **Python Environment:**
+
 ```bash
 cd backend
 source venv/bin/activate  # or activate your environment
@@ -145,6 +154,7 @@ python ingestion/download_canadian_laws.py --limit 10
 This creates 10 sample XML files in `data/regulations/canadian_laws/`.
 
 **Output:**
+
 ```
 data/regulations/canadian_laws/
 ├── employment-insurance-act.xml
@@ -167,6 +177,7 @@ python ingestion/data_pipeline.py data/regulations/canadian_laws --limit 10 --va
 ```
 
 **Expected Output:**
+
 ```
 2025-11-25 10:15:00 - INFO - Found 10 XML files in data/regulations/canadian_laws
 2025-11-25 10:15:01 - INFO - [1/10] Processing employment-insurance-act.xml
@@ -204,14 +215,14 @@ curl http://localhost:9200/regulations/_count
 
 ## 📊 Data Statistics (MVP Target)
 
-| Metric | Target | Sample Data |
-|--------|--------|-------------|
-| Regulations | 50 | 10 |
-| Sections | 500-1,000 | 30 |
-| Amendments | 50-100 | 10 |
-| Cross-references | 200-500 | 20 |
-| Graph Nodes | 1,000+ | 40 |
-| Graph Relationships | 2,000+ | 60 |
+| Metric              | Target    | Sample Data |
+| ------------------- | --------- | ----------- |
+| Regulations         | 50        | 10          |
+| Sections            | 500-1,000 | 30          |
+| Amendments          | 50-100    | 10          |
+| Cross-references    | 200-500   | 20          |
+| Graph Nodes         | 1,000+    | 40          |
+| Graph Relationships | 2,000+    | 60          |
 
 ## 🔧 Configuration
 
@@ -319,6 +330,7 @@ python ingestion/canadian_law_xml_parser.py
 ### Issue: "Directory not found"
 
 **Solution:**
+
 ```bash
 mkdir -p data/regulations/canadian_laws
 python ingestion/download_canadian_laws.py --limit 10
@@ -327,29 +339,32 @@ python ingestion/download_canadian_laws.py --limit 10
 ### Issue: "Database connection failed"
 
 **Solution:**
+
 ```bash
 # Check Docker services
-docker-compose ps
+docker compose ps
 
 # Restart if needed
-docker-compose restart postgres
+docker compose restart postgres
 ```
 
 ### Issue: "Neo4j authentication failed"
 
 **Solution:**
+
 ```bash
 # Check credentials in .env
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password123
 
 # Or reset Neo4j password
-docker-compose restart neo4j
+docker compose restart neo4j
 ```
 
 ### Issue: "Elasticsearch index not created"
 
 **Solution:**
+
 ```bash
 # Check Elasticsearch is running
 curl http://localhost:9200
@@ -366,17 +381,18 @@ curl -X DELETE http://localhost:9200/sections
 
 ### Benchmarks (Single Node)
 
-| Operation | Time per File | Throughput |
-|-----------|--------------|------------|
-| XML Parsing | 50-100ms | ~20 files/sec |
-| PostgreSQL Insert | 100-200ms | ~10 files/sec |
-| Neo4j Graph Build | 200-400ms | ~5 files/sec |
-| Elasticsearch Index | 100-200ms | ~10 files/sec |
-| **Total Pipeline** | **500ms-1s** | **~2 files/sec** |
+| Operation           | Time per File | Throughput       |
+| ------------------- | ------------- | ---------------- |
+| XML Parsing         | 50-100ms      | ~20 files/sec    |
+| PostgreSQL Insert   | 100-200ms     | ~10 files/sec    |
+| Neo4j Graph Build   | 200-400ms     | ~5 files/sec     |
+| Elasticsearch Index | 100-200ms     | ~10 files/sec    |
+| **Total Pipeline**  | **500ms-1s**  | **~2 files/sec** |
 
 ### Optimization Tips
 
 1. **Batch Processing:**
+
 ```python
 # Process in batches of 10
 for i in range(0, len(files), 10):
@@ -386,6 +402,7 @@ for i in range(0, len(files), 10):
 ```
 
 2. **Parallel Processing:**
+
 ```python
 # Use multiple workers
 import asyncio
@@ -394,6 +411,7 @@ results = await asyncio.gather(*tasks, return_exceptions=True)
 ```
 
 3. **Skip Existing:**
+
 ```python
 # Check hash before ingestion
 if existing_hash(content_hash):
@@ -405,11 +423,13 @@ if existing_hash(content_hash):
 ### Real Data Sources
 
 1. **Open Canada Portal:**
+
    - URL: https://open.canada.ca/data/en/dataset/1f0aae37-18e4-4bad-bbca-59a4094e44fa
    - Download ZIP (~50 MB)
    - Extract to `data/regulations/canadian_laws/`
 
 2. **Justice Laws Website:**
+
    - URL: https://laws-lois.justice.gc.ca/eng/
    - Download individual acts as XML
    - Automated scraping with `requests` + `BeautifulSoup`

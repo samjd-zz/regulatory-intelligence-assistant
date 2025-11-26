@@ -692,7 +692,7 @@ Integration tests require running Elasticsearch:
 
 ```bash
 # Start Elasticsearch with Docker
-docker-compose up -d elasticsearch
+docker compose up -d elasticsearch
 
 # Run integration tests
 pytest tests/test_search_service.py::TestSearchServiceIntegration -v

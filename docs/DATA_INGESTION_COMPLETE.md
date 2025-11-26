@@ -148,7 +148,7 @@ These will be addressed in subsequent tasks.
 ### Manual Verification
 ```bash
 # Start services
-docker-compose up -d
+docker compose up -d
 
 # Verify PostgreSQL data
 docker exec regulatory-postgres psql -U postgres -d regulatory_db -c \

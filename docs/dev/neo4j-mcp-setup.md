@@ -6,7 +6,7 @@ Successfully installed and configured the **Neo4j MCP Memory Server** for the Re
 ## What Was Installed
 
 ### 1. Docker Infrastructure
-Created `docker-compose.yml` with all required services:
+Created `docker compose.yml` with all required services:
 - **PostgreSQL** (port 5432) - Relational database
 - **Neo4j** (ports 7474, 7687) - Graph database with APOC and GDS plugins
 - **Elasticsearch** (port 9200) - Search and vector storage
@@ -118,7 +118,7 @@ This MCP server is perfectly suited for the regulatory intelligence assistant be
 
 ```bash
 # Start all services
-docker-compose up -d
+docker compose up -d
 
 # Check service status
 docker ps
@@ -127,10 +127,10 @@ docker ps
 docker logs regulatory-neo4j
 
 # Stop all services
-docker-compose down
+docker compose down
 
 # Stop and remove data (caution!)
-docker-compose down -v
+docker compose down -v
 ```
 
 ## Connection Details
