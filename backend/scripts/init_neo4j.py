@@ -6,12 +6,14 @@ import sys
 import os
 from pathlib import Path
 
-# Add project root to Python path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+# Add backend directory to Python path
+# In Docker: /app/scripts -> /app
+# Locally: /path/to/backend/scripts -> /path/to/backend
+backend_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_dir))
 
-from backend.utils.neo4j_client import get_neo4j_client
-from backend.services.graph_service import get_graph_service
+from utils.neo4j_client import get_neo4j_client
+from services.graph_service import get_graph_service
 from datetime import date
 import logging
 
