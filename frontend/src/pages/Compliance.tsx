@@ -1,10 +1,11 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CheckCircle, AlertCircle, XCircle } from "lucide-react";
-import { useComplianceStore } from "@/store/complianceStore";
+
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { useComplianceStore } from "@/store/complianceStore";
 
 // Validation schema
 const complianceSchema = z.object({
@@ -76,7 +77,7 @@ export function Compliance() {
 						<h2 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">
 							Compliance Check
 						</h2>
-						<p className="text-sm text-slate-400 dark:text-zinc-500 mt-1">
+						<p className="text-sm text-slate-400 dark:text-zinc-400 mt-1">
 							Employment Insurance Application
 						</p>
 					</div>
@@ -149,7 +150,7 @@ export function Compliance() {
 										Temporary Resident (Work Permit)
 									</option>
 								</select>
-								<span className="material-symbols-outlined absolute right-0 top-3 pointer-events-none text-slate-400 dark:text-zinc-500 text-sm group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+								<span className="material-symbols-outlined absolute right-0 top-3 pointer-events-none text-slate-400 dark:text-zinc-400 text-sm group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
 									expand_more
 								</span>
 							</div>
@@ -177,7 +178,7 @@ export function Compliance() {
 									min="0"
 									className={`input-minimal ${errors.hours_worked ? "border-red-500 dark:border-red-500" : ""}`}
 								/>
-								<span className="text-xs text-slate-400 dark:text-zinc-500 whitespace-nowrap pt-3">
+								<span className="text-xs text-slate-400 dark:text-zinc-400 whitespace-nowrap pt-3">
 									Min. 420 hrs
 								</span>
 							</div>
@@ -240,7 +241,7 @@ export function Compliance() {
 							<h3 className="text-lg font-medium text-slate-700 dark:text-zinc-300 mb-2">
 								Ready for Analysis
 							</h3>
-							<p className="text-sm text-slate-400 dark:text-zinc-500 max-w-[200px] leading-relaxed">
+							<p className="text-sm text-slate-400 dark:text-zinc-400 max-w-[200px] leading-relaxed">
 								Fill out the applicant details to generate a real-time
 								compliance report.
 							</p>
@@ -280,7 +281,7 @@ export function Compliance() {
 							{/* Result Details */}
 							<div className="space-y-6">
 								<div className="flex justify-between border-b border-slate-100 dark:border-zinc-800 pb-2 animate-slide-up delay-100">
-									<span className="text-sm text-slate-500 dark:text-zinc-400">
+									<span className="text-sm text-slate-500 dark:text-zinc-300">
 										Hours Threshold
 									</span>
 									<span className="text-sm font-mono text-slate-900 dark:text-zinc-100">
@@ -297,7 +298,7 @@ export function Compliance() {
 									</span>
 								</div>
 								<div className="flex justify-between border-b border-slate-100 dark:border-zinc-800 pb-2 animate-slide-up delay-200">
-									<span className="text-sm text-slate-500 dark:text-zinc-400">
+									<span className="text-sm text-slate-500 dark:text-zinc-300">
 										Residency Status
 									</span>
 									<span className="text-sm font-mono text-slate-900 dark:text-zinc-100">
@@ -307,7 +308,7 @@ export function Compliance() {
 									</span>
 								</div>
 								<div className="flex justify-between border-b border-slate-100 dark:border-zinc-800 pb-2 animate-slide-up delay-300">
-									<span className="text-sm text-slate-500 dark:text-zinc-400">
+									<span className="text-sm text-slate-500 dark:text-zinc-300">
 										Confidence Score
 									</span>
 									<span className="text-sm font-mono text-teal-600 dark:text-teal-400 flex items-center gap-2">
@@ -356,7 +357,7 @@ export function Compliance() {
 														<p className="font-medium text-slate-900 dark:text-zinc-100">
 															{issue.description}
 														</p>
-														<p className="text-slate-600 dark:text-zinc-400 mt-1">
+														<p className="text-slate-600 dark:text-zinc-300 mt-1">
 															💡 {issue.suggestion}
 														</p>
 													</div>
@@ -383,7 +384,7 @@ export function Compliance() {
 												</li>
 											))}
 											{report.passed_checks.length > 3 && (
-												<li className="text-slate-600 dark:text-zinc-400 pl-5">
+												<li className="text-slate-600 dark:text-zinc-300 pl-5">
 													+{report.passed_checks.length - 3} more
 												</li>
 											)}
@@ -395,7 +396,7 @@ export function Compliance() {
 							<div className="mt-12 animate-slide-up delay-300">
 								<button
 									type="button"
-									className="text-xs font-bold text-slate-400 dark:text-zinc-500 hover:text-teal-600 dark:hover:text-teal-400 flex items-center gap-2 uppercase tracking-wide group transition-colors"
+									className="text-xs font-bold text-slate-400 dark:text-zinc-400 hover:text-teal-600 dark:hover:text-teal-400 flex items-center gap-2 uppercase tracking-wide group transition-colors"
 								>
 									<span className="material-symbols-outlined text-lg group-hover:scale-110 transition-transform">
 										description

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useSearchStore } from "@/store/searchStore";
+
 import { ConfidenceBadge } from "@/components/shared/ConfidenceBadge";
 import { SearchSkeleton } from "@/components/shared/SearchSkeleton";
 import { formatDate } from "@/lib/utils";
+import { useSearchStore } from "@/store/searchStore";
 
 export function Search() {
 	const { query, results, loading, error, search, total, processingTime } =
@@ -35,13 +36,13 @@ export function Search() {
 							value={localQuery}
 							onChange={(e) => setLocalQuery(e.target.value)}
 							placeholder="e.g. eligibility requirements for employment insurance..."
-							className="w-full text-3xl font-light text-slate-900 dark:text-zinc-100 border-b border-slate-200 dark:border-zinc-800 pb-4 px-2 outline-none focus:border-teal-600 dark:focus:border-teal-500 placeholder-slate-300 dark:placeholder-zinc-600 bg-transparent transition-colors duration-300"
+							className="w-full text-3xl font-light text-slate-900 dark:text-zinc-100 border-b border-slate-200 dark:border-zinc-800 pb-4 px-2 outline-none focus:border-teal-600 dark:focus:border-teal-500 placeholder-slate-300 dark:placeholder-zinc-500 bg-transparent transition-colors duration-300"
 							aria-label="Search regulations"
 						/>
 						<button
 							type="submit"
 							disabled={loading || !localQuery.trim()}
-							className="absolute right-2 bottom-4 text-slate-400 dark:text-zinc-500 hover:text-teal-600 dark:hover:text-teal-400 transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
+							className="absolute right-2 bottom-4 text-slate-400 dark:text-zinc-400 hover:text-teal-600 dark:hover:text-teal-400 transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
 						>
 							<span className="material-symbols-outlined text-3xl">search</span>
 						</button>
@@ -67,19 +68,19 @@ export function Search() {
 											defaultChecked
 											className="checkbox-custom"
 										/>
-										<span className="text-sm text-slate-600 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">
+										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
 											Federal
 										</span>
 									</label>
 									<label className="checkbox-wrapper group">
 										<input type="checkbox" className="checkbox-custom" />
-										<span className="text-sm text-slate-600 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">
+										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
 											Provincial
 										</span>
 									</label>
 									<label className="checkbox-wrapper group">
 										<input type="checkbox" className="checkbox-custom" />
-										<span className="text-sm text-slate-600 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">
+										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
 											Municipal
 										</span>
 									</label>
@@ -94,7 +95,7 @@ export function Search() {
 											defaultChecked
 											className="checkbox-custom"
 										/>
-										<span className="text-sm text-slate-600 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">
+										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
 											Act
 										</span>
 									</label>
@@ -104,13 +105,13 @@ export function Search() {
 											defaultChecked
 											className="checkbox-custom"
 										/>
-										<span className="text-sm text-slate-600 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">
+										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
 											Regulation
 										</span>
 									</label>
 									<label className="checkbox-wrapper group">
 										<input type="checkbox" className="checkbox-custom" />
-										<span className="text-sm text-slate-600 dark:text-zinc-400 group-hover:text-slate-900 dark:group-hover:text-zinc-200 transition-colors">
+										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
 											Policy
 										</span>
 									</label>
@@ -140,16 +141,16 @@ export function Search() {
 				</div>
 
 				{/* Results */}
-				<div className="border-t border-slate-100 dark:border-zinc-800 pt-8 animate-slide-up delay-200">
+				<div className="border-t border-slate-100 dark:border-zinc-800/60 pt-8 animate-slide-up delay-200">
 					{/* Results Count */}
 					{!loading && !error && results.length > 0 && (
-						<div className="mb-6 text-xs text-slate-500 dark:text-zinc-500 uppercase tracking-wide">
+						<div className="mb-6 text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wide">
 							Found{" "}
-							<span className="font-semibold text-slate-700 dark:text-zinc-300">
+							<span className="font-semibold text-slate-700 dark:text-zinc-200">
 								{total}
 							</span>{" "}
 							results for "
-							<span className="font-semibold text-slate-700 dark:text-zinc-300">
+							<span className="font-semibold text-slate-700 dark:text-zinc-200">
 								{query}
 							</span>
 							" in{" "}
@@ -189,7 +190,7 @@ export function Search() {
 									style={{ animationDelay: `${idx * 100}ms` }}
 								>
 									<div className="flex items-center gap-3 mb-2">
-										<span className="text-[10px] font-bold bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 px-1 py-0.5 rounded transition-colors group-hover:bg-teal-50 dark:group-hover:bg-teal-900/30 group-hover:text-teal-600 dark:group-hover:text-teal-400 uppercase">
+										<span className="text-[10px] font-bold bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-300 px-1 py-0.5 rounded transition-colors group-hover:bg-teal-50 dark:group-hover:bg-teal-900/30 group-hover:text-teal-600 dark:group-hover:text-teal-400 uppercase">
 											{result.jurisdiction} {result.document_type}
 										</span>
 										<h3 className="text-lg font-medium text-teal-700 dark:text-teal-400 group-hover:underline transition-all">
@@ -197,10 +198,10 @@ export function Search() {
 										</h3>
 										<ConfidenceBadge score={result.confidence} />
 									</div>
-									<p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed max-w-3xl transition-colors group-hover:text-slate-600 dark:group-hover:text-zinc-300">
+									<p className="text-sm text-slate-500 dark:text-zinc-300 leading-relaxed max-w-3xl transition-colors group-hover:text-slate-600 dark:group-hover:text-zinc-200">
 										{result.snippet}
 									</p>
-									<p className="text-xs text-slate-400 dark:text-zinc-500 mt-2">
+									<p className="text-xs text-slate-400 dark:text-zinc-400 mt-2">
 										{result.citation} • {formatDate(result.effective_date)}
 									</p>
 								</div>
@@ -220,7 +221,7 @@ export function Search() {
 							<h3 className="text-lg font-medium text-slate-700 dark:text-zinc-300 mb-2">
 								No results found
 							</h3>
-							<p className="text-sm text-slate-400 dark:text-zinc-500 max-w-[300px] leading-relaxed">
+							<p className="text-sm text-slate-400 dark:text-zinc-400 max-w-[300px] leading-relaxed">
 								We couldn't find any regulations matching "{query}". Try
 								refining your search terms.
 							</p>
@@ -239,7 +240,7 @@ export function Search() {
 							<h3 className="text-lg font-medium text-slate-700 dark:text-zinc-300 mb-2">
 								Ready to Search
 							</h3>
-							<p className="text-sm text-slate-400 dark:text-zinc-500 max-w-[250px] leading-relaxed">
+							<p className="text-sm text-slate-400 dark:text-zinc-400 max-w-[250px] leading-relaxed">
 								Enter keywords above to search through thousands of regulatory
 								documents.
 							</p>

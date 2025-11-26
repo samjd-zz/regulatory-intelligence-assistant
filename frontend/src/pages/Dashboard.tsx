@@ -25,7 +25,7 @@ export function Dashboard() {
 								+12 This Week
 							</span>
 						</div>
-						<p className="text-sm text-slate-500 dark:text-zinc-400 leading-relaxed max-w-sm animate-slide-up delay-300">
+						<p className="text-sm text-slate-500 dark:text-zinc-300 leading-relaxed max-w-sm animate-slide-up delay-300">
 							Full digitization of the Employment Insurance Act and workforce
 							policies. System validates forms against indexed regulations in
 							real-time.
@@ -43,7 +43,7 @@ export function Dashboard() {
 								<span className="text-5xl md:text-6xl value-kpi text-slate-800 dark:text-zinc-200 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
 									95.2%
 								</span>
-								<span className="text-sm text-slate-400 dark:text-zinc-500">
+								<span className="text-sm text-slate-400 dark:text-zinc-400">
 									verified
 								</span>
 							</div>
@@ -54,7 +54,7 @@ export function Dashboard() {
 								<span className="text-5xl md:text-6xl value-kpi text-slate-800 dark:text-zinc-200 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
 									0.8s
 								</span>
-								<span className="text-sm text-slate-400 dark:text-zinc-500">
+								<span className="text-sm text-slate-400 dark:text-zinc-400">
 									latency
 								</span>
 							</div>

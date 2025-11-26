@@ -1,5 +1,6 @@
-import { Copy, Check } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
+
 import { cn } from "@/lib/utils";
 import type { CitationTagProps } from "@/types";
 

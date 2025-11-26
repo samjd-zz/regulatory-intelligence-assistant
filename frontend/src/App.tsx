@@ -1,16 +1,17 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
 	BrowserRouter as Router,
-	Routes,
-	Route,
 	Navigate,
+	Route,
+	Routes,
 } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ThemeProvider } from "@/context/ThemeContext";
+
 import { MainLayout } from "@/components/layout/MainLayout";
-import { Dashboard } from "@/pages/Dashboard";
-import { Search } from "@/pages/Search";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { Chat } from "@/pages/Chat";
 import { Compliance } from "@/pages/Compliance";
+import { Dashboard } from "@/pages/Dashboard";
+import { Search } from "@/pages/Search";
 
 // Create a client for React Query
 const queryClient = new QueryClient({

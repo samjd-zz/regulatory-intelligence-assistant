@@ -1,9 +1,10 @@
-import { useState, useRef, useCallback } from "react";
-import { useChatStore } from "@/store/chatStore";
-import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
-import { ConfidenceBadge } from "@/components/shared/ConfidenceBadge";
+import { useCallback, useRef, useState } from "react";
+
 import { CitationTag } from "@/components/shared/CitationTag";
+import { ConfidenceBadge } from "@/components/shared/ConfidenceBadge";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { formatDate } from "@/lib/utils";
+import { useChatStore } from "@/store/chatStore";
 
 export function Chat() {
 	const { messages, loading, error, sendMessage } = useChatStore();
@@ -43,7 +44,7 @@ export function Chat() {
 						<h2 className="text-2xl font-light text-slate-900 dark:text-zinc-100 mb-3">
 							Regulatory Assistant
 						</h2>
-						<p className="text-sm text-slate-400 dark:text-zinc-500 max-w-md mx-auto leading-relaxed">
+						<p className="text-sm text-slate-400 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
 							Ask questions about specific mandates. Citations included
 							automatically.
 						</p>
@@ -64,7 +65,7 @@ export function Chat() {
 									<div className="text-2xl md:text-3xl font-light text-slate-900 dark:text-zinc-100 leading-tight">
 										{message.content}
 									</div>
-									<p className="text-[10px] font-bold text-slate-300 dark:text-zinc-600 uppercase tracking-widest mt-3">
+									<p className="text-[10px] font-bold text-slate-300 dark:text-zinc-400 uppercase tracking-widest mt-3">
 										You • {formatDate(message.timestamp)}
 									</p>
 								</div>
@@ -97,7 +98,7 @@ export function Chat() {
 											))}
 										</div>
 									)}
-									<p className="text-[10px] font-bold text-slate-300 dark:text-zinc-600 uppercase tracking-widest">
+									<p className="text-[10px] font-bold text-slate-300 dark:text-zinc-400 uppercase tracking-widest">
 										{formatDate(message.timestamp)}
 									</p>
 								</div>
@@ -148,7 +149,7 @@ export function Chat() {
 								}
 							}}
 							placeholder="Type your question here..."
-							className="w-full text-xl font-light text-slate-900 dark:text-zinc-100 border-b border-slate-200 dark:border-zinc-800 pb-4 px-2 outline-none focus:border-teal-600 dark:focus:border-teal-500 placeholder-slate-300 dark:placeholder-zinc-600 bg-transparent transition-colors duration-300"
+							className="w-full text-xl font-light text-slate-900 dark:text-zinc-100 border-b border-slate-200 dark:border-zinc-800 pb-4 px-2 outline-none focus:border-teal-600 dark:focus:border-teal-500 placeholder-slate-300 dark:placeholder-zinc-500 bg-transparent transition-colors duration-300"
 							disabled={loading}
 							aria-label="Question input"
 						/>
@@ -157,7 +158,7 @@ export function Chat() {
 						type="button"
 						onClick={handleSend}
 						disabled={loading || !input.trim()}
-						className="text-slate-400 dark:text-zinc-500 hover:text-teal-600 dark:hover:text-teal-400 transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 mb-2"
+						className="text-slate-400 dark:text-zinc-400 hover:text-teal-600 dark:hover:text-teal-400 transition-transform hover:scale-110 active:scale-95 disabled:opacity-50 mb-2"
 					>
 						<span className="material-symbols-outlined text-3xl">send</span>
 					</button>

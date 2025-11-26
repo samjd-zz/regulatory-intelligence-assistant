@@ -1,5 +1,6 @@
+import { Moon, Sun } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { Sun, Moon } from "lucide-react";
+
 import { useTheme } from "@/context/ThemeContext";
 
 export function Header() {
