@@ -176,7 +176,8 @@ select,
   appearance: none;
   width: 1.15rem;
   height: 1.15rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid;
+  @apply border-slate-300 dark:border-zinc-600;
   border-radius: 2px;
   display: grid;
   place-content: center;
@@ -188,18 +189,18 @@ select,
   width: 0.65rem;
   height: 0.65rem;
   transform: scale(0);
-  background-color: #0d9488;
+  @apply bg-teal-600 dark:bg-teal-400;
   transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 .checkbox-custom:checked {
-  border-color: #0d9488;
+  @apply border-teal-600 dark:border-teal-400;
 }
 .checkbox-custom:checked::before {
   transform: scale(1);
 }
 .checkbox-wrapper:hover .checkbox-custom {
-  border-color: #0d9488;
+  @apply border-teal-600 dark:border-teal-400;
 }
 
 .label-kpi {

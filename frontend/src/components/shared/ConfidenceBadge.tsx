@@ -23,10 +23,10 @@ export function ConfidenceBadge({
 
 	const bgClass =
 		score >= 0.8
-			? "bg-teal-50 text-teal-700"
+			? "bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400"
 			: score >= 0.5
-				? "bg-amber-50 text-amber-700"
-				: "bg-red-50 text-red-700";
+				? "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+				: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400";
 
 	return (
 		<output

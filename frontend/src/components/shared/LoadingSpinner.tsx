@@ -16,10 +16,10 @@ export function LoadingSpinner({ size = "md", message }: LoadingSpinnerProps) {
 			aria-busy="true"
 		>
 			<Loader2
-				className={cn("animate-spin text-teal-600", sizeClasses[size])}
+				className={cn("animate-spin text-teal-600 dark:text-teal-400", sizeClasses[size])}
 				aria-hidden="true"
 			/>
-			{message && <p className="text-sm text-slate-500">{message}</p>}
+			{message && <p className="text-sm text-slate-500 dark:text-zinc-400">{message}</p>}
 			<span className="sr-only">Loading...</span>
 		</output>
 	);
