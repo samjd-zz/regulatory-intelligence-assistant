@@ -370,14 +370,49 @@ docker compose up -d
 # Wait ~30 seconds for services to be ready, then verify:
 docker compose ps
 
-# Set up backend environment
+# OPTION 1: Full Docker Setup (Recommended for Quick Start)
+# Backend runs in Docker container - no local Python setup needed
+
+# All services are already running from `docker compose up -d`
+# Now run setup commands inside the backend container:
+
+# Run database migrations
+docker compose exec backend alembic upgrade head
+
+# Load sample Canadian federal regulations (REQUIRED for testing)
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 10 --validate
+
+# Initialize Neo4j knowledge graph
+docker compose exec backend python scripts/init_neo4j.py
+
+# (Optional) Seed PostgreSQL with additional sample data
+docker compose exec backend python seed_data.py
+
+# Backend is already running at http://localhost:8000
+
+# Set up and start frontend (runs locally, not in Docker)
+cd frontend
+npm install
+npm run dev
+
+# Frontend will be available at http://localhost:5173
+
+# ===================================================================
+
+# OPTION 2: Hybrid Setup (For Active Development)
+# Backend runs locally for easier debugging, databases in Docker
+
+# Stop the backend container (keep databases running)
+docker compose stop backend
+
+# Set up local Python environment
 cd backend
 
-# Option 1: Using Python venv (recommended)
+# Using Python venv (recommended)
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Option 2: Using conda (if you prefer)
+# OR using conda
 # conda create -n regulatory-ai python=3.12
 # conda activate regulatory-ai
 
@@ -387,13 +422,16 @@ pip install -r requirements.txt
 # Run database migrations (PostgreSQL)
 alembic upgrade head
 
-# Initialize Neo4j knowledge graph with schema and sample data
+# Load sample Canadian federal regulations (REQUIRED for testing)
+python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 10 --validate
+
+# Initialize Neo4j knowledge graph
 python scripts/init_neo4j.py
 
 # (Optional) Seed PostgreSQL with additional sample data
 python seed_data.py
 
-# Start FastAPI backend server
+# Start FastAPI backend server locally
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # In a new terminal: Set up and start frontend
