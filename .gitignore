@@ -234,3 +234,6 @@ checkpoints/
 *.zip
 *.tar.gz
 *.rar
+
+!backend/models
+!backend/neo4j
