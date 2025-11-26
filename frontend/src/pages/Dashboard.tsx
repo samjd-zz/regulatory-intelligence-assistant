@@ -13,7 +13,7 @@ export function Dashboard() {
 							Total Regulations Indexed
 						</p>
 						<div className="flex items-baseline gap-4 mb-8 overflow-hidden">
-							<span className="text-7xl md:text-9xl value-kpi text-slate-900 transition-transform hover:scale-105 duration-500 origin-left cursor-default animate-slide-up delay-100">
+							<span className="text-7xl md:text-9xl value-kpi text-slate-900 transition-all hover:text-teal-600 duration-150 origin-left cursor-default animate-slide-up delay-100">
 								1,245
 							</span>
 						</div>

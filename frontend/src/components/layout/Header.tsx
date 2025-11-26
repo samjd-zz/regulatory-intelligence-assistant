@@ -19,8 +19,15 @@ export function Header() {
 			<div className="max-w-6xl mx-auto px-6 md:px-12 py-5 flex justify-between items-end">
 				<div>
 					<Link to="/">
-						<h1 className="text-lg font-normal text-slate-700 tracking-tight hover:text-teal-600 transition-colors cursor-pointer animate-slide-up delay-100">
-							Regulatory Intelligence
+						<h1 className="text-lg font-light text-slate-900 tracking-tight hover:text-teal-600 transition-colors cursor-pointer animate-slide-up delay-100">
+							<span className="underline decoration-teal-500 underline-offset-4">
+								R
+							</span>
+							egulatory{" "}
+							<span className="underline decoration-teal-500 underline-offset-4">
+								I
+							</span>
+							ntelligence
 						</h1>
 					</Link>
 				</div>
