@@ -123,7 +123,9 @@ export function Chat() {
 							error
 						</span>
 						<div>
-							<p className="font-medium text-red-900 dark:text-red-100">Error</p>
+							<p className="font-medium text-red-900 dark:text-red-100">
+								Error
+							</p>
 							<p className="text-sm text-red-700 dark:text-red-300">{error}</p>
 						</div>
 					</div>

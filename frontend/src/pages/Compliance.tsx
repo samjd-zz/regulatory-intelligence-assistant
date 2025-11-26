@@ -250,7 +250,9 @@ export function Compliance() {
 					{/* Result State */}
 					{!checking && !error && report && (
 						<div className="animate-scale-in">
-							<p className="label-kpi mb-4 text-teal-600 dark:text-teal-400">Evaluation Result</p>
+							<p className="label-kpi mb-4 text-teal-600 dark:text-teal-400">
+								Evaluation Result
+							</p>
 
 							{/* Status Header */}
 							<div className="mb-10">
@@ -284,9 +286,13 @@ export function Compliance() {
 									<span className="text-sm font-mono text-slate-900 dark:text-zinc-100">
 										{hoursWorked || 0} / 420
 										{(hoursWorked ?? 0) >= 420 ? (
-											<span className="text-teal-600 dark:text-teal-400 font-bold ml-2">✓</span>
+											<span className="text-teal-600 dark:text-teal-400 font-bold ml-2">
+												✓
+											</span>
 										) : (
-											<span className="text-red-600 dark:text-red-400 font-bold ml-2">✕</span>
+											<span className="text-red-600 dark:text-red-400 font-bold ml-2">
+												✕
+											</span>
 										)}
 									</span>
 								</div>

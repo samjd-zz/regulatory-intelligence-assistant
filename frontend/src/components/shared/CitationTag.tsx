@@ -35,7 +35,10 @@ export function CitationTag({
 				type="button"
 			>
 				{copied ? (
-					<Check className="w-3 h-3 text-teal-600 dark:text-teal-400" aria-label="Copied" />
+					<Check
+						className="w-3 h-3 text-teal-600 dark:text-teal-400"
+						aria-label="Copied"
+					/>
 				) : (
 					<Copy className="w-3 h-3" aria-hidden="true" />
 				)}

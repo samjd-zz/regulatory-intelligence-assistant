@@ -145,9 +145,14 @@ export function Search() {
 					{!loading && !error && results.length > 0 && (
 						<div className="mb-6 text-xs text-slate-500 dark:text-zinc-500 uppercase tracking-wide">
 							Found{" "}
-							<span className="font-semibold text-slate-700 dark:text-zinc-300">{total}</span>{" "}
+							<span className="font-semibold text-slate-700 dark:text-zinc-300">
+								{total}
+							</span>{" "}
 							results for "
-							<span className="font-semibold text-slate-700 dark:text-zinc-300">{query}</span>" in{" "}
+							<span className="font-semibold text-slate-700 dark:text-zinc-300">
+								{query}
+							</span>
+							" in{" "}
 							<span className="font-semibold text-teal-600 dark:text-teal-400">
 								{processingTime}ms
 							</span>
@@ -164,8 +169,12 @@ export function Search() {
 								error
 							</span>
 							<div>
-								<p className="font-medium text-red-900 dark:text-red-100">Error</p>
-								<p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+								<p className="font-medium text-red-900 dark:text-red-100">
+									Error
+								</p>
+								<p className="text-sm text-red-700 dark:text-red-300">
+									{error}
+								</p>
 							</div>
 						</div>
 					)}
