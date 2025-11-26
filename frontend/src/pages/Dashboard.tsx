@@ -4,16 +4,16 @@ export function Dashboard() {
 	const navigate = useNavigate();
 
 	return (
-		<div className="p-12 flex flex-col h-full animate-fade-in">
-			<div className="grid grid-cols-12 gap-12 h-full">
+		<div className="flex flex-col h-full animate-fade-in">
+			<div className="grid grid-cols-12 gap-12 md:gap-24 h-full">
 				{/* Dominant Metric */}
-				<div className="col-span-5 flex flex-col pr-8 border-r border-slate-50">
-					<div className="mb-auto pt-8">
-						<p className="label-kpi animate-slide-up">
+				<div className="col-span-12 lg:col-span-5 flex flex-col lg:pr-16 lg:border-r border-slate-100">
+					<div className="mb-auto">
+						<p className="label-kpi animate-slide-up text-lg mb-4">
 							Total Regulations Indexed
 						</p>
-						<div className="flex items-baseline gap-4 mb-6 overflow-hidden">
-							<span className="text-8xl value-kpi text-slate-900 transition-transform hover:scale-105 duration-500 origin-left cursor-default animate-slide-up delay-100">
+						<div className="flex items-baseline gap-4 mb-8 overflow-hidden">
+							<span className="text-7xl md:text-9xl value-kpi text-slate-900 transition-transform hover:scale-105 duration-500 origin-left cursor-default animate-slide-up delay-100">
 								1,245
 							</span>
 						</div>
@@ -34,22 +34,22 @@ export function Dashboard() {
 				</div>
 
 				{/* Secondary Metrics & Quick Actions */}
-				<div className="col-span-7 flex flex-col justify-between pt-8">
+				<div className="col-span-12 lg:col-span-7 flex flex-col justify-between">
 					{/* Top Row: Metrics */}
-					<div className="grid grid-cols-2 gap-16">
+					<div className="grid grid-cols-2 gap-12 md:gap-24">
 						<div className="animate-slide-up delay-200">
-							<p className="label-kpi">Search Accuracy</p>
+							<p className="label-kpi mb-2">Search Accuracy</p>
 							<div className="flex items-baseline gap-2 group">
-								<span className="text-5xl value-kpi text-slate-800 group-hover:text-teal-600 transition-colors">
+								<span className="text-5xl md:text-6xl value-kpi text-slate-800 group-hover:text-teal-600 transition-colors">
 									95.2%
 								</span>
 								<span className="text-sm text-slate-400">verified</span>
 							</div>
 						</div>
 						<div className="animate-slide-up delay-300">
-							<p className="label-kpi">Avg Response Time</p>
+							<p className="label-kpi mb-2">Avg Response Time</p>
 							<div className="flex items-baseline gap-2 group">
-								<span className="text-5xl value-kpi text-slate-800 group-hover:text-teal-600 transition-colors">
+								<span className="text-5xl md:text-6xl value-kpi text-slate-800 group-hover:text-teal-600 transition-colors">
 									0.8s
 								</span>
 								<span className="text-sm text-slate-400">latency</span>
@@ -58,9 +58,9 @@ export function Dashboard() {
 					</div>
 
 					{/* Middle Row: Chart */}
-					<div className="mt-12 animate-slide-up delay-300">
-						<p className="label-kpi mb-6">Query Volume (6 Month Trend)</p>
-						<div className="w-full h-24 flex items-end justify-between gap-4 max-w-lg">
+					<div className="mt-24 animate-slide-up delay-300">
+						<p className="label-kpi mb-8">Query Volume (6 Month Trend)</p>
+						<div className="w-full h-48 flex items-end justify-between gap-6 max-w-2xl">
 							<div
 								className="w-full bg-slate-100 h-[30%] chart-bar"
 								style={{ animationDelay: "400ms" }}
@@ -93,10 +93,10 @@ export function Dashboard() {
 					</div>
 
 					{/* Bottom Row: Nav Links */}
-					<div className="grid grid-cols-3 gap-8 mt-auto border-t border-slate-50 pt-8 animate-slide-up delay-500">
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-12 mt-auto pt-12 border-t border-slate-100 animate-slide-up delay-500">
 						<button
 							type="button"
-							className="text-left group"
+							className="text-left group cursor-pointer"
 							onClick={() => navigate("/search")}
 						>
 							<span className="text-xs font-bold text-slate-900 group-hover:text-teal-600 flex items-center gap-2 transition-all group-hover:translate-x-1">
@@ -108,7 +108,7 @@ export function Dashboard() {
 						</button>
 						<button
 							type="button"
-							className="text-left group"
+							className="text-left group cursor-pointer"
 							onClick={() => navigate("/chat")}
 						>
 							<span className="text-xs font-bold text-slate-900 group-hover:text-teal-600 flex items-center gap-2 transition-all group-hover:translate-x-1">
@@ -120,7 +120,7 @@ export function Dashboard() {
 						</button>
 						<button
 							type="button"
-							className="text-left group"
+							className="text-left group cursor-pointer"
 							onClick={() => navigate("/compliance")}
 						>
 							<span className="text-xs font-bold text-slate-900 group-hover:text-teal-600 flex items-center gap-2 transition-all group-hover:translate-x-1">
