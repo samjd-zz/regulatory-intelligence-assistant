@@ -1,10 +1,10 @@
 @import "tailwindcss";
+@variant dark (&:where(.dark, .dark *));
 
 body {
   font-family: "Inter", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: #f8fafc; /* Slate-50 */
-  color: #0f172a; /* Slate-900 */
+  @apply bg-slate-50 text-slate-900 dark:bg-zinc-950 dark:text-zinc-50 transition-colors duration-300;
 }
 
 /* --- Animations & Transitions --- */
@@ -100,11 +100,11 @@ select,
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  @apply bg-slate-300 dark:bg-zinc-700;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  @apply bg-slate-400 dark:bg-zinc-600;
 }
 
 /* --- Components --- */
@@ -114,7 +114,7 @@ select,
   font-weight: 500;
   padding-bottom: 0.25rem;
   border-bottom: 2px solid transparent;
-  color: #64748b;
+  @apply text-slate-500 dark:text-zinc-400 transition-colors duration-300;
   position: relative;
 }
 
@@ -125,19 +125,18 @@ select,
   left: 0;
   width: 0%;
   height: 2px;
-  background-color: #0d9488;
+  @apply bg-teal-600 dark:bg-teal-500;
   transition: width 0.3s ease;
 }
 
 .nav-btn:hover {
-  color: #334155;
+  @apply text-slate-700 dark:text-zinc-200;
 }
 .nav-btn:hover::after {
   width: 30%;
 }
 .nav-btn.active {
-  color: #0d9488;
-  border-bottom-color: #0d9488;
+  @apply text-teal-600 dark:text-teal-400 border-b-teal-600 dark:border-b-teal-400;
 }
 .nav-btn.active::after {
   width: 100%;
@@ -147,24 +146,23 @@ select,
   width: 100%;
   background: transparent;
   border: none;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid;
+  @apply border-slate-200 dark:border-zinc-800 text-slate-900 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500;
   padding: 0.75rem 0;
   font-size: 0.95rem;
-  color: #0f172a;
   outline: none;
   border-radius: 0;
 }
 
 .input-minimal:focus {
-  border-bottom-color: #0d9488;
+  @apply border-b-teal-600 dark:border-b-teal-500;
   padding-left: 0.5rem;
 }
 .input-minimal::placeholder {
-  color: #94a3b8;
   transition: color 0.3s;
 }
 .input-minimal:focus::placeholder {
-  color: #cbd5e1;
+  @apply text-slate-300 dark:text-zinc-600;
 }
 
 .checkbox-wrapper {
@@ -209,7 +207,7 @@ select,
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  @apply text-slate-400 dark:text-zinc-500;
   margin-bottom: 0.5rem;
 }
 

@@ -5,6 +5,7 @@ import {
 	Navigate,
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Dashboard } from "@/pages/Dashboard";
 import { Search } from "@/pages/Search";
@@ -25,17 +26,19 @@ const queryClient = new QueryClient({
 function App() {
 	return (
 		<QueryClientProvider client={queryClient}>
-			<Router>
-				<MainLayout>
-					<Routes>
-						<Route path="/" element={<Dashboard />} />
-						<Route path="/search" element={<Search />} />
-						<Route path="/chat" element={<Chat />} />
-						<Route path="/compliance" element={<Compliance />} />
-						<Route path="*" element={<Navigate to="/" replace />} />
-					</Routes>
-				</MainLayout>
-			</Router>
+			<ThemeProvider>
+				<Router>
+					<MainLayout>
+						<Routes>
+							<Route path="/" element={<Dashboard />} />
+							<Route path="/search" element={<Search />} />
+							<Route path="/chat" element={<Chat />} />
+							<Route path="/compliance" element={<Compliance />} />
+							<Route path="*" element={<Navigate to="/" replace />} />
+						</Routes>
+					</MainLayout>
+				</Router>
+			</ThemeProvider>
 		</QueryClientProvider>
 	);
 }
