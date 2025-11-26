@@ -8,11 +8,13 @@ export function Search() {
 	const { query, results, loading, error, search, total, processingTime } =
 		useSearchStore();
 	const [localQuery, setLocalQuery] = useState("");
+	const [showFilters, setShowFilters] = useState(false);
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
 		if (localQuery.trim()) {
 			search(localQuery);
+			setShowFilters(false);
 		}
 	};
 
@@ -20,7 +22,11 @@ export function Search() {
 		<div className="flex flex-col h-full animate-fade-in">
 			<div className="max-w-4xl mx-auto w-full pt-16 px-12">
 				{/* Search Input */}
-				<div className="mb-12 animate-slide-up">
+				<div
+					className={`animate-slide-up transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] ${
+						showFilters ? "mb-12" : "mb-8"
+					}`}
+				>
 					<p className="label-kpi mb-4">Semantic Search</p>
 					<form onSubmit={handleSearch} className="relative group">
 						<input
@@ -29,13 +35,13 @@ export function Search() {
 							value={localQuery}
 							onChange={(e) => setLocalQuery(e.target.value)}
 							placeholder="e.g. eligibility requirements for employment insurance..."
-							className="w-full text-3xl font-light text-slate-900 border-b border-slate-200 pb-4 outline-none focus:border-teal-600 placeholder-slate-300 bg-transparent transition-all"
+							className="w-full text-3xl font-light text-slate-900 border-b border-slate-200 pb-4 px-2 outline-none focus:border-teal-600 placeholder-slate-300 bg-transparent transition-colors duration-300"
 							aria-label="Search regulations"
 						/>
 						<button
 							type="submit"
 							disabled={loading || !localQuery.trim()}
-							className="absolute right-0 bottom-4 text-slate-400 hover:text-teal-600 transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
+							className="absolute right-2 bottom-4 text-slate-400 hover:text-teal-600 transition-transform hover:scale-110 active:scale-95 disabled:opacity-50"
 						>
 							<span className="material-symbols-outlined text-3xl">search</span>
 						</button>
@@ -43,65 +49,94 @@ export function Search() {
 				</div>
 
 				{/* Filters */}
-				<div className="grid grid-cols-2 gap-16 mb-16 animate-slide-up delay-100">
-					<div>
-						<p className="label-kpi mb-4">Jurisdiction</p>
-						<div className="space-y-3">
-							<label className="checkbox-wrapper group">
-								<input
-									type="checkbox"
-									defaultChecked
-									className="checkbox-custom"
-								/>
-								<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
-									Federal
-								</span>
-							</label>
-							<label className="checkbox-wrapper group">
-								<input type="checkbox" className="checkbox-custom" />
-								<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
-									Provincial
-								</span>
-							</label>
-							<label className="checkbox-wrapper group">
-								<input type="checkbox" className="checkbox-custom" />
-								<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
-									Municipal
-								</span>
-							</label>
+				<div
+					className={`grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] ${
+						showFilters
+							? "grid-rows-[1fr] opacity-100"
+							: "grid-rows-[0fr] opacity-0"
+					}`}
+				>
+					<div className="overflow-hidden">
+						<div className="grid grid-cols-2 gap-16 mb-12">
+							<div>
+								<p className="label-kpi mb-4">Jurisdiction</p>
+								<div className="space-y-3">
+									<label className="checkbox-wrapper group">
+										<input
+											type="checkbox"
+											defaultChecked
+											className="checkbox-custom"
+										/>
+										<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+											Federal
+										</span>
+									</label>
+									<label className="checkbox-wrapper group">
+										<input type="checkbox" className="checkbox-custom" />
+										<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+											Provincial
+										</span>
+									</label>
+									<label className="checkbox-wrapper group">
+										<input type="checkbox" className="checkbox-custom" />
+										<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+											Municipal
+										</span>
+									</label>
+								</div>
+							</div>
+							<div>
+								<p className="label-kpi mb-4">Document Type</p>
+								<div className="space-y-3">
+									<label className="checkbox-wrapper group">
+										<input
+											type="checkbox"
+											defaultChecked
+											className="checkbox-custom"
+										/>
+										<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+											Act
+										</span>
+									</label>
+									<label className="checkbox-wrapper group">
+										<input
+											type="checkbox"
+											defaultChecked
+											className="checkbox-custom"
+										/>
+										<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+											Regulation
+										</span>
+									</label>
+									<label className="checkbox-wrapper group">
+										<input type="checkbox" className="checkbox-custom" />
+										<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
+											Policy
+										</span>
+									</label>
+								</div>
+							</div>
 						</div>
 					</div>
-					<div>
-						<p className="label-kpi mb-4">Document Type</p>
-						<div className="space-y-3">
-							<label className="checkbox-wrapper group">
-								<input
-									type="checkbox"
-									defaultChecked
-									className="checkbox-custom"
-								/>
-								<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
-									Act
-								</span>
-							</label>
-							<label className="checkbox-wrapper group">
-								<input
-									type="checkbox"
-									defaultChecked
-									className="checkbox-custom"
-								/>
-								<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
-									Regulation
-								</span>
-							</label>
-							<label className="checkbox-wrapper group">
-								<input type="checkbox" className="checkbox-custom" />
-								<span className="text-sm text-slate-600 group-hover:text-slate-900 transition-colors">
-									Policy
-								</span>
-							</label>
-						</div>
-					</div>
+				</div>
+
+				{/* Toggle Filters Button */}
+				<div className="flex justify-center mb-8 animate-fade-in">
+					<button
+						type="button"
+						onClick={() => setShowFilters(!showFilters)}
+						className="text-xs font-bold text-teal-600 uppercase tracking-wide hover:text-teal-700 flex items-center gap-2 transition-colors"
+					>
+						{showFilters ? "Hide Filters" : "Show Filters"}
+						<span
+							className="material-symbols-outlined text-sm transition-transform duration-300"
+							style={{
+								transform: showFilters ? "rotate(180deg)" : "rotate(0deg)",
+							}}
+						>
+							expand_more
+						</span>
+					</button>
 				</div>
 
 				{/* Results */}
@@ -124,8 +159,14 @@ export function Search() {
 
 					{/* Error State */}
 					{error && (
-						<div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 animate-scale-in">
-							{error}
+						<div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800 animate-scale-in flex items-start gap-3 mb-8">
+							<span className="material-symbols-outlined text-red-500 mt-0.5">
+								error
+							</span>
+							<div>
+								<p className="font-medium text-red-900">Error</p>
+								<p className="text-sm text-red-700">{error}</p>
+							</div>
 						</div>
 					)}
 
@@ -160,18 +201,39 @@ export function Search() {
 
 					{/* No Results */}
 					{!loading && !error && query && results.length === 0 && (
-						<div className="text-center py-12 text-slate-600 animate-scale-in">
-							No results found for "{query}". Try refining your search.
+						<div className="flex flex-col items-center justify-center text-center py-12 animate-scale-in">
+							<div className="relative mb-6 group cursor-default">
+								<div className="absolute inset-0 bg-slate-100 rounded-full blur-xl opacity-40 group-hover:opacity-60 transition-opacity duration-500" />
+								<span className="material-symbols-outlined text-6xl text-slate-300 relative z-10 transition-transform duration-500 group-hover:scale-110">
+									search_off
+								</span>
+							</div>
+							<h3 className="text-lg font-medium text-slate-700 mb-2">
+								No results found
+							</h3>
+							<p className="text-sm text-slate-400 max-w-[300px] leading-relaxed">
+								We couldn't find any regulations matching "{query}". Try
+								refining your search terms.
+							</p>
 						</div>
 					)}
 
 					{/* Initial State */}
 					{!loading && !error && !query && results.length === 0 && (
-						<div className="text-center py-12 opacity-40 animate-scale-in">
-							<span className="material-symbols-outlined text-4xl text-slate-300 mb-2 animate-bounce">
-								manage_search
-							</span>
-							<p className="text-sm text-slate-400">Awaiting query...</p>
+						<div className="flex flex-col items-center justify-center text-center py-12 animate-scale-in">
+							<div className="relative mb-6 group cursor-default">
+								<div className="absolute inset-0 bg-teal-100 rounded-full blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
+								<span className="material-symbols-outlined text-6xl text-slate-300 relative z-10 transition-transform duration-500 group-hover:scale-110 group-hover:text-teal-500/50">
+									manage_search
+								</span>
+							</div>
+							<h3 className="text-lg font-medium text-slate-700 mb-2">
+								Ready to Search
+							</h3>
+							<p className="text-sm text-slate-400 max-w-[250px] leading-relaxed">
+								Enter keywords above to search through thousands of regulatory
+								documents.
+							</p>
 						</div>
 					)}
 				</div>

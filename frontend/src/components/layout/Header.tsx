@@ -16,11 +16,13 @@ export function Header() {
 
 	return (
 		<header className="border-b border-slate-100 z-20 bg-white/95 backdrop-blur-sm sticky top-0">
-			<div className="max-w-6xl mx-auto px-6 md:px-12 py-8 flex justify-between items-end">
+			<div className="max-w-6xl mx-auto px-6 md:px-12 py-5 flex justify-between items-end">
 				<div>
-					<h1 className="text-xl font-semibold text-slate-800 tracking-tight animate-slide-up delay-100">
-						Regulatory Intelligence
-					</h1>
+					<Link to="/">
+						<h1 className="text-lg font-normal text-slate-700 tracking-tight hover:text-teal-600 transition-colors cursor-pointer animate-slide-up delay-100">
+							Regulatory Intelligence
+						</h1>
+					</Link>
 				</div>
 				{/* Tab Navigation */}
 				<nav className="flex gap-10 animate-slide-up delay-200">
