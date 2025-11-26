@@ -388,6 +388,9 @@ docker compose exec backend python scripts/init_neo4j.py
 # (Optional) Seed PostgreSQL with additional sample data
 docker compose exec backend python seed_data.py
 
+# Note: If you encounter schema errors, the models are now fully aligned with
+# the database schema (started_at/completed_at for workflow_sessions, no metadata column)
+
 # Backend is already running at http://localhost:8000
 
 # Set up and start frontend (runs locally, not in Docker)

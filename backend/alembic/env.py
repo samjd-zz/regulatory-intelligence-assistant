@@ -77,6 +77,12 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    # Override the sqlalchemy.url from alembic.ini with DATABASE_URL env var if present
+    # This allows the same alembic.ini to work in Docker (with service names) and locally
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        config.set_main_option("sqlalchemy.url", database_url)
+    
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

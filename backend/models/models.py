@@ -179,9 +179,9 @@ class WorkflowSession(Base):
     workflow_type = Column(String(100), nullable=False)
     state = Column(JSON, default=dict)
     status = Column(String(50), default="active")
+    started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
     extra_metadata = Column(JSON, default=dict)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     user = relationship("User", back_populates="workflow_sessions")
@@ -204,7 +204,6 @@ class WorkflowStep(Base):
     input_data = Column(JSON, default=dict)
     validation_result = Column(JSON, default=dict)
     completed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     session = relationship("WorkflowSession", back_populates="steps")
