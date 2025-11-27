@@ -79,6 +79,25 @@ export function Dashboard() {
 							</span>
 						</div>
 						
+						{/* Impact & Responsible AI Indicators */}
+						<div className="mt-8 p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg animate-slide-up delay-400">
+							<div className="flex items-start gap-3">
+								<div className="flex-shrink-0 w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+									<svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+									</svg>
+								</div>
+								<div className="flex-1">
+									<h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1">Responsible AI</h4>
+									<p className="text-xs text-green-700 dark:text-green-300">
+										✓ Bias-free algorithms<br/>
+										✓ Human oversight enabled<br/>
+										✓ Privacy compliant (PIPEDA)
+									</p>
+								</div>
+							</div>
+						</div>
+
 						{/* Query Volume Chart - */}
 						<div className="mt-8 animate-slide-up delay-400">
 							<p className="label-kpi mb-8">Query Volume (6 Month Trend)</p>
@@ -110,25 +129,6 @@ export function Dashboard() {
 									<span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-teal-600 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
 										NOW
 									</span>
-								</div>
-							</div>
-						</div>
-
-						{/* Impact & Responsible AI Indicators */}
-						<div className="mt-8 p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg animate-slide-up delay-400">
-							<div className="flex items-start gap-3">
-								<div className="flex-shrink-0 w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-									<svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-									</svg>
-								</div>
-								<div className="flex-1">
-									<h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-1">Responsible AI</h4>
-									<p className="text-xs text-green-700 dark:text-green-300">
-										✓ Bias-free algorithms<br/>
-										✓ Human oversight enabled<br/>
-										✓ Privacy compliant (PIPEDA)
-									</p>
 								</div>
 							</div>
 						</div>
@@ -234,9 +234,6 @@ export function Dashboard() {
 						</div>
 					</div>
 
-					
-
-					
 					{/* Enterprise-Grade Tech Stack*/}
 					<div className="mt-8 p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg animate-slide-up delay-375">
 						<div className="flex items-center gap-2 mb-3">
