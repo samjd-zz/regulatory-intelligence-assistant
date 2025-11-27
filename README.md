@@ -343,9 +343,28 @@ regulatory-intelligence-assistant/
 - Node.js 18+
 - Docker & Docker Compose
 - Git
-- API Keys: Gemini API (for RAG and embeddings)
+- **API Keys**: Gemini API (for RAG and embeddings)
 
 **Note:** All database services (PostgreSQL, Neo4j, Elasticsearch, Redis) run in Docker containers - no local installation needed!
+
+### Gemini API Configuration
+
+The RAG system uses Google's Gemini API for question answering. You'll need:
+
+1. **Get a Gemini API key**: Visit [Google AI Studio](https://makersuite.google.com/app/apikey) to create a free API key
+2. **Configure environment variables** in `backend/.env`:
+   ```bash
+   GEMINI_API_KEY=your_api_key_here
+   GEMINI_MODEL=gemini-1.5-flash-latest  # Default model
+   ```
+
+**Available Models** (can be changed in `.env`):
+- `gemini-1.5-flash-latest` (default - fastest, good for most use cases)
+- `gemini-1.5-pro-latest` (more capable, slightly slower)
+- `gemini-pro` (stable baseline model)
+- `gemini-1.0-pro` (older stable version)
+
+**Note**: The model name must match the format supported by Gemini API v1beta. Using incorrect model names (e.g., `gemini-1.5-flash` without `-latest`) will cause "404 model not found" errors.
 
 ### Installation
 
