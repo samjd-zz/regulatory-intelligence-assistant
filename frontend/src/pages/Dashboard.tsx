@@ -78,12 +78,42 @@ export function Dashboard() {
 								+12 This Week
 							</span>
 						</div>
-						<p className="text-sm text-slate-500 dark:text-zinc-300 leading-relaxed max-w-sm animate-slide-up delay-300">
-							Full digitization of the Employment Insurance Act and workforce
-							policies. System validates forms against indexed regulations in
-							real-time.
-						</p>
 						
+						{/* Query Volume Chart - */}
+						<div className="mt-8 animate-slide-up delay-400">
+							<p className="label-kpi mb-8">Query Volume (6 Month Trend)</p>
+							<div className="w-full h-48 flex items-end justify-between gap-6 max-w-2xl">
+								<div
+									className="w-full bg-slate-100 dark:bg-zinc-800 h-[30%] chart-bar"
+									style={{ animationDelay: "400ms" }}
+								></div>
+								<div
+									className="w-full bg-slate-100 dark:bg-zinc-800 h-[45%] chart-bar"
+									style={{ animationDelay: "500ms" }}
+								></div>
+								<div
+									className="w-full bg-slate-100 dark:bg-zinc-800 h-[40%] chart-bar"
+									style={{ animationDelay: "600ms" }}
+								></div>
+								<div
+									className="w-full bg-slate-100 dark:bg-zinc-800 h-[65%] chart-bar"
+									style={{ animationDelay: "700ms" }}
+								></div>
+								<div
+									className="w-full bg-slate-100 dark:bg-zinc-800 h-[55%] chart-bar"
+									style={{ animationDelay: "800ms" }}
+								></div>
+								<div
+									className="w-full bg-teal-600 h-[85%] relative chart-bar group cursor-pointer"
+									style={{ animationDelay: "900ms" }}
+								>
+									<span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-teal-600 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
+										NOW
+									</span>
+								</div>
+							</div>
+						</div>
+
 						{/* Impact & Responsible AI Indicators */}
 						<div className="mt-8 p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg animate-slide-up delay-400">
 							<div className="flex items-start gap-3">
@@ -184,7 +214,7 @@ export function Dashboard() {
 							<div className="flex flex-col gap-1">
 								<div className="flex items-center gap-1.5">
 									<svg className="w-3 h-3 text-teal-600 dark:text-teal-400" viewBox="0 0 24 24" fill="currentColor">
-										<path d="M12 0c6.627 0 12 2.686 12 6v12c0 3.314-5.373 6-12 6s-12-2.686-12-6V6c0-3.314 5.373-6 12-6zm0 2C7.03 2 3 3.79 3 6s4.03 4 9 4 9-1.79 9-4-4.03-4-9-4zM3 8.69c1.953 1.396 5.174 2.31 9 2.31s7.047-.914 9-2.31V12c0 2.21-4.03 4-9 4s-9-1.79-9-4V8.69z"/>
+										<path d="M12 0c6.627 0 12 2.686 12 6v12c0 2 3.6 3.5 8 3.5s8-1.5 8-3.5V5.5C20 3.6 16.4 2 12 2zm-6 3.5c0-.3 2.7-1.5 6-1.5s6 1.2 6 1.5S15.3 7 12 7 6 5.8 6 5.5zM6 18v-2.3c1.3.6 2.6.9 4 1.1v2.3c-2.2-.2-4-.7-4-1.1zm8 1.1v-2.3c1.4-.2 2.7-.5 4-1.1V18c0 .4-1.8.9-4 1.1z"/>
 									</svg>
 									<span className="text-[10px] text-teal-700 dark:text-teal-300">PostgreSQL</span>
 								</div>
@@ -203,9 +233,12 @@ export function Dashboard() {
 							</div>
 						</div>
 					</div>
+
 					
-					{/* Tech Stack Showcase */}
-					<div className="mt-6 p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg animate-slide-up delay-375">
+
+					
+					{/* Enterprise-Grade Tech Stack*/}
+					<div className="mt-8 p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg animate-slide-up delay-375">
 						<div className="flex items-center gap-2 mb-3">
 							<svg className="w-4 h-4 text-slate-700 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
@@ -310,41 +343,6 @@ export function Dashboard() {
 									<span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse delay-100"></span>
 									<span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse delay-200"></span>
 								</div>
-							</div>
-						</div>
-					</div>
-
-					{/* Middle Row: Chart with Scalability Context */}
-					<div className="mt-12 animate-slide-up delay-300">
-						<p className="label-kpi mb-8">Query Volume (6 Month Trend)</p>
-						<div className="w-full h-48 flex items-end justify-between gap-6 max-w-2xl">
-							<div
-								className="w-full bg-slate-100 dark:bg-zinc-800 h-[30%] chart-bar"
-								style={{ animationDelay: "400ms" }}
-							></div>
-							<div
-								className="w-full bg-slate-100 dark:bg-zinc-800 h-[45%] chart-bar"
-								style={{ animationDelay: "500ms" }}
-							></div>
-							<div
-								className="w-full bg-slate-100 dark:bg-zinc-800 h-[40%] chart-bar"
-								style={{ animationDelay: "600ms" }}
-							></div>
-							<div
-								className="w-full bg-slate-100 dark:bg-zinc-800 h-[65%] chart-bar"
-								style={{ animationDelay: "700ms" }}
-							></div>
-							<div
-								className="w-full bg-slate-100 dark:bg-zinc-800 h-[55%] chart-bar"
-								style={{ animationDelay: "800ms" }}
-							></div>
-							<div
-								className="w-full bg-teal-600 h-[85%] relative chart-bar group cursor-pointer"
-								style={{ animationDelay: "900ms" }}
-							>
-								<span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-teal-600 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity transform translate-y-2 group-hover:translate-y-0">
-									NOW
-								</span>
 							</div>
 						</div>
 					</div>
