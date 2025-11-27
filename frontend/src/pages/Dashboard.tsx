@@ -16,13 +16,13 @@ export function Dashboard() {
 							60-75% Time Savings
 						</span>
 						
-						{/* Interoperability */}
-						<span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded-full border border-blue-200 dark:border-blue-800">
-							<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-							</svg>
-							Multi-Format Export
-						</span>
+					{/* Interoperability */}
+					<span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded-full border border-blue-200 dark:border-blue-800">
+						<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+						</svg>
+						JSON API
+					</span>
 						
 						{/* Explainability */}
 						<span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs font-semibold rounded-full border border-purple-200 dark:border-purple-800">
@@ -152,18 +152,18 @@ export function Dashboard() {
 
 					{/* Interoperability & Tech Stack for Scalability */}
 					<div className="grid grid-cols-2 gap-6 mt-8 animate-slide-up delay-350">
-						<div className="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded">
-							<div className="flex items-center gap-2 mb-1">
-								<svg className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-								</svg>
-								<span className="text-xs font-semibold text-blue-900 dark:text-blue-100">Interoperability</span>
-							</div>
-							<p className="text-[10px] text-blue-700 dark:text-blue-300">
-								JSON/CSV/XML export<br/>
-								RESTful API ready
-							</p>
+					<div className="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded">
+						<div className="flex items-center gap-2 mb-1">
+							<svg className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+							</svg>
+							<span className="text-xs font-semibold text-blue-900 dark:text-blue-100">Interoperability</span>
 						</div>
+						<p className="text-[10px] text-blue-700 dark:text-blue-300">
+							RESTful API<br/>
+							JSON responses
+						</p>
+					</div>
 						<div className="p-3 bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800 rounded">
 							<div className="flex items-center gap-2 mb-1">
 								<svg className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -214,7 +214,7 @@ export function Dashboard() {
 								<p className="text-[9px] text-slate-500 dark:text-zinc-400 font-semibold uppercase mb-1">Data Layer</p>
 								<p className="text-[10px] text-slate-700 dark:text-zinc-300">
 									Neo4j Knowledge Graph<br/>
-									Pinecone Vectors
+									Elasticsearch Vectors
 								</p>
 							</div>
 						</div>
