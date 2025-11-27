@@ -113,7 +113,7 @@ const socialAssistanceSchema = z.object({
 export const PROGRAMS: Record<ProgramId, ProgramConfig> = {
 	"employment-insurance": {
 		id: "employment-insurance",
-		name: "Employment Insurance (EI)",
+		name: "Employment Insurance",
 		description: "Regular benefits for those who lost their job through no fault of their own",
 		fields: [
 			{
@@ -154,7 +154,7 @@ export const PROGRAMS: Record<ProgramId, ProgramConfig> = {
 	},
 	"cpp-retirement": {
 		id: "cpp-retirement",
-		name: "Canada Pension Plan (CPP) Retirement",
+		name: "CPP Retirement",
 		description: "Monthly pension for contributors aged 60 and older",
 		fields: [
 			{
@@ -192,7 +192,7 @@ export const PROGRAMS: Record<ProgramId, ProgramConfig> = {
 	},
 	"canada-child-benefit": {
 		id: "canada-child-benefit",
-		name: "Canada Child Benefit (CCB)",
+		name: "Child Benefit",
 		description: "Tax-free monthly payment for families with children under 18",
 		fields: [
 			{
@@ -228,7 +228,7 @@ export const PROGRAMS: Record<ProgramId, ProgramConfig> = {
 	},
 	gis: {
 		id: "gis",
-		name: "Guaranteed Income Supplement (GIS)",
+		name: "Income Supplement",
 		description: "Monthly benefit for low-income OAS recipients",
 		fields: [
 			{
