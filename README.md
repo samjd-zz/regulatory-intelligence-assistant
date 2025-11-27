@@ -184,7 +184,7 @@ regulatory-intelligence-assistant/
 │   │   └── compliance_rules.py       # Compliance data models
 │   ├── services/                     # Business logic
 │   │   ├── compliance_checker.py     # Compliance engine
-│   │   ├── document_parser.py        # Document parsing (PDF, HTML, XML, TXT)
+│   │   ├── document_parser.py        # Document parsing (PDF, HTML, XML, TXT, DOCX)
 │   │   ├── gemini_client.py          # Gemini API client
 │   │   ├── graph_builder.py          # Graph construction from documents
 │   │   ├── graph_service.py          # Neo4j operations
@@ -781,7 +781,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 - **Total Tests**: 285 tests (227 passing, 32 skipped, 26 failing)
 - **Coverage**:
   - ✅ Compliance Tests: 24 tests (100% pass rate)
-  - ✅ Document Parser: 27 tests
+  - ✅ Document Parser: 32 tests (DOCX support added)
   - ✅ Query Parser: 44 tests (100% pass rate)
   - ✅ Legal NLP: 50+ tests (100% pass rate)
   - ✅ RAG Service: 25 tests (100% pass rate)
@@ -968,7 +968,7 @@ For questions or support, please refer to the project documentation or contact t
 **Phase 2: Document Processing ✅ COMPLETE**
 
 - ✅ Stream 2A: Document Parsing & Graph Population (Developer 3)
-  - Document parser supporting PDF, HTML, XML, and TXT formats
+  - Document parser supporting PDF, HTML, XML, TXT, and DOCX formats
   - Structured extraction: sections, subsections, clauses, cross-references
   - Document models with 6 types (Act, Regulation, Policy, etc.)
   - Document upload API with 9 endpoints
@@ -1031,7 +1031,7 @@ For questions or support, please refer to the project documentation or contact t
 - ✅ **Compliance Tests**: 24 tests, 100% pass rate
 - ✅ **Graph Builder Tests**: 12 tests, 100% pass rate
 - ✅ **Graph Service Tests**: 14 tests, 100% pass rate
-- ✅ **Document Parser Tests**: 27 tests, 22 passing, 5 skipped (PDF/BeautifulSoup mocking)
+- ✅ **Document Parser Tests**: 32 tests, 27 passing, 5 skipped (PDF/BeautifulSoup mocking)
 - ✅ **Query Parser Tests**: 44 tests, 100% pass rate
 - ✅ **Legal NLP Tests**: 50+ tests, 100% pass rate
 - ✅ **RAG Service Tests**: 25 unit tests, 100% pass rate
