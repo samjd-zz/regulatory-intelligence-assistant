@@ -17,6 +17,7 @@ interface ComplianceState {
   validateField: (programId: string, field: string) => Promise<void>
   checkCompliance: (programId: string) => Promise<void>
   clearForm: () => void
+  reset: () => void
   setFormData: (data: Record<string, unknown>) => void
   setChecking: (checking: boolean) => void
   setError: (error: string | null) => void
@@ -79,6 +80,15 @@ export const useComplianceStore = create<ComplianceState>((set, get) => ({
       formData: {},
       validationResults: {},
       report: null,
+      error: null,
+    }),
+
+  reset: () =>
+    set({
+      formData: {},
+      validationResults: {},
+      report: null,
+      checking: false,
       error: null,
     }),
 

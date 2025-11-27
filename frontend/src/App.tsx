@@ -9,7 +9,7 @@ import {
 import { MainLayout } from "@/components/layout/MainLayout";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { Chat } from "@/pages/Chat";
-import { Compliance } from "@/pages/Compliance";
+import { ComplianceDynamic } from "@/pages/ComplianceDynamic";
 import { Dashboard } from "@/pages/Dashboard";
 import { Search } from "@/pages/Search";
 
@@ -34,7 +34,7 @@ function App() {
 							<Route path="/" element={<Dashboard />} />
 							<Route path="/search" element={<Search />} />
 							<Route path="/chat" element={<Chat />} />
-							<Route path="/compliance" element={<Compliance />} />
+							<Route path="/compliance" element={<ComplianceDynamic />} />
 							<Route path="*" element={<Navigate to="/" replace />} />
 						</Routes>
 					</MainLayout>
