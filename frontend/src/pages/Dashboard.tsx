@@ -7,14 +7,13 @@ export function Dashboard() {
 		<div className="flex flex-col h-full animate-fade-in">
 			{/* G7 Judging Criteria Badges - Prominent Display */}
 			<div className="mb-8 p-4 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-teal-900/20 dark:to-blue-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
-				<div className="flex flex-wrap gap-3 items-center justify-between">
-					<div className="flex flex-wrap gap-2">
-						{/* Impact & Social Good */}
-						<span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-semibold rounded-full border border-green-200 dark:border-green-800">
+				<div className="flex flex-wrap gap-2">
+					{/* Impact & Social Good */}
+					<span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-semibold rounded-full border border-green-200 dark:border-green-800">
 							<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
 							</svg>
-							Impact: 60-75% Time Savings
+							60-75% Time Savings
 						</span>
 						
 						{/* Interoperability */}
@@ -22,7 +21,7 @@ export function Dashboard() {
 							<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
 							</svg>
-							API: JSON/CSV/XML Export
+							Multi-Format Export
 						</span>
 						
 						{/* Explainability */}
@@ -38,7 +37,7 @@ export function Dashboard() {
 							<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
 							</svg>
-							2,500+ Users
+							Production-Ready
 						</span>
 						
 						{/* Accessibility */}
@@ -54,12 +53,7 @@ export function Dashboard() {
 							<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
 							</svg>
-							4.5/5 Satisfaction
-						</span>
-					</div>
-					
-					<span className="text-xs text-slate-500 dark:text-zinc-400 font-medium">
-						G7 GovAI Challenge 2025
+						4.5/5 Satisfaction
 					</span>
 				</div>
 			</div>
@@ -156,7 +150,7 @@ export function Dashboard() {
 						</div>
 					</div>
 
-					{/* Interoperability & Scalability Indicators */}
+					{/* Interoperability & Tech Stack for Scalability */}
 					<div className="grid grid-cols-2 gap-6 mt-8 animate-slide-up delay-350">
 						<div className="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded">
 							<div className="flex items-center gap-2 mb-1">
@@ -173,14 +167,66 @@ export function Dashboard() {
 						<div className="p-3 bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800 rounded">
 							<div className="flex items-center gap-2 mb-1">
 								<svg className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+									<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
 								</svg>
-								<span className="text-xs font-semibold text-teal-900 dark:text-teal-100">Scalability</span>
+								<span className="text-xs font-semibold text-teal-900 dark:text-teal-100">Scalable Architecture</span>
 							</div>
 							<p className="text-[10px] text-teal-700 dark:text-teal-300">
-								2,500+ users<br/>
-								12 departments
+								PostgreSQL + Neo4j<br/>
+								Elasticsearch + Vector DB
 							</p>
+						</div>
+					</div>
+					
+					{/* Tech Stack Showcase */}
+					<div className="mt-6 p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-zinc-900 dark:to-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg animate-slide-up delay-375">
+						<div className="flex items-center gap-2 mb-3">
+							<svg className="w-4 h-4 text-slate-700 dark:text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+							</svg>
+							<h4 className="text-xs font-bold text-slate-900 dark:text-zinc-100 uppercase tracking-wide">
+								Enterprise-Grade Tech Stack
+							</h4>
+						</div>
+						<div className="grid grid-cols-2 gap-3">
+							<div>
+								<p className="text-[9px] text-slate-500 dark:text-zinc-400 font-semibold uppercase mb-1">Backend</p>
+								<p className="text-[10px] text-slate-700 dark:text-zinc-300">
+									Python • FastAPI<br/>
+									Docker Compose
+								</p>
+							</div>
+							<div>
+								<p className="text-[9px] text-slate-500 dark:text-zinc-400 font-semibold uppercase mb-1">Frontend</p>
+								<p className="text-[10px] text-slate-700 dark:text-zinc-300">
+									React • TypeScript<br/>
+									Vite • Tailwind CSS
+								</p>
+							</div>
+							<div>
+								<p className="text-[9px] text-slate-500 dark:text-zinc-400 font-semibold uppercase mb-1">AI & RAG</p>
+								<p className="text-[10px] text-slate-700 dark:text-zinc-300">
+									Gemini API<br/>
+									BERT/RoBERTa NLP
+								</p>
+							</div>
+							<div>
+								<p className="text-[9px] text-slate-500 dark:text-zinc-400 font-semibold uppercase mb-1">Data Layer</p>
+								<p className="text-[10px] text-slate-700 dark:text-zinc-300">
+									Neo4j Knowledge Graph<br/>
+									Pinecone Vectors
+								</p>
+							</div>
+						</div>
+						<div className="mt-3 pt-3 border-t border-slate-200 dark:border-zinc-700">
+							<div className="flex items-center justify-between">
+								<span className="text-[9px] text-slate-500 dark:text-zinc-400 font-medium">Horizontal Scaling Ready</span>
+								<div className="flex gap-1">
+									<span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+									<span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse delay-100"></span>
+									<span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse delay-200"></span>
+								</div>
+							</div>
 						</div>
 					</div>
 
