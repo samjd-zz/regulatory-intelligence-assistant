@@ -137,182 +137,78 @@ This project addresses the challenge of navigating complex regulatory environmen
 
 ## 📁 Project Structure
 
+### Core Application
+
 ```
 regulatory-intelligence-assistant/
-├── backend/                          # FastAPI backend service
-│   ├── alembic/                      # Database migrations
-│   │   ├── versions/                 # Migration scripts
-│   │   │   ├── 001_initial_schema.py         # Initial database schema
-│   │   │   └── 002_document_models.py        # Document model additions
-│   │   ├── env.py                    # Alembic configuration
-│   │   └── script.py.mako            # Migration template
-│   ├── config/                       # Configuration management
-│   │   ├── __init__.py
-│   │   ├── config_validator.py       # Config validation logic
-│   │   ├── elasticsearch_mappings.json  # ES index mappings
-│   │   ├── model_config.py           # ML model configurations
-│   │   └── templates/                # Config templates
-│   │       ├── development.json
-│   │       └── production.json
-│   ├── neo4j/                        # Custom Neo4j Docker image
-│   │   ├── Dockerfile                # Neo4j 5.15 with APOC + GDS plugins
-│   │   └── docker-entrypoint-wrapper.sh  # Restart-safe entrypoint
-│   ├── evaluation/                   # Quality evaluation
-│   │   ├── BAITMAN_test_queries.json # Test query dataset
-│   │   ├── evaluate_search_quality.py  # Search quality metrics
-│   │   ├── model_evaluator.py        # Model performance evaluation
-│   │   └── performance_benchmark.py  # System benchmarking
-│   ├── middleware/                   # API middleware
-│   │   ├── __init__.py
-│   │   ├── rate_limit_middleware.py  # Rate limiting
-│   │   └── validation_middleware.py  # Request validation
-│   ├── models/                       # SQLAlchemy models
-│   │   ├── __init__.py
-│   │   └── models.py                 # Database models (10+ tables)
-│   ├── routes/                       # API endpoints (10 routers)
-│   │   ├── batch.py                  # Batch processing endpoints
-│   │   ├── compliance.py             # Compliance API routes
-│   │   ├── config.py                 # Configuration endpoints
-│   │   ├── documents.py              # Document management API
-│   │   ├── graph.py                  # Knowledge graph API
-│   │   ├── nlp.py                    # Legal NLP endpoints
-│   │   ├── rag.py                    # RAG Q&A endpoints
-│   │   ├── search.py                 # Search API endpoints
-│   │   ├── suggestions.py            # Query suggestions API
-│   │   └── version.py                # API versioning
-│   ├── schemas/                      # Pydantic schemas
-│   │   └── compliance_rules.py       # Compliance data models
-│   ├── services/                     # Business logic
-│   │   ├── compliance_checker.py     # Compliance engine
-│   │   ├── document_parser.py        # Document parsing (PDF, HTML, XML, TXT, DOCX)
-│   │   ├── gemini_client.py          # Gemini API client
-│   │   ├── graph_builder.py          # Graph construction from documents
-│   │   ├── graph_service.py          # Neo4j operations
-│   │   ├── legal_nlp.py              # Legal entity extraction & NLP
-│   │   ├── query_parser.py           # Query intent classification
-│   │   ├── query_suggestions.py      # Auto-suggestions service
-│   │   ├── rag_service.py            # RAG with Gemini API
-│   │   └── search_service.py         # Hybrid search (BM25 + vector)
-│   ├── scripts/                      # Utility scripts
-│   │   ├── init_graph.cypher         # Neo4j schema initialization
-│   │   ├── init_neo4j.py             # Graph setup script
-│   │   ├── README.md                 # Scripts documentation
-│   │   ├── seed_graph_data.py        # Seed graph with sample data
-│   │   ├── test_document_api.py      # Document API testing
-│   │   ├── test_graph_system.py      # Graph system testing
-│   │   └── verify_graph.py           # Graph verification
-│   ├── tasks/                        # Background tasks
-│   │   ├── populate_graph.py         # Graph population tasks
-│   │   └── README.md                 # Tasks documentation
-│   ├── tests/                        # Test suite (150+ tests)
-│   │   ├── test_compliance_checker.py        # Compliance unit tests (24 tests)
-│   │   ├── test_compliance_integration.py    # Compliance integration tests
-│   │   ├── test_e2e_workflows.py             # End-to-end workflow tests
-│   │   ├── test_integration_nlp.py           # NLP integration tests
-│   │   ├── test_integration_rag.py           # RAG integration tests
-│   │   ├── test_integration_search.py        # Search integration tests
-│   │   ├── test_legal_nlp.py                 # Legal NLP unit tests
-│   │   ├── test_rag_service.py               # RAG service tests
-│   │   └── test_search_service.py            # Search service tests
-│   ├── utils/                        # Helper utilities
-│   │   ├── api_versioning.py         # API version management
-│   │   ├── batch_processor.py        # Batch processing utilities
-│   │   ├── cache_optimizer.py        # Cache optimization
-│   │   ├── error_handling.py         # Error handling utilities
-│   │   ├── legal_text_parser.py      # Legal text parsing helpers
-│   │   ├── monitoring.py             # Monitoring and metrics
-│   │   ├── neo4j_client.py           # Neo4j connection manager
-│   │   ├── rate_limiter.py           # Rate limiting utilities
-│   │   ├── regulatory_batch.py       # Regulatory batch processing
-│   │   └── validators.py             # Data validation utilities
-│   ├── .env.example                  # Environment template
-│   ├── alembic.ini                   # Alembic config
-│   ├── create_tables.py              # Database table creation
-│   ├── database.py                   # Database connection
-│   ├── main.py                       # FastAPI application (10 routers)
-│   ├── pytest.ini                    # Test configuration
-│   ├── requirements.txt              # Python dependencies
-│   └── seed_data.py                  # Sample data seeding
-├── frontend/                         # React TypeScript frontend
+├── backend/                    # FastAPI backend service (Python 3.11+)
+│   ├── services/              # Business logic layer
+│   │   ├── compliance_checker.py      # Compliance validation engine
+│   │   ├── document_parser.py         # Multi-format document parsing
+│   │   ├── gemini_client.py           # Gemini API integration
+│   │   ├── graph_builder.py           # Knowledge graph construction
+│   │   ├── graph_service.py           # Neo4j operations
+│   │   ├── legal_nlp.py               # Legal entity extraction
+│   │   ├── query_parser.py            # Query intent classification
+│   │   ├── rag_service.py             # RAG Q&A system
+│   │   └── search_service.py          # Hybrid search engine
+│   ├── routes/                # REST API endpoints (10 routers, 50+ endpoints)
+│   ├── models/                # SQLAlchemy ORM models (10+ tables)
+│   ├── tests/                 # Test suite (338 tests, 100% passing)
+│   ├── ingestion/             # Data ingestion pipeline
+│   ├── scripts/               # Utility scripts (init, seed, verify)
+│   └── main.py                # FastAPI application entry point
+│
+├── frontend/                  # React TypeScript frontend
 │   ├── src/
-│   │   ├── components/               # Reusable UI components
-│   │   │   └── shared/               # Shared components (badges, spinners, citations)
-│   │   ├── pages/                    # Page components
-│   │   │   ├── Dashboard.tsx         # Homepage with quick actions
-│   │   │   ├── Search.tsx            # Regulation search interface
-│   │   │   ├── Chat.tsx              # Q&A chat interface
-│   │   │   └── Compliance.tsx        # Compliance checking form
-│   │   ├── services/                 # API service layer
-│   │   │   └── api.ts                # Axios client with interceptors
-│   │   ├── store/                    # Zustand state management
-│   │   │   ├── searchStore.ts        # Search state
-│   │   │   ├── chatStore.ts          # Chat state
-│   │   │   ├── complianceStore.ts    # Compliance state
-│   │   │   └── userStore.ts          # User preferences (persisted)
-│   │   ├── types/                    # TypeScript interfaces
-│   │   │   └── index.ts              # Shared type definitions
-│   │   ├── lib/                      # Utility functions
-│   │   │   └── utils.ts              # Helper functions
-│   │   ├── App.tsx                   # Root component with routing
-│   │   ├── main.tsx                  # Application entry point
-│   │   └── index.css                 # Tailwind v4 styles
-│   ├── public/                       # Static assets
-│   ├── vite.config.ts               # Vite configuration
-│   ├── tailwind.config.js           # Tailwind theme
-│   ├── tsconfig.json                # TypeScript config
-│   ├── package.json                 # Dependencies
-│   ├── README.md                    # Frontend documentation
-│   └── TESTING.md                   # Testing guide
-├── docs/                             # Documentation
-│   ├── dev/                          # Development guides
-│   │   ├── BAITMAN_developer_setup.md       # Developer setup guide
-│   │   ├── BAITMAN_legal-nlp-service.md     # Legal NLP service docs
-│   │   ├── BAITMAN_rag-service.md           # RAG service documentation
-│   │   ├── BAITMAN_search-service.md        # Search service docs
-│   │   ├── compliance-engine.md             # Compliance system docs
-│   │   ├── database-management.md           # PostgreSQL guide
-│   │   ├── developer-assignments.md         # Team responsibilities
-│   │   ├── document-parser.md               # Document parsing guide
-│   │   ├── knowledge-graph-implementation.md  # Graph implementation
-│   │   ├── KNOWLEDGE_GRAPH_COMPLETE.md      # Graph completion summary
-│   │   ├── neo4j-implementation-summary.md  # Neo4j implementation
-│   │   ├── neo4j-knowledge-graph.md         # Graph schema & queries
-│   │   ├── neo4j-mcp-setup.md               # MCP server setup
-│   │   ├── neo4j-quick-reference.md         # Neo4j quick ref
-│   │   ├── neo4j-schema.md                  # Detailed schema docs
-│   │   └── neo4j-visual-schema.md           # Visual schema guide
-│   ├── BAITMAN_COMPLIANCE_REPORT.md  # Compliance report
-│   ├── BAITMAN_production_deployment_checklist.md  # Deployment guide
-│   ├── design.md                     # Technical architecture
-│   ├── idea.md                       # Initial concept
-│   ├── parallel-plan.md              # Development workflow
-│   ├── plan.md                       # Implementation plan
-│   └── prd.md                        # Product requirements
-├── media/                            # Media assets
-│   ├── AI_Guide_to_Regulations.mp4   # Demo video
-│   ├── info-graphic.png              # Project infographic
-│   ├── Regulatory_Intelligence_Actionable_Clarity.pdf  # Presentation
-│   └── super-powers.png              # Feature graphic
-├── .clinerules                       # Cline AI assistant rules
-├── .gitignore                        # Git ignore rules
-├── CLAUDE.md                         # Claude AI context
-├── DEPLOYMENT_CHECKLIST.md           # Production deployment checklist
-├── docker compose.yml                # Service orchestration
-├── GETTING_STARTED.md                # Getting started guide
-└── README.md                         # This file
+│   │   ├── pages/            # 4 main pages (Dashboard, Search, Chat, Compliance)
+│   │   ├── components/       # Reusable UI components
+│   │   ├── store/            # Zustand state management
+│   │   ├── services/         # API client layer
+│   │   └── types/            # TypeScript definitions
+│   ├── e2e/                  # Playwright E2E tests
+│   └── package.json          # React 19 + Vite 7 + Tailwind v4
+│
+└── docs/                      # Project documentation
+    ├── README.md              # Documentation index & navigation guide
+    ├── planning/              # Product requirements & roadmap
+    │   ├── prd.md
+    │   ├── idea.md
+    │   └── plan.md
+    ├── design/                # UI/UX and architecture designs
+    ├── dev/                   # Technical implementation guides
+    ├── testing/               # Test reports & coverage
+    ├── reports/               # Progress & compliance reports
+    └── deployment/            # Production deployment guides
 ```
 
-### Key Directories
+### Infrastructure
 
-- **`backend/`**: FastAPI server with all business logic and API endpoints
-- **`backend/models/`**: SQLAlchemy ORM models for PostgreSQL database
-- **`backend/services/`**: Core services (compliance checking, graph operations, search, RAG)
-- **`backend/routes/`**: RESTful API endpoint definitions
-- **`backend/schemas/`**: Pydantic models for request/response validation
-- **`backend/scripts/`**: Initialization and utility scripts
-- **`backend/tests/`**: Comprehensive test suite with unit and integration tests
-- **`docs/dev/`**: Technical documentation for developers
-- **`docs/`**: Planning, architecture, and design documents
+```
+├── docker-compose.yml         # Service orchestration
+├── .clinerules               # AI assistant configuration
+├── DEPLOYMENT_CHECKLIST.md   # Production deployment tasks
+└── GETTING_STARTED.md        # Quick start guide
+```
+
+### Key Services (Docker)
+
+- **PostgreSQL 14**: Relational database for documents and metadata
+- **Neo4j 5.15**: Knowledge graph with APOC + GDS plugins
+- **Elasticsearch**: Hybrid search (keyword + semantic)
+- **Redis**: Caching layer
+
+### Documentation Structure
+
+All project documentation is organized in the `docs/` directory:
+
+- **[docs/README.md](./docs/README.md)** - Documentation index and navigation
+- **[docs/planning/](./docs/planning/)** - Product requirements, roadmap, and project planning
+- **[docs/design/](./docs/design/)** - UI/UX designs, architecture, and technical design
+- **[docs/dev/](./docs/dev/)** - Developer guides, API docs, and implementation details
+- **[docs/testing/](./docs/testing/)** - Test reports, coverage, and quality metrics
+- **[docs/reports/](./docs/reports/)** - Progress reports, compliance, and data ingestion status
+- **[docs/deployment/](./docs/deployment/)** - Production deployment checklists and guides
 
 ## 📚 Documentation
 
