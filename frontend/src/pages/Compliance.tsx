@@ -55,7 +55,9 @@ export function Compliance() {
 	const hoursWorked = watch("hours_worked");
 	const residencyStatus = watch("residency_status");
 
-	const onSubmit = async () => {
+	const onSubmit = async (data: ComplianceFormData) => {
+		// Update store with form data before checking compliance
+		useComplianceStore.getState().setFormData(data);
 		await checkCompliance(programId);
 	};
 
@@ -328,9 +330,9 @@ export function Compliance() {
 										Issues ({report.issues.length})
 									</h3>
 									<div className="space-y-2 max-h-40 overflow-y-auto">
-										{report.issues.map((issue) => (
+											{report.issues.map((issue) => (
 											<div
-												key={issue.id}
+												key={issue.issue_id}
 												className={`rounded p-3 border-l-4 text-xs ${
 													issue.severity === "critical"
 														? "bg-red-50 dark:bg-red-900/20 border-red-500 dark:border-red-500"
@@ -368,27 +370,17 @@ export function Compliance() {
 								</div>
 							)}
 
-							{/* Passed Checks */}
-							{report.passed_checks.length > 0 && (
+							{/* Passed Requirements */}
+							{report.passed_requirements > 0 && (
 								<div className="mt-6 animate-slide-up delay-300">
 									<h3 className="font-semibold text-slate-900 dark:text-zinc-100 mb-3 flex items-center gap-2 text-sm">
 										<CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-										Passed ({report.passed_checks.length})
+										Requirements Met ({report.passed_requirements}/{report.total_requirements})
 									</h3>
 									<div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded p-3">
-										<ul className="text-xs text-green-800 dark:text-green-200 space-y-1">
-											{report.passed_checks.slice(0, 3).map((check) => (
-												<li key={check} className="flex items-start gap-2">
-													<CheckCircle className="w-3 h-3 mt-0.5 shrink-0" />
-													<span>{check}</span>
-												</li>
-											))}
-											{report.passed_checks.length > 3 && (
-												<li className="text-slate-600 dark:text-zinc-300 pl-5">
-													+{report.passed_checks.length - 3} more
-												</li>
-											)}
-										</ul>
+										<p className="text-xs text-green-800 dark:text-green-200">
+											{report.passed_requirements} of {report.total_requirements} compliance requirements have been met.
+										</p>
 									</div>
 								</div>
 							)}

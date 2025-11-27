@@ -69,20 +69,8 @@ class RequirementExtractor:
         
         sections = query.all()
         
-        # Also get related sections from knowledge graph
-        if request.program_id:
-            graph_sections = await self.graph_service.get_program_regulations(
-                request.program_id
-            )
-            # Merge with database sections
-            section_ids = {s.id for s in sections}
-            for graph_section in graph_sections:
-                if graph_section['section_id'] not in section_ids:
-                    db_section = self.db.query(Section).filter(
-                        Section.id == graph_section['section_id']
-                    ).first()
-                    if db_section:
-                        sections.append(db_section)
+        # Note: Graph service integration for program-specific regulations 
+        # can be added when get_program_regulations method is implemented
         
         # Extract requirements from each section
         for section in sections:
@@ -175,8 +163,8 @@ class RequirementExtractor:
             requirement_text=text,
             requirement_type=requirement_type,
             severity=severity,
-            source_regulation_id=regulation_id,
-            source_section_id=section_id,
+            source_regulation_id=str(regulation_id),
+            source_section_id=str(section_id) if section_id else None,
             citation=citation,
             extracted_conditions=conditions if conditions else None,
             confidence=0.75  # Base confidence for pattern matching

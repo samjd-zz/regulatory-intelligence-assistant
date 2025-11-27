@@ -192,20 +192,33 @@ export interface ComplianceCheckRequest {
 }
 
 export interface ComplianceCheckResponse {
+  report_id: string
+  program_id: string
+  workflow_type: string
+  timestamp: string
   compliant: boolean
-  issues: Issue[]
-  passed_checks: string[]
   confidence: number
-  generated_at: string
+  issues: Issue[]
+  passed_requirements: number
+  total_requirements: number
+  critical_issues: number
+  high_issues: number
+  recommendations: string[]
+  next_steps: string[]
 }
 
 export interface Issue {
-  id: string
-  severity: 'critical' | 'high' | 'medium' | 'low'
-  field: string
+  issue_id: string
+  field_name: string | null
+  requirement: string
   description: string
-  regulation: string
-  suggestion: string
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  regulation_citation: string | null
+  regulation_id: string | null
+  section_id: string | null
+  suggestion: string | null
+  current_value: unknown
+  expected_value: unknown
 }
 
 export interface ValidationResult {

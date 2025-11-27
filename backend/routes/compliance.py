@@ -66,9 +66,16 @@ async def check_compliance(
         report = await checker.check_compliance(request)
         return report
     except Exception as e:
+        import traceback
+        error_details = {
+            "error": str(e),
+            "type": type(e).__name__,
+            "traceback": traceback.format_exc()
+        }
+        print(f"Compliance check error: {error_details}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Compliance check failed: {str(e)}"
+            detail=f"Compliance check failed: {type(e).__name__}: {str(e)}"
         )
 
 

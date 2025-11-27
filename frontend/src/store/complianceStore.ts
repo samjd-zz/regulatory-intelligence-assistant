@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import type {
   ComplianceCheckResponse,
   ValidationResult,
-  Issue,
 } from '@/types'
 import { checkCompliance, validateField } from '@/services/api'
 
@@ -60,6 +59,7 @@ export const useComplianceStore = create<ComplianceState>((set, get) => ({
       const response = await checkCompliance({
         form_data: get().formData,
         program_id: programId,
+        workflow_type: 'ei_application', // Required by backend
       })
 
       set({
