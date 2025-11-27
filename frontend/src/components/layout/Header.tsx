@@ -1,4 +1,4 @@
-import { Moon, Sun } from "lucide-react";
+import { LayoutDashboard, Moon, Search, MessageSquare, ShieldCheck, Sun } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 import { useTheme } from "@/context/ThemeContext";
@@ -8,10 +8,10 @@ export function Header() {
 	const { theme, toggleTheme } = useTheme();
 
 	const navItems = [
-		{ path: "/", label: "Overview" },
-		{ path: "/search", label: "Search" },
-		{ path: "/chat", label: "Assistant" },
-		{ path: "/compliance", label: "Compliance" },
+		{ path: "/", label: "Overview", icon: LayoutDashboard },
+		{ path: "/search", label: "Search", icon: Search },
+		{ path: "/chat", label: "Assistant", icon: MessageSquare },
+		{ path: "/compliance", label: "Compliance", icon: ShieldCheck },
 	];
 
 	const isActive = (path: string) => {
@@ -37,15 +37,19 @@ export function Header() {
 				</div>
 				{/* Tab Navigation */}
 				<nav className="flex gap-10 items-center animate-slide-up delay-200">
-					{navItems.map((item) => (
-						<Link
-							key={item.path}
-							to={item.path}
-							className={`nav-btn ${isActive(item.path) ? "active" : ""}`}
-						>
-							{item.label}
-						</Link>
-					))}
+					{navItems.map((item) => {
+						const Icon = item.icon;
+						return (
+							<Link
+								key={item.path}
+								to={item.path}
+								className={`nav-btn ${isActive(item.path) ? "active" : ""} flex items-center gap-2`}
+							>
+								<Icon className="w-4 h-4" />
+								{item.label}
+							</Link>
+						);
+					})}
 					<button
 						type="button"
 						onClick={toggleTheme}

@@ -1,11 +1,20 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
+import { AlertCircle, Briefcase, Baby, Heart, Users, CheckCircle, XCircle, DollarSign } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { PROGRAMS, type ProgramId, type FieldConfig } from "@/config/programs";
 import { useComplianceStore } from "@/store/complianceStore";
+
+// Program icons mapping
+const PROGRAM_ICONS: Record<ProgramId, React.ComponentType<{ className?: string }>> = {
+	"employment-insurance": Briefcase,
+	"cpp-retirement": DollarSign,
+	"canada-child-benefit": Baby,
+	"gis": Heart,
+	"social-assistance": Users,
+};
 
 export function ComplianceDynamic() {
 	const { report, checking, error, checkCompliance } = useComplianceStore();
@@ -181,19 +190,23 @@ export function ComplianceDynamic() {
 					Select a government program to check your eligibility
 				</p>
 				<div className="flex gap-2 overflow-x-auto">
-					{Object.values(PROGRAMS).map((program) => (
-						<button
-							key={program.id}
-							onClick={() => handleProgramChange(program.id)}
-							className={`px-4 py-2 text-xs font-medium rounded transition-all ${
-								selectedProgramId === program.id
-									? "bg-teal-600 text-white dark:bg-teal-500"
-									: "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-							}`}
-						>
-							{program.name}
-						</button>
-					))}
+					{Object.values(PROGRAMS).map((program) => {
+						const Icon = PROGRAM_ICONS[program.id];
+						return (
+							<button
+								key={program.id}
+								onClick={() => handleProgramChange(program.id)}
+								className={`px-4 py-2 text-xs font-medium rounded transition-all flex items-center gap-2 whitespace-nowrap ${
+									selectedProgramId === program.id
+										? "bg-teal-600 text-white dark:bg-teal-500"
+										: "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+								}`}
+							>
+								<Icon className="w-4 h-4" />
+								{program.name}
+							</button>
+						);
+					})}
 				</div>
 			</div>
 
