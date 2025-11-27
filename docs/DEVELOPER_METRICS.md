@@ -10,12 +10,12 @@ This report provides insights into the development activity and contributions fo
 
 ### Commit Distribution by Developer
 
-| Developer | Commits | Percentage | Lines Added | Lines Removed | Net Lines | LOC % |
-|-----------|---------|------------|-------------|---------------|-----------|-------|
-| samjd-zz | 83 | 83.8% | 61,006 | 2,236 | 58,770 | 85.9% |
-| Suraj Mandal | 13 | 13.1% | 3,269 | 2,031 | 1,238 | 1.8% |
-| Abdulrasaq Lawani | 3 | 3.0% | 8,412 | 11 | 8,401 | 12.3% |
-| **Total** | **99** | **100%** | **72,687** | **4,278** | **68,409** | **100%** |
+| Developer | Commits | Percentage | Lines Added | Lines Removed | Net Lines | LOC % | Role |
+|-----------|---------|------------|-------------|---------------|-----------|-------|------|
+| samjd-zz | 83 | 83.8% | 61,006 | 2,236 | 58,770 | 85.9% | Fullstack Lead Developer |
+| Suraj Mandal | 13 | 13.1% | 3,269 | 2,031 | 1,238 | 1.8% | AI/ML Engineer |
+| Abdulrasaq Lawani | 3 | 3.0% | 8,412 | 11 | 8,401 | 12.3% | Knowledge Graph Developer |
+| **Total** | **99** | **100%** | **72,687** | **4,278** | **68,409** | **100%** | |
 
 **Note on LOC**: samjd-zz's lines of code include both commits under their name (38,392 added) and commits under "Claude" (22,614 added), totaling 61,006 lines added, as both represent the same developer using AI-TDD methodology.
 
@@ -69,36 +69,39 @@ Suraj Mandal     ██ 1,238
 
 ## Development Insights
 
-### Lead Developer (samjd-zz)
+### Fullstack Lead Developer (samjd-zz)
 - **Commits**: 83 (83.8%)
-- **Role**: Lead developer and project architect
+- **Role**: Fullstack lead developer and project architect
 - **Development Method**: AI-TDD (AI-Test-Driven Development)
 - **Key Areas**: 
   - Project initialization and structure
   - Core architecture decisions
-  - Frontend and backend integration
+  - Frontend development (React, TypeScript, UI/UX)
+  - Backend development (Python, FastAPI, PostgreSQL)
   - Legal NLP engine and RAG system
-  - Knowledge graph implementation
+  - Knowledge graph architecture
   - Documentation and project management
   - G7 GovAI Challenge submission materials
   - Code generation and scaffolding (AI-assisted)
   - Test implementation (AI-assisted)
   - Code refactoring and optimization (AI-assisted)
 
-### Backend Developer (Suraj Mandal)
+### AI/ML Engineer (Suraj Mandal)
 - **Commits**: 13 (13.1%)
-- **Role**: Backend specialist
+- **Role**: AI/ML engineer
 - **Development Method**: AI-enhanced development
 - **Key Areas**:
-  - API development
-  - Database schema design
+  - Legal NLP model development
+  - RAG system implementation
+  - Vector search and embeddings
+  - AI model integration
+  - Machine learning pipelines
+  - Backend API development
   - Service implementation
-  - Backend testing
-  - Integration with external services
 
-### Contributor (Abdulrasaq Lawani)
+### Knowledge Graph Developer (Abdulrasaq Lawani)
 - **Commits**: 3 (3.0%)
-- **Role**: Knowledge Graph Developer
+- **Role**: Knowledge graph developer
 - **Development Method**: AI-enhanced development
 - **Key Areas**:
   - Neo4j knowledge graph implementation
