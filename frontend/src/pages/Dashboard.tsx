@@ -9,9 +9,9 @@ export function Dashboard() {
 			<div className="mb-8 pb-8 border-b border-slate-100 dark:border-zinc-800">
 				<div className="flex flex-wrap justify-between w-full gap-y-2">
 					{/* Impact & Social Good */}
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/30">
 						<svg
-							className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"
+							className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -24,15 +24,15 @@ export function Dashboard() {
 								d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
 							/>
 						</svg>
-						<span className="text-xs font-medium text-slate-600 dark:text-zinc-400">
+						<span className="text-xs font-medium text-blue-700 dark:text-blue-300">
 							60-75% Time Savings
 						</span>
 					</div>
 
 					{/* Interoperability */}
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2 px-2 py-1 bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/30">
 						<svg
-							className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"
+							className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -45,15 +45,15 @@ export function Dashboard() {
 								d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
 							/>
 						</svg>
-						<span className="text-xs font-medium text-slate-600 dark:text-zinc-400">
+						<span className="text-xs font-medium text-violet-700 dark:text-violet-300">
 							JSON API
 						</span>
 					</div>
 
 					{/* Explainability */}
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2 px-2 py-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800/30">
 						<svg
-							className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"
+							className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -66,15 +66,15 @@ export function Dashboard() {
 								d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
 							/>
 						</svg>
-						<span className="text-xs font-medium text-slate-600 dark:text-zinc-400">
+						<span className="text-xs font-medium text-amber-700 dark:text-amber-300">
 							Explainable AI
 						</span>
 					</div>
 
 					{/* Scalability */}
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2 px-2 py-1 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800/30">
 						<svg
-							className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"
+							className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -87,15 +87,15 @@ export function Dashboard() {
 								d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
 							/>
 						</svg>
-						<span className="text-xs font-medium text-slate-600 dark:text-zinc-400">
+						<span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
 							Production-Ready
 						</span>
 					</div>
 
 					{/* Accessibility */}
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2 px-2 py-1 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800/30">
 						<svg
-							className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"
+							className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -108,15 +108,15 @@ export function Dashboard() {
 								d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
 							/>
 						</svg>
-						<span className="text-xs font-medium text-slate-600 dark:text-zinc-400">
+						<span className="text-xs font-medium text-rose-700 dark:text-rose-300">
 							WCAG 2.1 AA
 						</span>
 					</div>
 
 					{/* Usability */}
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2 px-2 py-1 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-800/30">
 						<svg
-							className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400"
+							className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400"
 							fill="none"
 							stroke="currentColor"
 							viewBox="0 0 24 24"
@@ -129,7 +129,7 @@ export function Dashboard() {
 								d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
 							/>
 						</svg>
-						<span className="text-xs font-medium text-slate-600 dark:text-zinc-400">
+						<span className="text-xs font-medium text-cyan-700 dark:text-cyan-300">
 							4.5/5 Satisfaction
 						</span>
 					</div>
