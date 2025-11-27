@@ -10,12 +10,14 @@ This report provides insights into the development activity and contributions fo
 
 ### Commit Distribution by Developer
 
-| Developer | Commits | Percentage | Role/Focus |
-|-----------|---------|------------|------------|
-| samjd-zz | 83 | 83.8% | Lead Developer / Project Architect |
-| Suraj Mandal | 13 | 13.1% | Backend Developer |
-| Abdulrasaq Lawani | 3 | 3.0% | Contributor |
-| **Total** | **99** | **100%** | |
+| Developer | Commits | Percentage | Lines Added | Lines Removed | Net Lines | LOC % |
+|-----------|---------|------------|-------------|---------------|-----------|-------|
+| samjd-zz | 83 | 83.8% | 61,006 | 2,236 | 58,770 | 85.9% |
+| Suraj Mandal | 13 | 13.1% | 3,269 | 2,031 | 1,238 | 1.8% |
+| Abdulrasaq Lawani | 3 | 3.0% | 8,412 | 11 | 8,401 | 12.3% |
+| **Total** | **99** | **100%** | **72,687** | **4,278** | **68,409** | **100%** |
+
+**Note on LOC**: samjd-zz's lines of code include both commits under their name (38,392 added) and commits under "Claude" (22,614 added), totaling 61,006 lines added, as both represent the same developer using AI-TDD methodology.
 
 ### AI-Enhanced Development Methodology
 
@@ -29,12 +31,38 @@ This report provides insights into the development activity and contributions fo
 
 **Note on Git Attribution**: 18 commits were explicitly attributed to "Claude" in git logs (where the author name was configured as "Claude" rather than the developer's name). These have been consolidated with samjd-zz's total, as they represent the same developer using AI assistance. The practice of separately attributing AI commits has been discontinued in favor of recognizing that all development was AI-enhanced.
 
+### Lines of Code Breakdown
+
+**Total Project Size**: 68,409 net lines of code
+
+**By Developer**:
+- **samjd-zz (AI-TDD)**: 58,770 lines (85.9%)
+  - Includes 36,554 lines from commits under "samjd-zz"
+  - Includes 22,216 lines from commits under "Claude" (same developer using AI-TDD)
+  - Average: 708 lines per commit
+  
+- **Abdulrasaq Lawani**: 8,401 lines (12.3%)
+  - Average: 2,800 lines per commit
+  
+- **Suraj Mandal**: 1,238 lines (1.8%)
+  - Average: 95 lines per commit
+
+**Code Churn** (lines added + removed): 72,687 + 4,278 = 76,965 total line changes
+
 ### Visual Representation
 
+**Commits:**
 ```
 samjd-zz         ████████████████████████████████████████████████████████████████████████████████ 83
 Suraj Mandal     █████████████ 13
 Abdulrasaq Lawani ███ 3
+```
+
+**Lines of Code (Net):**
+```
+samjd-zz         █████████████████████████████████████████████████████████████████████████████████ 58,770
+Abdulrasaq Lawani ████████████ 8,401
+Suraj Mandal     ██ 1,238
 ```
 
 ---
