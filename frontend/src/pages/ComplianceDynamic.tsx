@@ -180,7 +180,7 @@ export function ComplianceDynamic() {
 				<p className="text-sm text-slate-400 dark:text-zinc-400 mb-4">
 					Select a government program to check your eligibility
 				</p>
-				<div className="flex gap-2 flex-wrap">
+				<div className="flex gap-2 overflow-x-auto">
 					{Object.values(PROGRAMS).map((program) => (
 						<button
 							key={program.id}
