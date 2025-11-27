@@ -404,10 +404,18 @@ class ComplianceChecker:
                 passed_requirements += 1
             else:
                 # Create compliance issue
+                # Use the detailed error_message from rule if error is generic
+                description = error
+                if error in ["This field is required", "Required"]:
+                    # Use the more detailed rule error message which includes requirement text
+                    description = rule.error_message
+                elif not error:
+                    description = rule.error_message
+                    
                 issue = ComplianceIssue(
                     field_name=rule.field_name,
                     requirement=rule.name,
-                    description=error or rule.error_message,
+                    description=description,
                     severity=rule.severity,
                     regulation_citation=self._format_citation(rule),
                     regulation_id=rule.regulation_id,
@@ -555,6 +563,14 @@ class ComplianceChecker:
         # Infer field name from requirement text (simplified)
         field_name = self._infer_field_name(requirement.requirement_text)
         
+        # If we can't infer a field name, log it and use a generic one
+        if field_name is None:
+            print(f"⚠️ Could not infer field name from requirement: {requirement.requirement_text[:100]}")
+            # Extract first few words as a fallback identifier
+            import re
+            words = re.findall(r'\b\w+\b', requirement.requirement_text.lower())
+            field_name = '_'.join(words[:3]) if words else 'unknown_requirement'
+        
         # Build validation logic
         validation_logic = {}
         if requirement.requirement_type == RequirementType.MANDATORY_FIELD:
@@ -562,6 +578,11 @@ class ComplianceChecker:
         elif requirement.requirement_type == RequirementType.DOCUMENT_REQUIREMENT:
             validation_logic['required'] = True
             validation_logic['pattern'] = r'.+\.(pdf|jpg|png|doc|docx)$'
+        
+        # Create a more descriptive error message that includes the requirement text
+        error_message = requirement.requirement_text
+        if len(error_message) > 200:
+            error_message = error_message[:200] + "..."
         
         return ComplianceRule(
             name=f"Requirement from {requirement.citation}",
@@ -572,14 +593,15 @@ class ComplianceChecker:
             section_reference=requirement.citation,
             field_name=field_name,
             validation_logic=validation_logic,
-            error_message=f"This field is required by {requirement.citation}",
+            error_message=error_message,
             suggestion=self._generate_suggestion(requirement)
         )
     
     def _infer_field_name(self, requirement_text: str) -> Optional[str]:
         """Infer field name from requirement text."""
-        # Simple keyword matching (would be improved with NLP)
+        # Enhanced keyword matching with more patterns
         field_mappings = {
+            # Primary identifiers
             'social insurance number': 'sin',
             'sin': 'sin',
             'work permit': 'work_permit',
@@ -587,12 +609,33 @@ class ComplianceChecker:
             'address': 'address',
             'proof of residency': 'residency_proof',
             'identification': 'id_document',
+            'id_document': 'id_document',
+            
+            # Employment related
+            'hours worked': 'hours_worked',
+            'hours of work': 'hours_worked',
+            'employment status': 'employment_status',
+            'employed': 'employment_status',
+            
+            # Personal information
+            'full name': 'full_name',
+            'legal name': 'full_name',
+            'name': 'full_name',
+            
+            # Residency
+            'residency': 'residency_status',
+            'resident': 'residency_status',
+            'citizenship': 'residency_status',
+            'citizen': 'residency_status',
         }
         
         text_lower = requirement_text.lower()
-        for keyword, field_name in field_mappings.items():
+        
+        # Try exact phrase matches first (longer phrases first)
+        sorted_keywords = sorted(field_mappings.keys(), key=len, reverse=True)
+        for keyword in sorted_keywords:
             if keyword in text_lower:
-                return field_name
+                return field_mappings[keyword]
         
         return None
     
@@ -603,20 +646,17 @@ class ComplianceChecker:
     ) -> List[ComplianceRule]:
         """Get essential hardcoded rules for common scenarios."""
         
-        # Example: Employment Insurance application rules
+        # Employment Insurance (EI)
         if 'employment' in program_id.lower() or 'ei' in program_id.lower():
             return [
                 ComplianceRule(
                     name="Social Insurance Number Required",
-                    description="Valid Social Insurance Number is mandatory",
+                    description="Valid Social Insurance Number is mandatory for Employment Insurance",
                     requirement_type=RequirementType.MANDATORY_FIELD,
                     severity=SeverityLevel.CRITICAL,
                     field_name="sin",
-                    validation_logic={
-                        'required': True,
-                        'pattern': r'^\d{3}-\d{3}-\d{3}$'
-                    },
-                    error_message="Social Insurance Number is required",
+                    validation_logic={'required': True, 'pattern': r'^\d{3}-\d{3}-\d{3}$'},
+                    error_message="Social Insurance Number is required for Employment Insurance",
                     suggestion="Enter your 9-digit SIN in format XXX-XXX-XXX"
                 ),
                 ComplianceRule(
@@ -628,21 +668,123 @@ class ComplianceChecker:
                     validation_logic={
                         'required': True,
                         'conditional': {
-                            'condition': {
-                                'type': 'field_equals',
-                                'field': 'residency_status',
-                                'value': 'temporary'
-                            },
+                            'condition': {'type': 'field_equals', 'field': 'residency_status', 'value': 'temporary'},
                             'validation': {'required': True}
                         }
                     },
-                    condition={
-                        'type': 'field_equals',
-                        'field': 'residency_status',
-                        'value': 'temporary'
-                    },
+                    condition={'type': 'field_equals', 'field': 'residency_status', 'value': 'temporary'},
                     error_message="Valid work permit is required for temporary residents",
                     suggestion="Upload a copy of your valid work permit"
+                ),
+            ]
+        
+        # Canada Pension Plan (CPP) / Old Age Security (OAS) / Retirement
+        elif 'pension' in program_id.lower() or 'cpp' in program_id.lower() or 'oas' in program_id.lower() or 'retirement' in program_id.lower():
+            return [
+                ComplianceRule(
+                    name="Age Requirement",
+                    description="Must be at least 60 years old for CPP retirement pension",
+                    requirement_type=RequirementType.ELIGIBILITY_CRITERIA,
+                    severity=SeverityLevel.CRITICAL,
+                    field_name="age",
+                    validation_logic={'required': True, 'range': {'min': 60, 'max': 120}},
+                    error_message="You must be at least 60 years old to apply for CPP retirement pension",
+                    suggestion="CPP retirement pension is available from age 60, with full pension at age 65"
+                ),
+                ComplianceRule(
+                    name="Social Insurance Number Required",
+                    description="Valid Social Insurance Number is mandatory",
+                    requirement_type=RequirementType.MANDATORY_FIELD,
+                    severity=SeverityLevel.CRITICAL,
+                    field_name="sin",
+                    validation_logic={'required': True, 'pattern': r'^\d{3}-\d{3}-\d{3}$'},
+                    error_message="Social Insurance Number is required",
+                    suggestion="Enter your 9-digit SIN in format XXX-XXX-XXX"
+                ),
+                ComplianceRule(
+                    name="Years of Contribution",
+                    description="Must have contributed to CPP for at least one year",
+                    requirement_type=RequirementType.ELIGIBILITY_CRITERIA,
+                    severity=SeverityLevel.CRITICAL,
+                    field_name="years_of_contribution",
+                    validation_logic={'required': True, 'range': {'min': 1}},
+                    error_message="You must have contributed to CPP for at least one year",
+                    suggestion="Review your CPP contribution history"
+                ),
+            ]
+        
+        # Canada Child Benefit (CCB)
+        elif 'child' in program_id.lower() or 'ccb' in program_id.lower():
+            return [
+                ComplianceRule(
+                    name="Social Insurance Number Required",
+                    description="Valid Social Insurance Number is mandatory",
+                    requirement_type=RequirementType.MANDATORY_FIELD,
+                    severity=SeverityLevel.CRITICAL,
+                    field_name="sin",
+                    validation_logic={'required': True, 'pattern': r'^\d{3}-\d{3}-\d{3}$'},
+                    error_message="Social Insurance Number is required",
+                    suggestion="Enter your 9-digit SIN in format XXX-XXX-XXX"
+                ),
+                ComplianceRule(
+                    name="Child Information Required",
+                    description="Information about dependent children is required",
+                    requirement_type=RequirementType.MANDATORY_FIELD,
+                    severity=SeverityLevel.CRITICAL,
+                    field_name="number_of_children",
+                    validation_logic={'required': True, 'range': {'min': 1, 'max': 20}},
+                    error_message="Number of dependent children under 18 is required",
+                    suggestion="Include all children under 18 years of age"
+                ),
+            ]
+        
+        # Guaranteed Income Supplement (GIS)
+        elif 'gis' in program_id.lower() or 'supplement' in program_id.lower():
+            return [
+                ComplianceRule(
+                    name="Age Requirement",
+                    description="Must be at least 65 years old for GIS",
+                    requirement_type=RequirementType.ELIGIBILITY_CRITERIA,
+                    severity=SeverityLevel.CRITICAL,
+                    field_name="age",
+                    validation_logic={'required': True, 'range': {'min': 65}},
+                    error_message="You must be at least 65 years old to apply for GIS",
+                    suggestion="GIS is available to OAS recipients aged 65 and older"
+                ),
+                ComplianceRule(
+                    name="Income Information",
+                    description="Annual income information is required to determine eligibility",
+                    requirement_type=RequirementType.MANDATORY_FIELD,
+                    severity=SeverityLevel.CRITICAL,
+                    field_name="annual_income",
+                    validation_logic={'required': True, 'range': {'min': 0}},
+                    error_message="Annual income information is required",
+                    suggestion="Provide your total income from the previous tax year"
+                ),
+            ]
+        
+        # Social Assistance / Welfare
+        elif 'social' in program_id.lower() or 'assistance' in program_id.lower() or 'welfare' in program_id.lower():
+            return [
+                ComplianceRule(
+                    name="Proof of Identity",
+                    description="Valid government-issued ID is required",
+                    requirement_type=RequirementType.DOCUMENT_REQUIREMENT,
+                    severity=SeverityLevel.CRITICAL,
+                    field_name="id_document",
+                    validation_logic={'required': True},
+                    error_message="Government-issued identification is required",
+                    suggestion="Upload a copy of your driver's license, passport, or other government ID"
+                ),
+                ComplianceRule(
+                    name="Proof of Residency",
+                    description="Proof of current address is required",
+                    requirement_type=RequirementType.DOCUMENT_REQUIREMENT,
+                    severity=SeverityLevel.CRITICAL,
+                    field_name="proof_of_residency",
+                    validation_logic={'required': True},
+                    error_message="Proof of current residence is required",
+                    suggestion="Upload a recent utility bill, lease agreement, or bank statement showing your address"
                 ),
             ]
         

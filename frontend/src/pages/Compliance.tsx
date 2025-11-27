@@ -330,42 +330,79 @@ export function Compliance() {
 										Issues ({report.issues.length})
 									</h3>
 									<div className="space-y-2 max-h-40 overflow-y-auto">
-											{report.issues.map((issue) => (
-											<div
-												key={issue.issue_id}
-												className={`rounded p-3 border-l-4 text-xs ${
-													issue.severity === "critical"
-														? "bg-red-50 dark:bg-red-900/20 border-red-500 dark:border-red-500"
-														: issue.severity === "high"
-															? "bg-orange-50 dark:bg-orange-900/20 border-orange-500 dark:border-orange-500"
-															: issue.severity === "medium"
-																? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500 dark:border-yellow-500"
-																: "bg-blue-50 dark:bg-blue-900/20 border-blue-500 dark:border-blue-500"
-												}`}
-											>
-												<div className="flex items-start gap-2">
-													<AlertCircle
-														className={`w-4 h-4 shrink-0 ${
+											{report.issues.map((issue) => {
+												// Format field name for display
+												const getFieldLabel = (fieldName: string | null, description: string) => {
+													if (!fieldName) {
+														// If no field name, extract key info from description
+														const firstSentence = description.split('.')[0];
+														return firstSentence.length > 60 ? firstSentence.substring(0, 60) + "..." : firstSentence;
+													}
+													
+													const labels: Record<string, string> = {
+														sin: "Social Insurance Number (SIN)",
+														work_permit: "Work Permit",
+														full_name: "Full Name",
+														residency_status: "Residency Status",
+														hours_worked: "Hours Worked",
+														employment_status: "Employment Status",
+													};
+													
+													// If field name is not in our known list and looks auto-generated (has underscores with 3+ parts)
+													const fieldParts = fieldName.split('_');
+													if (!labels[fieldName] && fieldParts.length >= 3) {
+														// This is likely an auto-generated field name, use description instead
+														const firstSentence = description.split('.')[0];
+														return firstSentence.length > 60 ? firstSentence.substring(0, 60) + "..." : firstSentence;
+													}
+													
+													return labels[fieldName] || fieldName.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+												};
+
+												return (
+													<div
+														key={issue.issue_id}
+														className={`rounded p-3 border-l-4 text-xs ${
 															issue.severity === "critical"
-																? "text-red-600 dark:text-red-400"
+																? "bg-red-50 dark:bg-red-900/20 border-red-500 dark:border-red-500"
 																: issue.severity === "high"
-																	? "text-orange-600 dark:text-orange-400"
+																	? "bg-orange-50 dark:bg-orange-900/20 border-orange-500 dark:border-orange-500"
 																	: issue.severity === "medium"
-																		? "text-yellow-600 dark:text-yellow-400"
-																		: "text-blue-600 dark:text-blue-400"
+																		? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-500 dark:border-yellow-500"
+																		: "bg-blue-50 dark:bg-blue-900/20 border-blue-500 dark:border-blue-500"
 														}`}
-													/>
-													<div>
-														<p className="font-medium text-slate-900 dark:text-zinc-100">
-															{issue.description}
-														</p>
-														<p className="text-slate-600 dark:text-zinc-300 mt-1">
-															💡 {issue.suggestion}
-														</p>
+													>
+														<div className="flex items-start gap-2">
+															<AlertCircle
+																className={`w-4 h-4 shrink-0 mt-0.5 ${
+																	issue.severity === "critical"
+																		? "text-red-600 dark:text-red-400"
+																		: issue.severity === "high"
+																			? "text-orange-600 dark:text-orange-400"
+																			: issue.severity === "medium"
+																				? "text-yellow-600 dark:text-yellow-400"
+																				: "text-blue-600 dark:text-blue-400"
+																}`}
+															/>
+															<div className="flex-1">
+																{/* Show field name prominently */}
+																<p className="font-bold text-slate-900 dark:text-zinc-100 mb-1">
+																	Missing: {getFieldLabel(issue.field_name, issue.description)}
+																</p>
+																<p className="text-slate-700 dark:text-zinc-200">
+																	{issue.description}
+																</p>
+																{issue.suggestion && (
+																	<p className="text-slate-600 dark:text-zinc-300 mt-1.5 flex items-start gap-1">
+																		<span className="text-amber-600 dark:text-amber-400">💡</span>
+																		<span>{issue.suggestion}</span>
+																	</p>
+																)}
+															</div>
+														</div>
 													</div>
-												</div>
-											</div>
-										))}
+												);
+											})}
 									</div>
 								</div>
 							)}
