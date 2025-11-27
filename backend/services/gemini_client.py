@@ -31,15 +31,16 @@ class GeminiClient:
     with safety settings and configuration management.
     """
 
-    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None):
         """
         Initialize Gemini client.
 
         Args:
             api_key: Gemini API key (defaults to env var GEMINI_API_KEY)
-            model_name: Model to use (default: gemini-1.5-flash)
+            model_name: Model to use (defaults to env var GEMINI_MODEL or gemini-1.5-pro)
         """
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
+        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
 
         if not self.api_key:
             logger.warning("GEMINI_API_KEY not set. Gemini features will be unavailable.")
@@ -48,14 +49,12 @@ class GeminiClient:
 
         # Configure Gemini API
         genai.configure(api_key=self.api_key)
-
-        self.model_name = model_name
         self.available = True
 
         # Initialize model
         try:
-            self.model = genai.GenerativeModel(model_name)
-            logger.info(f"Gemini client initialized with model: {model_name}")
+            self.model = genai.GenerativeModel(self.model_name)
+            logger.info(f"Gemini client initialized with model: {self.model_name}")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini model: {e}")
             self.available = False
