@@ -341,8 +341,13 @@ class DataIngestionPipeline:
         
         # Use GraphBuilder to create graph structure
         from services.graph_builder import GraphBuilder
+        from utils.neo4j_client import get_neo4j_client
         
-        graph_builder = GraphBuilder(self.graph_service, self.db)
+        # Get Neo4j client (GraphBuilder expects neo4j_client, not graph_service)
+        neo4j_client = get_neo4j_client()
+        
+        # Fix: GraphBuilder expects (db, neo4j_client), not (graph_service, db)
+        graph_builder = GraphBuilder(self.db, neo4j_client)
         
         # Build regulation subgraph (this is a synchronous method)
         result = graph_builder.build_regulation_subgraph(str(regulation.id))
