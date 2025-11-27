@@ -7,7 +7,7 @@ export function Dashboard() {
 		<div className="flex flex-col h-full animate-fade-in">
 			{/* G7 Judging Criteria Badges - Prominent Display */}
 			<div className="mb-8 p-4 bg-gradient-to-r from-teal-50 to-blue-50 dark:from-teal-900/20 dark:to-blue-900/20 rounded-lg border border-teal-200 dark:border-teal-800">
-				<div className="flex flex-wrap gap-2">
+				<div className="flex flex-wrap justify-center gap-2">
 					{/* Impact & Social Good */}
 					<span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-semibold rounded-full border border-green-200 dark:border-green-800">
 							<svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
