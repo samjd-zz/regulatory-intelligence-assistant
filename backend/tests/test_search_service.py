@@ -211,10 +211,12 @@ class TestSearchService:
         }
         mock_es.search.return_value = mock_response
 
-        # Mock the embedder
+        # Mock the embedder with tolist() support
         with patch.object(search_service, '_get_embedder') as mock_embedder:
             mock_model = Mock()
-            mock_model.encode.return_value = [0.1] * 384
+            mock_embedding = Mock()
+            mock_embedding.tolist.return_value = [0.1] * 384
+            mock_model.encode.return_value = mock_embedding
             mock_embedder.return_value = mock_model
 
             results = search_service.vector_search("test query")
@@ -354,7 +356,9 @@ class TestSearchService:
 
         with patch.object(search_service, '_get_embedder') as mock_embedder:
             mock_model = Mock()
-            mock_model.encode.return_value = [0.1] * 384
+            mock_embedding = Mock()
+            mock_embedding.tolist.return_value = [0.1] * 384
+            mock_model.encode.return_value = mock_embedding
             mock_embedder.return_value = mock_model
 
             results = search_service.hybrid_search("test query", keyword_weight=0.6, vector_weight=0.4)
@@ -380,7 +384,11 @@ class TestSearchService:
     def test_get_document_not_found(self, search_service, mock_es):
         """Test retrieving a non-existent document"""
         from elasticsearch import NotFoundError
-        mock_es.get.side_effect = NotFoundError()
+        
+        # NotFoundError requires message, meta, and body arguments
+        error_meta = Mock()
+        error_meta.status = 404
+        mock_es.get.side_effect = NotFoundError("Document not found", meta=error_meta, body={})
 
         doc = search_service.get_document('nonexistent')
 
@@ -463,7 +471,9 @@ class TestSearchService:
 
         with patch.object(search_service, '_get_embedder') as mock_embedder:
             mock_model = Mock()
-            mock_model.encode.return_value = [0.1] * 384
+            mock_embedding = Mock()
+            mock_embedding.tolist.return_value = [0.1] * 384
+            mock_model.encode.return_value = mock_embedding
             mock_embedder.return_value = mock_model
 
             doc = {
@@ -510,7 +520,9 @@ class TestSearchService:
 
         with patch.object(search_service, '_get_embedder') as mock_embedder:
             mock_model = Mock()
-            mock_model.encode.return_value = [0.1] * 384
+            mock_embedding = Mock()
+            mock_embedding.tolist.return_value = [0.1] * 384
+            mock_model.encode.return_value = mock_embedding
             mock_embedder.return_value = mock_model
 
             with patch('services.search_service.bulk') as mock_bulk:
