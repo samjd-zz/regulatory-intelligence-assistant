@@ -98,9 +98,12 @@ Suraj Mandal     ██ 1,238
 
 ### Contributor (Abdulrasaq Lawani)
 - **Commits**: 3 (3.0%)
-- **Role**: Contributing developer
+- **Role**: Knowledge Graph Developer
 - **Development Method**: AI-enhanced development
 - **Key Areas**:
+  - Neo4j knowledge graph implementation
+  - Graph schema design and relationships
+  - Graph data population
   - Feature contributions
   - Bug fixes
   - Documentation updates
@@ -145,9 +148,9 @@ Based on the commit distribution, the project shows:
   - Playwright for E2E testing
 
 ### Data & AI Components
-- **Primary Contributors**: samjd-zz (AI-TDD), Suraj Mandal (AI-enhanced)
+- **Primary Contributors**: samjd-zz (AI-TDD), Suraj Mandal (AI-enhanced), Abdulrasaq Lawani (AI-enhanced)
 - **Technologies**:
-  - Knowledge Graph (Neo4j)
+  - Knowledge Graph (Neo4j) - led by Abdulrasaq Lawani
   - Vector Search (Elasticsearch)
   - RAG with Gemini API
   - Legal document parsing
@@ -174,10 +177,11 @@ Based on commit history and project structure (all developed using AI-TDD):
    - Entity extraction
    - Query processing
 
-4. **Knowledge Graph** (samjd-zz with AI-TDD)
-   - Neo4j integration
-   - Relationship mapping
-   - Graph queries
+4. **Knowledge Graph** (samjd-zz with AI-TDD, Abdulrasaq Lawani with AI-enhanced)
+   - Initial Neo4j setup and architecture (samjd-zz)
+   - Neo4j implementation and schema design (Abdulrasaq Lawani)
+   - Relationship mapping and graph queries
+   - Graph data population
 
 5. **RAG System** (samjd-zz with AI-TDD, Suraj Mandal with AI-enhanced)
    - Gemini API integration
