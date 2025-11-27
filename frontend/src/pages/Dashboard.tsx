@@ -313,7 +313,7 @@ export function Dashboard() {
 							</div>
 							<div className="mt-2 flex items-center gap-1">
 								<svg
-									className="w-3 h-3 text-teal-600 dark:text-teal-400"
+									className="w-3 h-3 text-orange-500 dark:text-orange-400"
 									fill="none"
 									stroke="currentColor"
 									viewBox="0 0 24 24"
