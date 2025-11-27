@@ -7,7 +7,7 @@ The Document Parser and Ingestion System processes regulatory documents in multi
 ## Features
 
 ### ✅ Document Upload API
-- Multi-format support: PDF, HTML, XML, TXT
+- Multi-format support: PDF, HTML, XML, TXT, DOCX
 - File validation and deduplication (SHA-256 hashing)
 - Metadata extraction and storage
 - Automatic document processing
@@ -424,7 +424,7 @@ curl http://localhost:8000/documents/statistics/summary
 ## Future Enhancements
 
 - [ ] OCR support for scanned PDFs
-- [ ] DOCX format support
+- [x] DOCX format support
 - [ ] Batch document upload
 - [ ] Document versioning
 - [ ] Advanced section matching algorithms
@@ -438,6 +438,11 @@ curl http://localhost:8000/documents/statistics/summary
 ```bash
 pip install --upgrade PyPDF2
 # Or try alternative: pdfplumber, pypdf
+```
+
+### DOCX Extraction Fails
+```bash
+pip install --upgrade python-docx
 ```
 
 ### HTML Parsing Issues
@@ -457,7 +462,8 @@ echo $DATABASE_URL
 ## Files
 
 - `backend/models/document_models.py` - SQLAlchemy models
-- `backend/services/document_parser.py` - Document parsing service
+- `backend/services/document_parser.py` - Document parsing service (supports PDF, HTML, XML, TXT, DOCX)
 - `backend/utils/legal_text_parser.py` - Legal text parsing utilities
 - `backend/routes/documents.py` - FastAPI routes
 - `backend/alembic/versions/002_document_models.py` - Database migration
+- `backend/tests/test_document_parser.py` - Comprehensive test suite (33 tests)

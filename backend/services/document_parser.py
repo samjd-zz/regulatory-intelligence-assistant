@@ -25,6 +25,14 @@ except ImportError:
     HTML_AVAILABLE = False
     logging.warning("BeautifulSoup4 not available. HTML parsing will be disabled.")
 
+# DOCX parsing
+try:
+    from docx import Document as DocxDocument
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+    logging.warning("python-docx not available. DOCX parsing will be disabled.")
+
 # XML parsing
 import xml.etree.ElementTree as ET
 
@@ -43,7 +51,7 @@ class DocumentParser:
     Service for parsing and processing regulatory documents.
     """
     
-    SUPPORTED_FORMATS = ['pdf', 'html', 'htm', 'xml', 'txt']
+    SUPPORTED_FORMATS = ['pdf', 'html', 'htm', 'xml', 'txt', 'docx']
     
     def __init__(self, db: Session):
         """
@@ -167,6 +175,8 @@ class DocumentParser:
             return self._extract_html_text(content)
         elif file_format == 'xml':
             return self._extract_xml_text(content)
+        elif file_format == 'docx':
+            return self._extract_docx_text(content)
         else:  # txt or unknown
             return content.decode('utf-8', errors='ignore')
     
@@ -254,6 +264,48 @@ class DocumentParser:
         except Exception as e:
             logger.error(f"Error extracting XML text: {e}")
             raise ValueError(f"Failed to parse XML: {e}")
+    
+    def _extract_docx_text(self, content: bytes) -> str:
+        """Extract text from DOCX content."""
+        if not DOCX_AVAILABLE:
+            logger.error("python-docx not installed. Cannot parse DOCX files.")
+            raise ValueError("DOCX parsing not available. Install python-docx.")
+        
+        try:
+            from io import BytesIO
+            from docx import Document as DocxDocument
+            
+            docx_file = BytesIO(content)
+            doc = DocxDocument(docx_file)
+            
+            # Extract text from all paragraphs
+            text_parts = []
+            for paragraph in doc.paragraphs:
+                if paragraph.text.strip():
+                    text_parts.append(paragraph.text.strip())
+            
+            # Extract text from tables
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = []
+                    for cell in row.cells:
+                        if cell.text.strip():
+                            row_text.append(cell.text.strip())
+                    if row_text:
+                        text_parts.append(' | '.join(row_text))
+            
+            text = '\n\n'.join(text_parts)
+            
+            if not text.strip():
+                logger.error("No text could be extracted from DOCX.")
+                raise ValueError("DOCX contains no extractable text.")
+            
+            logger.info(f"Successfully extracted {len(text)} characters from DOCX")
+            return text.strip()
+            
+        except Exception as e:
+            logger.error(f"Error parsing DOCX: {str(e)}")
+            raise ValueError(f"Failed to parse DOCX: {str(e)}")
     
     def _extract_title(
         self,
