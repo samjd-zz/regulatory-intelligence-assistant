@@ -706,6 +706,90 @@ MATCH (n) DETACH DELETE n
 curl -X DELETE "localhost:9200/regulatory_documents"
 ```
 
+### Obtaining Real Canadian Law XML Data
+
+⚠️ **IMPORTANT**: The current dataset contains **sample XML files for testing only**. For production use, you must obtain real regulatory data from official government sources.
+
+#### OPTION 1: Download from Open Canada Portal (Recommended)
+
+The complete dataset of Canadian federal acts and regulations is available as open data:
+
+1. **Visit**: [Open Canada - Consolidated Federal Acts and Regulations (XML)](https://open.canada.ca/data/en/dataset/1f0aae37-18e4-4bad-bbca-59a4094e44fa)
+
+2. **Download** the complete XML dataset:
+   - File: "Consolidated Federal Acts and Regulations (XML)"
+   - Size: ~50 MB compressed
+   - Format: ZIP archive containing XML files
+   - License: Open Government License - Canada
+
+3. **Extract** to: `backend/data/regulations/canadian_laws/`
+
+4. **Run ingestion pipeline**:
+   ```bash
+   cd backend
+   python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 500 --validate
+   ```
+
+#### OPTION 2: Justice Laws Website (Individual Acts)
+
+For specific acts or smaller datasets:
+
+1. **Visit**: [Justice Laws Website](https://laws-lois.justice.gc.ca/eng/)
+
+2. **Search** for specific acts (e.g., "Employment Insurance Act")
+
+3. **Click "XML" button** on the act page to download individual XML files
+
+4. **Save** downloaded files to: `backend/data/regulations/canadian_laws/`
+
+5. **Run ingestion** as shown above
+
+#### OPTION 3: Bulk Download (Advanced)
+
+For large-scale deployments or custom datasets:
+
+- **Contact**: Justice Canada at laws-lois@justice.gc.ca
+- **Request**: XML format for bulk download
+- **Use Cases**: Provincial/territorial regulations, historical versions, custom datasets
+
+#### Sample Data vs. Real Data
+
+**Current Sample Data** (for testing):
+- 100 generated XML files with basic structure
+- NOT real legal content
+- Suitable for: Pipeline testing, system validation, demos
+
+**Real Data** (for production):
+- Official Justice Laws Canada XML files
+- Legally authoritative content
+- Includes: Full text, amendments, cross-references, metadata
+- Updated regularly by Justice Canada
+
+**To Replace Sample Data with Real Data:**
+
+```bash
+# Step 1: Download real data (Option 1 or 2 above)
+# Step 2: Clear existing sample data
+rm backend/data/regulations/canadian_laws/*.xml
+
+# Step 3: Extract real XML files to the same directory
+# Step 4: Clear existing database content
+docker compose exec backend python -c "
+from database import SessionLocal
+from models.models import Regulation, Section, Amendment, Citation
+db = SessionLocal()
+db.query(Citation).delete()
+db.query(Amendment).delete()
+db.query(Section).delete()
+db.query(Regulation).delete()
+db.commit()
+print('Database cleared')
+"
+
+# Step 5: Run ingestion with real data
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 500 --validate
+```
+
 ### Documentation
 
 For complete documentation on the data ingestion system, see:
@@ -713,6 +797,7 @@ For complete documentation on the data ingestion system, see:
 - **[Data Ingestion Complete Guide](./docs/DATA_INGESTION_MVP_COMPLETE.md)** - Full pipeline documentation
 - **[Ingestion README](./backend/ingestion/README.md)** - Technical implementation details
 - **[Canadian Law XML Parser](./backend/ingestion/canadian_law_xml_parser.py)** - Parser documentation
+- **[Data Verification Report](./docs/reports/DATA_VERIFICATION_REPORT.md)** - Data source evaluation and recommendations
 
 ### Next Steps After Ingestion
 
