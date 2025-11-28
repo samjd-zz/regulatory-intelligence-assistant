@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { ConfidenceBadge } from "@/components/shared/ConfidenceBadge";
 import { SearchSkeleton } from "@/components/shared/SearchSkeleton";
@@ -184,9 +185,10 @@ export function Search() {
 					{!loading && !error && results.length > 0 && (
 						<div className="grid grid-cols-1 gap-8">
 							{results.map((result, idx) => (
-								<div
+								<Link
 									key={result.id}
-									className="group cursor-pointer animate-slide-up"
+									to={`/regulation/${result.id}`}
+									className="group cursor-pointer animate-slide-up block"
 									style={{ animationDelay: `${idx * 100}ms` }}
 								>
 									<div className="flex items-center gap-3 mb-2">
@@ -204,7 +206,7 @@ export function Search() {
 									<p className="text-xs text-slate-400 dark:text-zinc-400 mt-2">
 										{result.citation} • {formatDate(result.effective_date)}
 									</p>
-								</div>
+								</Link>
 							))}
 						</div>
 					)}

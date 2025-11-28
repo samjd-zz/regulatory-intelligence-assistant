@@ -359,6 +359,83 @@ async def get_document(doc_id: str):
         )
 
 
+@router.get("/regulation/{regulation_id}")
+async def get_regulation(regulation_id: str):
+    """
+    Get full regulation details including all sections.
+
+    - **regulation_id**: Regulation UUID
+    """
+    from database import SessionLocal
+    from models.models import Regulation, Section
+    from uuid import UUID
+    
+    db = SessionLocal()
+    
+    try:
+        # Parse UUID
+        try:
+            reg_uuid = UUID(regulation_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid regulation ID format"
+            )
+        
+        # Get regulation
+        regulation = db.query(Regulation).filter_by(id=reg_uuid).first()
+        
+        if not regulation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Regulation not found: {regulation_id}"
+            )
+        
+        # Get all sections
+        sections = db.query(Section).filter_by(
+            regulation_id=reg_uuid
+        ).order_by(Section.section_number).all()
+        
+        # Extract citation from extra_metadata if available
+        citation = None
+        if regulation.extra_metadata:
+            citation = regulation.extra_metadata.get('act_number') or \
+                      regulation.extra_metadata.get('chapter')
+        if not citation:
+            citation = regulation.authority
+        
+        return {
+            "success": True,
+            "id": str(regulation.id),
+            "title": regulation.title,
+            "citation": citation,
+            "jurisdiction": regulation.jurisdiction,
+            "authority": regulation.authority,
+            "effective_date": regulation.effective_date.isoformat() if regulation.effective_date else None,
+            "status": regulation.status,
+            "full_text": regulation.full_text,
+            "sections": [
+                {
+                    "id": str(s.id),
+                    "number": s.section_number,
+                    "title": s.title,
+                    "content": s.content
+                }
+                for s in sections
+            ]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve regulation: {str(e)}"
+        )
+    finally:
+        db.close()
+
+
 @router.post("/index", response_model=IndexResponse)
 async def index_document(request: DocumentIndexRequest):
     """

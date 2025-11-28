@@ -11,6 +11,7 @@ import { ThemeProvider } from "@/context/ThemeContext";
 import { Chat } from "@/pages/Chat";
 import { ComplianceDynamic } from "@/pages/ComplianceDynamic";
 import { Dashboard } from "@/pages/Dashboard";
+import { RegulationDetail } from "@/pages/RegulationDetail";
 import { Search } from "@/pages/Search";
 
 // Create a client for React Query
@@ -33,6 +34,7 @@ function App() {
 						<Routes>
 							<Route path="/" element={<Dashboard />} />
 							<Route path="/search" element={<Search />} />
+							<Route path="/regulation/:id" element={<RegulationDetail />} />
 							<Route path="/chat" element={<Chat />} />
 							<Route path="/compliance" element={<ComplianceDynamic />} />
 							<Route path="*" element={<Navigate to="/" replace />} />

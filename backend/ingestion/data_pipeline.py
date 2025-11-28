@@ -380,6 +380,8 @@ class DataIngestionPipeline:
             'document_type': 'regulation',
             'jurisdiction': regulation.jurisdiction,
             'authority': regulation.authority,
+            'citation': parsed_reg.chapter or regulation.authority or f"{regulation.title}",
+            'legislation_name': regulation.title,
             'effective_date': regulation.effective_date.isoformat() if regulation.effective_date else None,
             'status': regulation.status,
             'metadata': {
@@ -443,6 +445,64 @@ class DataIngestionPipeline:
     def get_stats(self) -> Dict[str, int]:
         """Get ingestion statistics."""
         return self.stats.copy()
+    
+    def sync_regulations_to_elasticsearch(self) -> int:
+        """
+        Re-index all existing regulations from PostgreSQL to Elasticsearch.
+        Useful when Elasticsearch mapping or indexing logic changes.
+        
+        Returns:
+            Number of regulations indexed
+        """
+        logger.info("Re-indexing regulations to Elasticsearch...")
+        
+        regulations = self.db.query(Regulation).all()
+        logger.info(f"Found {len(regulations)} regulations to re-index")
+        
+        indexed_count = 0
+        
+        for regulation in regulations:
+            try:
+                # Extract citation from extra_metadata
+                citation = regulation.authority
+                if regulation.extra_metadata:
+                    citation = (
+                        regulation.extra_metadata.get('chapter') or
+                        regulation.extra_metadata.get('act_number') or
+                        regulation.authority or
+                        regulation.title
+                    )
+                
+                # Index the regulation
+                doc = {
+                    'id': str(regulation.id),
+                    'regulation_id': str(regulation.id),
+                    'title': regulation.title,
+                    'content': regulation.full_text,
+                    'document_type': 'regulation',
+                    'jurisdiction': regulation.jurisdiction,
+                    'authority': regulation.authority,
+                    'citation': citation,
+                    'legislation_name': regulation.title,
+                    'effective_date': regulation.effective_date.isoformat() if regulation.effective_date else None,
+                    'status': regulation.status,
+                    'metadata': regulation.extra_metadata or {}
+                }
+                
+                self.search_service.index_document(
+                    doc_id=str(regulation.id),
+                    document=doc
+                )
+                indexed_count += 1
+                
+                if indexed_count % 10 == 0:
+                    logger.info(f"Indexed {indexed_count}/{len(regulations)} regulations")
+                    
+            except Exception as e:
+                logger.error(f"Failed to index regulation {regulation.id}: {e}")
+        
+        logger.info(f"Successfully re-indexed {indexed_count} regulations")
+        return indexed_count
     
     async def validate_ingestion(self) -> Dict[str, Any]:
         """

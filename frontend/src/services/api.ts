@@ -94,6 +94,26 @@ export async function getRegulation(id: string): Promise<Regulation> {
   return data
 }
 
+export async function getRegulationDetail(id: string): Promise<{
+  id: string
+  title: string
+  citation: string
+  jurisdiction: string
+  authority: string
+  effective_date: string | null
+  status: string
+  full_text: string
+  sections: Array<{
+    id: string
+    number: string
+    title: string
+    content: string
+  }>
+}> {
+  const { data } = await api.get(`/search/regulation/${id}`)
+  return data
+}
+
 export async function getRelatedRegulations(id: string): Promise<Regulation[]> {
   const { data } = await api.get(`/graph/related/${id}`)
   return data.related || []
