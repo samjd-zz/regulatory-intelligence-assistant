@@ -1070,6 +1070,239 @@ curl -X POST "http://localhost:8000/api/nlp/extract-entities" \
 - Generate client libraries
 
 
+## 🔌 MCP Server Integration
+
+### Overview
+
+The **Regulatory Intelligence MCP Server** enables AI assistants (like Claude, GPT-4, or other LLM-based tools) to interact directly with the Regulatory Intelligence Assistant API through the Model Context Protocol (MCP). This allows AI assistants to search regulations, answer legal questions, check compliance, and extract legal entities using natural language.
+
+### What is MCP?
+
+The Model Context Protocol (MCP) is a standardized protocol that allows AI assistants to use external tools and services. By wrapping our API in an MCP server, we enable AI assistants to:
+
+- Search Canadian regulations semantically
+- Get detailed regulation information
+- Answer legal questions with citations
+- Check regulatory compliance
+- Validate form fields in real-time
+- Extract and analyze legal entities
+
+### Quick Start
+
+**Prerequisites:**
+- Backend API running at `http://localhost:8000`
+- Node.js 18+ installed
+- npm package manager
+
+**Installation:**
+
+```bash
+# Navigate to MCP server directory
+cd mcp-server
+
+# Install dependencies
+npm install
+
+# Build the server
+npm run build
+
+# The compiled server will be in mcp-server/build/index.js
+```
+
+**Configuration for Cline (VS Code):**
+
+Add the server to your MCP settings in `.vscode-server/data/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "regulatory-intelligence": {
+      "command": "node",
+      "args": ["/absolute/path/to/regulatory-intelligence-assistant/mcp-server/build/index.js"],
+      "env": {
+        "API_BASE_URL": "http://localhost:8000"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
+**Configuration for Other MCP Clients:**
+
+For Claude Desktop or other MCP clients, add to their configuration file:
+
+```json
+{
+  "mcpServers": {
+    "regulatory-intelligence": {
+      "command": "node",
+      "args": ["/path/to/mcp-server/build/index.js"],
+      "env": {
+        "API_BASE_URL": "http://localhost:8000",
+        "API_TIMEOUT": "30000"
+      }
+    }
+  }
+}
+```
+
+### Available Tools
+
+The MCP server provides 7 powerful tools:
+
+1. **`search_regulations`** - Search Canadian regulations using hybrid semantic + keyword search
+2. **`get_regulation_detail`** - Get complete regulation details including all sections
+3. **`ask_legal_question`** - Answer questions with AI-generated responses and legal citations
+4. **`analyze_query`** - Parse and analyze legal queries to extract intent and entities
+5. **`check_compliance`** - Check form data for regulatory compliance
+6. **`validate_field`** - Real-time validation of individual form fields
+7. **`extract_legal_entities`** - Extract legal entities from text (person types, programs, requirements)
+
+### Usage Examples
+
+Once configured, AI assistants can use these tools naturally:
+
+**Example 1: Search for Regulations**
+```
+User: "Find regulations about employment insurance eligibility"
+
+AI Assistant automatically uses: search_regulations
+- query: "employment insurance eligibility"
+- program: "employment_insurance"
+- size: 5
+
+Returns: Top 5 relevant regulations with citations and relevance scores
+```
+
+**Example 2: Answer Legal Questions**
+```
+User: "Can a temporary resident apply for employment insurance?"
+
+AI Assistant automatically uses: ask_legal_question
+- question: "Can a temporary resident apply for employment insurance?"
+- jurisdiction: "federal"
+
+Returns: AI-generated answer with legal citations and confidence score
+```
+
+**Example 3: Check Compliance**
+```
+User: "Check if this EI application meets requirements: 
+      SIN: 123-456-789, employment_status: unemployed, hours_worked: 700"
+
+AI Assistant automatically uses: check_compliance
+- program_id: "employment-insurance"
+- form_data: { sin: "123-456-789", employment_status: "unemployed", hours_worked: 700 }
+
+Returns: Detailed compliance report with pass/fail status, issues, and recommendations
+```
+
+**Example 4: Extract Legal Entities**
+```
+User: "Extract entities from: 'Canadian citizens and permanent residents may apply for OAS benefits'"
+
+AI Assistant automatically uses: extract_legal_entities
+- text: "Canadian citizens and permanent residents may apply for OAS benefits"
+- entity_types: ["person_type", "program"]
+
+Returns: 
+- "Canadian citizens" (person_type, confidence: 0.95)
+- "permanent residents" (person_type, confidence: 0.95)
+- "OAS" (program, confidence: 0.98)
+```
+
+### Environment Variables
+
+Configure the MCP server using environment variables:
+
+- **`API_BASE_URL`**: Backend API URL (default: `http://localhost:8000`)
+- **`API_TIMEOUT`**: Request timeout in milliseconds (default: `30000`)
+
+### Architecture
+
+```
+┌─────────────────┐      ┌──────────────────┐      ┌─────────────────────┐
+│   AI Assistant  │─────>│   MCP Server     │─────>│   FastAPI Backend   │
+│  (Claude, etc.) │<─────│  (Proxy Layer)   │<─────│   (Our API)         │
+└─────────────────┘      └──────────────────┘      └─────────────────────┘
+      ↑                          ↑
+      └──────────────────────────┘
+         MCP Protocol           HTTP/REST
+```
+
+The MCP server acts as a translation layer between the Model Context Protocol and our REST API, enabling AI assistants to use our regulatory intelligence capabilities through natural language.
+
+### Development
+
+**Project Structure:**
+```
+mcp-server/
+├── src/
+│   ├── index.ts           # Main server implementation
+│   ├── api-client.ts      # API client for backend communication
+│   ├── tools.ts           # Tool definitions and handlers
+│   └── types.ts           # TypeScript type definitions
+├── build/                 # Compiled JavaScript output
+├── package.json           # Project dependencies
+├── tsconfig.json          # TypeScript configuration
+└── README.md             # Detailed MCP documentation
+```
+
+**Building:**
+```bash
+cd mcp-server
+npm run build
+```
+
+**Watching for Changes:**
+```bash
+npm run watch
+```
+
+### Troubleshooting
+
+**"Cannot connect to backend API" Warning**
+
+- **Cause**: Backend server is not running
+- **Solution**: Start the backend server:
+  ```bash
+  cd backend
+  docker-compose up
+  # OR
+  python -m uvicorn main:app --reload
+  ```
+
+**Tools Failing with Network Errors**
+
+- **Cause**: Backend URL is incorrect or backend is down
+- **Solution**: 
+  1. Check backend is running: `curl http://localhost:8000/health`
+  2. Verify `API_BASE_URL` in MCP settings
+  3. Check Docker containers: `docker ps`
+
+**Server Not Appearing in Available Tools**
+
+- **Cause**: Server may be disabled or misconfigured
+- **Solution**:
+  1. Check MCP settings file
+  2. Ensure `"disabled": false`
+  3. Restart your AI assistant/IDE
+
+### Complete Documentation
+
+For detailed documentation including:
+- All tool parameters and return types
+- Advanced configuration options
+- Adding custom tools
+- API client implementation
+- TypeScript type definitions
+
+See the complete MCP server documentation: **[mcp-server/README.md](./mcp-server/README.md)**
+
+---
+
 ## 📥 Data Ingestion Pipeline
 
 ### Overview
@@ -1566,7 +1799,7 @@ The UK offers one of the most advanced legislative data systems in the world:
 | 🇬🇧 UK | legislation.gov.uk | XML/API | ⭐⭐⭐⭐⭐ | Open Gov | All UK law | EN only | **MEDIUM** |
 | 🇫🇷 France | Légifrance | XML/JSON | ⭐⭐⭐⭐ | Open License | All French law | FR only | **MEDIUM** |
 | 🇩🇪 Germany | Gesetze im Internet | XML/HTML | ⭐⭐⭐⭐ | Open Data | Federal | DE only | **LOW** |
-| 🇺🇸 USA | GovInfo (GPO) | XML | ⭐⭐⭐⭐ | Public Domain | Federal | EN only | **MEDIUM** |
+| 🇺🇸 USA | GovInfo (GPO) | XML | ⭐⭐⭐⭐ | Public Domain | Federal | EN only | **MEDIUM** 
 | 🇮🇹 Italy | Normattiva | HTML/XML | ⭐⭐⭐ | Open Data | Gazette | IT only | **LOW** |
 | 🇯🇵 Japan | e-Gov | HTML | ⭐⭐⭐ | Open Data | All laws | JA only | **LOW** |
 | 🇪🇺 EU | EUR-Lex | XML | ⭐⭐⭐⭐ | Free Access | EU law | 24 languages | **MEDIUM** |
