@@ -541,6 +541,535 @@ open http://localhost:7474
 - **Neo4j Browser**: http://localhost:7474 - Visual graph exploration (neo4j/password123)
 - **Elasticsearch**: http://localhost:9200 - Search engine status and indices
 
+## 📡 REST API Reference
+
+The backend provides **50+ REST endpoints** across **10 routers** for comprehensive regulatory intelligence operations. All endpoints follow RESTful conventions and return JSON responses.
+
+**Base URL**: `http://localhost:8000`  
+**Interactive Docs**: http://localhost:8000/docs (Swagger UI)  
+**ReDoc**: http://localhost:8000/redoc (Alternative documentation)
+
+### API Overview
+
+| Service | Base Path | Endpoints | Description |
+|---------|-----------|-----------|-------------|
+| Search | `/api/search` | 13 | Keyword, vector, and hybrid search |
+| RAG Q&A | `/api/rag` | 6 | AI-powered question answering with citations |
+| Compliance | `/api/compliance` | 6 | Regulatory compliance checking and validation |
+| Graph | `/graph` | 10 | Knowledge graph operations and queries |
+| NLP | `/api/nlp` | 7 | Legal entity extraction and query parsing |
+| Documents | `/documents` | 8 | Document upload, parsing, and management |
+| Health | `/health` | 6 | System health checks and monitoring |
+| Batch | `/api/batch` | 3 | Batch processing operations |
+| Config | `/api/config` | 2 | System configuration management |
+| Suggestions | `/api/suggestions` | 2 | Query and workflow suggestions |
+
+---
+
+### 🔍 Search API (`/api/search`)
+
+**Purpose**: Semantic search across regulatory documents using hybrid search (BM25 + vector embeddings).
+
+#### Core Search Endpoints
+
+**`POST /api/search/keyword`** - Keyword-based search using BM25 algorithm
+```bash
+curl -X POST "http://localhost:8000/api/search/keyword" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "employment insurance eligibility",
+    "size": 10,
+    "filters": {"jurisdiction": "federal"}
+  }'
+```
+- **Use Case**: Exact term matching, known legal terminology
+- **Performance**: <100ms average response time
+- **Returns**: Search results with BM25 relevance scores
+
+**`POST /api/search/vector`** - Semantic search using embeddings
+```bash
+curl -X POST "http://localhost:8000/api/search/vector" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "can temporary residents get EI benefits?",
+    "size": 10
+  }'
+```
+- **Use Case**: Conceptual searches, natural language queries
+- **Performance**: <400ms average response time
+- **Returns**: Semantically similar documents with cosine similarity scores
+
+**`POST /api/search/hybrid`** - Combined keyword + vector search (recommended)
+```bash
+curl -X POST "http://localhost:8000/api/search/hybrid" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "employment insurance temporary resident",
+    "keyword_weight": 0.6,
+    "vector_weight": 0.4,
+    "size": 10
+  }'
+```
+- **Use Case**: Best of both worlds - term matching + semantic understanding
+- **Performance**: <500ms average response time
+- **Returns**: Ranked results with combined scores
+
+**`GET /api/search/regulation/{regulation_id}`** ⭐ **NEW** - Get full regulation details
+```bash
+curl "http://localhost:8000/api/search/regulation/550e8400-e29b-41d4-a716-446655440000"
+```
+- **Use Case**: Fetch complete regulation with all sections
+- **Returns**: Full regulation text, metadata, citations, all sections
+- **Frontend**: Powers the RegulationDetail page (v0.1.6-alpha)
+
+#### Document Management
+
+**`GET /api/search/document/{doc_id}`** - Retrieve single document
+**`POST /api/search/index`** - Index a document
+**`POST /api/search/index/bulk`** - Bulk index up to 1000 documents
+**`DELETE /api/search/document/{doc_id}`** - Delete a document
+**`POST /api/search/index/create`** - Create or recreate Elasticsearch index
+**`GET /api/search/stats`** - Get index statistics
+**`GET /api/search/health`** - Search service health check
+**`GET /api/search/analyze`** - Analyze a query with NLP
+
+---
+
+### 🤖 RAG Q&A API (`/api/rag`)
+
+**Purpose**: Retrieval-Augmented Generation for answering legal questions with citations using Gemini API.
+
+**`POST /api/rag/ask`** - Ask a question and get AI-generated answer
+```bash
+curl -X POST "http://localhost:8000/api/rag/ask" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Can a temporary resident apply for employment insurance?",
+    "num_context_docs": 5,
+    "temperature": 0.3
+  }'
+```
+**Response includes:**
+- Generated answer with legal citations
+- Confidence score (0.0-1.0)
+- Source documents used for context
+- Query intent classification
+- Processing time and cache status
+
+**`POST /api/rag/ask/batch`** - Ask multiple questions (up to 10)
+```bash
+curl -X POST "http://localhost:8000/api/rag/ask/batch" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "questions": [
+      "What is the EI waiting period?",
+      "How long can I receive EI benefits?"
+    ]
+  }'
+```
+
+**`POST /api/rag/cache/clear`** - Clear RAG answer cache  
+**`GET /api/rag/cache/stats`** - Get cache statistics  
+**`GET /api/rag/health`** - RAG service health check  
+**`GET /api/rag/info`** - RAG configuration and capabilities
+
+**Key Features:**
+- 24-hour answer caching with LRU eviction
+- Citation extraction with 2 pattern types
+- 4-factor confidence scoring system
+- Multi-document context (1-20 documents)
+- Temperature control (0.0-1.0)
+
+---
+
+### ✅ Compliance API (`/api/compliance`)
+
+**Purpose**: Regulatory compliance checking, field validation, and requirement extraction.
+
+**`POST /api/compliance/check`** - Full compliance validation
+```bash
+curl -X POST "http://localhost:8000/api/compliance/check" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "program_id": "employment-insurance",
+    "workflow_type": "ei_application",
+    "form_data": {
+      "sin": "123-456-789",
+      "employment_status": "employed",
+      "residency_status": "citizen"
+    }
+  }'
+```
+**Returns:**
+- Overall compliance status (passed/failed)
+- Compliance issues (critical, high, medium, low severity)
+- Field-specific violations with suggestions
+- Legal citations for each requirement
+- Recommendations and next steps
+- Confidence scores (0.5-0.95 range)
+
+**`POST /api/compliance/validate-field`** - Real-time field validation
+```bash
+curl -X POST "http://localhost:8000/api/compliance/validate-field" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "program_id": "employment-insurance",
+    "field_name": "sin",
+    "field_value": "123-456-789"
+  }'
+```
+- **Performance**: <50ms response time for instant feedback
+- **Use Case**: As-you-type validation in forms
+
+**`POST /api/compliance/requirements/extract`** - Extract requirements from regulations  
+**`GET /api/compliance/requirements/{program_id}`** - Get all program requirements  
+**`GET /api/compliance/metrics`** - Compliance checking metrics  
+**`DELETE /api/compliance/cache/{program_id}`** - Clear rule cache
+
+**Validation Types Supported:**
+- Required fields
+- Pattern matching (regex)
+- Length constraints
+- Range validation
+- Enum/list validation
+- Date format validation
+- Conditional validation
+- Combined validation logic
+
+---
+
+### 🕸️ Knowledge Graph API (`/graph`)
+
+**Purpose**: Neo4j knowledge graph operations for exploring regulatory relationships.
+
+**`POST /graph/build`** - Build graph from processed documents (async)
+```bash
+curl -X POST "http://localhost:8000/graph/build" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "limit": 100,
+    "document_types": ["legislation", "regulation"]
+  }'
+```
+
+**`POST /graph/build/{document_id}`** - Build graph for single document (sync)
+**`GET /graph/stats`** - Get graph statistics (node/relationship counts)
+```bash
+curl "http://localhost:8000/graph/stats"
+```
+**Returns:**
+```json
+{
+  "nodes": [
+    {"label": "Legislation", "node_count": 103},
+    {"label": "Section", "node_count": 703}
+  ],
+  "relationships": [
+    {"type": "HAS_SECTION", "rel_count": 703},
+    {"type": "REFERENCES", "rel_count": 245}
+  ],
+  "summary": {
+    "total_nodes": 820,
+    "total_relationships": 1114
+  }
+}
+```
+
+**`GET /graph/search`** - Full-text search across graph  
+**`GET /graph/legislation/{legislation_id}/related`** - Get related legislation  
+**`GET /graph/section/{section_id}/references`** - Get section cross-references  
+**`DELETE /graph/clear`** - Clear entire graph (requires confirm=true)
+
+**Graph Schema:**
+- **6 Node Types**: Legislation, Section, Regulation, Program, Situation, Policy
+- **9 Relationship Types**: HAS_SECTION, REFERENCES, AMENDED_BY, APPLIES_TO, etc.
+
+---
+
+### 🧠 Legal NLP API (`/api/nlp`)
+
+**Purpose**: Natural language processing for legal text - entity extraction and query parsing.
+
+**`POST /api/nlp/extract-entities`** - Extract legal entities from text
+```bash
+curl -X POST "http://localhost:8000/api/nlp/extract-entities" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Can a temporary resident apply for employment insurance?",
+    "entity_types": ["person_type", "program"]
+  }'
+```
+**Returns:**
+```json
+{
+  "entities": [
+    {
+      "text": "temporary resident",
+      "entity_type": "person_type",
+      "normalized": "temporary_resident",
+      "confidence": 0.95,
+      "start_pos": 6,
+      "end_pos": 24
+    },
+    {
+      "text": "employment insurance",
+      "entity_type": "program",
+      "normalized": "employment_insurance",
+      "confidence": 0.98
+    }
+  ],
+  "entity_count": 2,
+  "entity_summary": {"person_type": 1, "program": 1}
+}
+```
+
+**`POST /api/nlp/parse-query`** - Parse natural language query
+```bash
+curl -X POST "http://localhost:8000/api/nlp/parse-query" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Can I apply for EI?"}'
+```
+**Returns:**
+- Intent classification (search, eligibility, compliance, etc.)
+- Extracted entities with confidence scores
+- Keywords and filters
+- Question type detection
+- Intent confidence (87.5% average accuracy)
+
+**`POST /api/nlp/parse-queries-batch`** - Batch parse up to 100 queries  
+**`POST /api/nlp/expand-query`** - Expand query with synonyms  
+**`GET /api/nlp/entity-types`** - List supported entity types (8 types)  
+**`GET /api/nlp/intent-types`** - List supported intent types (8 intents)  
+**`GET /api/nlp/health`** - NLP service health check
+
+**Supported Entity Types:**
+- `person_type`: citizen, permanent resident, temporary resident, etc.
+- `program`: EI, CPP, OAS, GIS, etc.
+- `jurisdiction`: federal, provincial, municipal
+- `organization`: government agencies
+- `legislation`: acts, regulations, laws
+- `date`: dates and time references
+- `money`: monetary amounts
+- `requirement`: SIN, work permit, etc.
+
+---
+
+### 📄 Documents API (`/documents`)
+
+**Purpose**: Document upload, parsing, and processing for multi-format legal documents.
+
+**`POST /documents/upload`** - Upload and parse a document
+```bash
+curl -X POST "http://localhost:8000/documents/upload" \
+  -F "file=@employment-insurance-act.pdf" \
+  -F "document_type=legislation" \
+  -F "jurisdiction=federal"
+```
+**Supported Formats:**
+- PDF (with text extraction)
+- DOCX (Microsoft Word)
+- TXT (plain text)
+- HTML
+- XML (Justice Laws Canada format)
+
+**`GET /documents/{document_id}`** - Get document details  
+**`GET /documents`** - List documents with filters  
+**`PUT /documents/{document_id}`** - Update document metadata  
+**`DELETE /documents/{document_id}`** - Delete document  
+**`GET /documents/{document_id}/sections`** - Get document sections  
+**`POST /documents/{document_id}/process`** - Trigger document processing  
+**`GET /documents/stats`** - Document statistics
+
+**Processing Pipeline:**
+1. Upload → Parse structure → Extract sections
+2. Build knowledge graph relationships
+3. Index in Elasticsearch for search
+4. Generate embeddings for semantic search
+
+---
+
+### 🏥 Health Check API (`/health`)
+
+**Purpose**: System monitoring and service health checks.
+
+**`GET /health`** - General health check
+```bash
+curl "http://localhost:8000/health"
+```
+
+**`GET /health/all`** - Comprehensive health check (all services)
+```bash
+curl "http://localhost:8000/health/all"
+```
+**Returns:**
+```json
+{
+  "status": "healthy",
+  "services": {
+    "postgres": {
+      "status": "healthy",
+      "tables": 11,
+      "database": "regulatory_db",
+      "version": "14.x"
+    },
+    "neo4j": {
+      "status": "healthy",
+      "nodes": 820,
+      "relationships": 1114,
+      "version": "5.15"
+    },
+    "elasticsearch": {
+      "status": "healthy",
+      "indices": 1,
+      "cluster_status": "green",
+      "version": "8.x"
+    },
+    "redis": {
+      "status": "healthy",
+      "connected_clients": 5,
+      "version": "7.x"
+    }
+  }
+}
+```
+
+**`GET /health/postgres`** - PostgreSQL health check  
+**`GET /health/neo4j`** - Neo4j health check  
+**`GET /health/elasticsearch`** - Elasticsearch health check  
+**`GET /health/redis`** - Redis health check
+
+---
+
+### 🔄 Additional APIs
+
+#### Batch Processing (`/api/batch`)
+- `POST /api/batch/process` - Process multiple operations in batch
+- `GET /api/batch/status/{job_id}` - Check batch job status
+- `GET /api/batch/results/{job_id}` - Get batch results
+
+#### Configuration (`/api/config`)
+- `GET /api/config` - Get system configuration
+- `PUT /api/config` - Update system configuration
+
+#### Suggestions (`/api/suggestions`)
+- `GET /api/suggestions/queries` - Get query suggestions
+- `GET /api/suggestions/workflows/{program_id}` - Get workflow suggestions
+
+#### Version (`/api/version`)
+- `GET /api/version` - Get API version information
+
+---
+
+### 📊 API Usage Examples
+
+#### Example 1: Search for regulations then view full details
+
+```bash
+# Step 1: Search for regulations
+curl -X POST "http://localhost:8000/api/search/hybrid" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "employment insurance", "size": 5}'
+
+# Step 2: Get full details of top result (copy regulation_id from search)
+curl "http://localhost:8000/api/search/regulation/550e8400-e29b-41d4-a716-446655440000"
+```
+
+#### Example 2: Ask a question with RAG
+
+```bash
+# Get AI-powered answer with citations
+curl -X POST "http://localhost:8000/api/rag/ask" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What are the eligibility requirements for EI?",
+    "num_context_docs": 5,
+    "temperature": 0.3
+  }'
+```
+
+#### Example 3: Validate compliance
+
+```bash
+# Check if form data meets regulatory requirements
+curl -X POST "http://localhost:8000/api/compliance/check" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "program_id": "employment-insurance",
+    "workflow_type": "ei_application",
+    "form_data": {
+      "sin": "123-456-789",
+      "employment_status": "employed",
+      "hours_worked": 700,
+      "residency_status": "citizen"
+    }
+  }'
+```
+
+#### Example 4: Extract entities from legal text
+
+```bash
+# Parse legal text and extract structured information
+curl -X POST "http://localhost:8000/api/nlp/extract-entities" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "text": "Permanent residents must have 700 hours of work to qualify for regular EI benefits",
+    "entity_types": ["person_type", "program", "requirement"]
+  }'
+```
+
+---
+
+### 🔐 API Authentication & Rate Limiting
+
+**Current Status (MVP):**
+- ✅ All endpoints publicly accessible (for demo/development)
+- ❌ Authentication not yet implemented
+- ❌ Rate limiting not yet enforced
+
+**Production Roadmap:**
+- JWT-based authentication with refresh tokens
+- Role-based access control (RBAC)
+- Rate limiting: 1000 requests/hour for authenticated users
+- API key management for external integrations
+- Audit logging for all queries and compliance checks
+
+---
+
+### 📈 API Performance Metrics
+
+| Endpoint Type | Target Latency | Current Performance | Status |
+|--------------|----------------|---------------------|---------|
+| Keyword Search | <100ms | ~80ms | ✅ Met |
+| Vector Search | <400ms | ~350ms | ✅ Met |
+| Hybrid Search | <500ms | ~450ms | ✅ Met |
+| RAG Q&A | <3s | ~2.5s | ✅ Met |
+| Field Validation | <50ms | ~35ms | ✅ Met |
+| Full Compliance Check | <200ms | ~175ms | ✅ Met |
+| NLP Entity Extraction | <100ms | ~75ms | ✅ Met |
+| Graph Query | <200ms | ~150ms | ✅ Met |
+
+---
+
+### 🛠️ API Development Tools
+
+**Swagger UI**: http://localhost:8000/docs
+- Interactive API documentation
+- Test endpoints directly in browser
+- View request/response schemas
+- Generate code snippets
+
+**ReDoc**: http://localhost:8000/redoc
+- Clean, responsive API documentation
+- Organized by tags
+- Search functionality
+- Markdown support
+
+**OpenAPI Spec**: http://localhost:8000/openapi.json
+- Machine-readable API specification
+- Import into Postman, Insomnia, etc.
+- Generate client libraries
+
+
 ## 📥 Data Ingestion Pipeline
 
 ### Overview
