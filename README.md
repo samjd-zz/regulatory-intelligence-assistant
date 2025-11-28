@@ -188,7 +188,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - Core search, Q&A, and compliance features fully functional
 - 100 sample Canadian federal acts loaded and searchable
 - Frontend UI complete with responsive design
-- All 338 tests passing (100% pass rate)
+- All 397 tests passing (100% pass rate)
 
 **Not Production-Ready** ⚠️
 - Limited dataset (100 acts, need 500+ for production)
@@ -280,7 +280,7 @@ regulatory-intelligence-assistant/
 │   │   └── search_service.py          # Hybrid search engine
 │   ├── routes/                # REST API endpoints (10 routers, 50+ endpoints)
 │   ├── models/                # SQLAlchemy ORM models (10+ tables)
-│   ├── tests/                 # Test suite (338 tests, 100% passing)
+│   ├── tests/                 # Test suite (397 tests total: 338 backend + 59 frontend E2E)
 │   ├── ingestion/             # Data ingestion pipeline
 │   ├── scripts/               # Utility scripts (init, seed, verify)
 │   └── main.py                # FastAPI application entry point
@@ -1536,7 +1536,7 @@ For questions or support, please refer to the project documentation or contact t
 - ✅ 10 routers registered in FastAPI
 - ✅ 50+ REST API endpoints operational
 - ✅ Comprehensive health checks for all services
-- ✅ **338 unit and integration tests (338 passing - 100% pass rate)** ✅
+- ✅ **397 total tests (397 passing - 100% pass rate): 338 backend + 59 frontend E2E** ✅
 
 **Test Coverage Summary:**
 
@@ -1581,7 +1581,7 @@ For questions or support, please refer to the project documentation or contact t
 
 - ✅ Load sample regulatory dataset (10 Canadian federal acts loaded)
 - ✅ Comprehensive test execution and reporting
-- ✅ **All tests passing (338/338 - 100% pass rate achieved)** ✅
+- ✅ **All tests passing (397/397 - 100% pass rate achieved: 338 backend + 59 frontend E2E)** ✅
 - ⏳ Demo video production
 - ⏳ Final documentation review
 
