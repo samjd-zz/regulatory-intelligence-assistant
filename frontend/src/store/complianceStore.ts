@@ -57,10 +57,21 @@ export const useComplianceStore = create<ComplianceState>((set, get) => ({
     set({ checking: true, error: null })
 
     try {
+      // Map program IDs to workflow types
+      const workflowTypeMap: Record<string, string> = {
+        'employment-insurance': 'ei_application',
+        'cpp-retirement': 'cpp_application',
+        'canada-child-benefit': 'ccb_application',
+        'gis': 'gis_application',
+        'social-assistance': 'sa_application',
+      }
+
+      const workflowType = workflowTypeMap[programId] || 'general'
+
       const response = await checkCompliance({
         form_data: get().formData,
         program_id: programId,
-        workflow_type: 'ei_application', // Required by backend
+        workflow_type: workflowType,
       })
 
       set({
