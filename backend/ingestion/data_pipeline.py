@@ -402,6 +402,9 @@ class DataIngestionPipeline:
             regulation_id=regulation.id
         ).all()
         
+        # Extract citation for sections (same as regulation)
+        section_citation = parsed_reg.chapter or regulation.authority or f"{regulation.title}"
+        
         for section in sections:
             section_doc = {
                 'id': str(section.id),
@@ -412,6 +415,9 @@ class DataIngestionPipeline:
                 'content': section.content,
                 'document_type': 'section',
                 'jurisdiction': regulation.jurisdiction,
+                'authority': regulation.authority,
+                'citation': section_citation,
+                'legislation_name': regulation.title,
                 'regulation_title': regulation.title,
                 'metadata': section.extra_metadata or {}
             }
@@ -493,6 +499,34 @@ class DataIngestionPipeline:
                     doc_id=str(regulation.id),
                     document=doc
                 )
+                
+                # Also re-index all sections for this regulation
+                sections = self.db.query(Section).filter_by(
+                    regulation_id=regulation.id
+                ).all()
+                
+                for section in sections:
+                    section_doc = {
+                        'id': str(section.id),
+                        'regulation_id': str(regulation.id),
+                        'section_id': str(section.id),
+                        'section_number': section.section_number,
+                        'title': section.title or regulation.title,
+                        'content': section.content,
+                        'document_type': 'section',
+                        'jurisdiction': regulation.jurisdiction,
+                        'authority': regulation.authority,
+                        'citation': citation,
+                        'legislation_name': regulation.title,
+                        'regulation_title': regulation.title,
+                        'metadata': section.extra_metadata or {}
+                    }
+                    
+                    self.search_service.index_document(
+                        doc_id=str(section.id),
+                        document=section_doc
+                    )
+                
                 indexed_count += 1
                 
                 if indexed_count % 10 == 0:

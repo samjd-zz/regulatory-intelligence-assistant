@@ -204,7 +204,8 @@ export function Search() {
 										{result.snippet}
 									</p>
 									<p className="text-xs text-slate-400 dark:text-zinc-400 mt-2">
-										{result.citation} • {formatDate(result.effective_date)}
+										{result.citation}
+										{result.effective_date && ` • ${formatDate(result.effective_date)}`}
 									</p>
 								</Link>
 							))}
