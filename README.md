@@ -1272,7 +1272,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 ### Backend Unit & Integration Testing ✅
 
 - **Framework**: pytest 7.4.4
-- **Total Tests**: 338 tests (**338 passing**)
+- **Total Tests**: 338 backend tests (**338 passing**)
 - **Overall Pass Rate**: 100%
 - **Execution Time**: ~75 seconds
 
