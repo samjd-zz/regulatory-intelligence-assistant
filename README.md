@@ -707,21 +707,31 @@ MATCH (n) DETACH DELETE n
 curl -X DELETE "localhost:9200/regulatory_documents"
 ```
 
-### Obtaining Real Canadian Law XML Data
+### Obtaining Real Regulatory Data from G7 Countries
 
 ⚠️ **IMPORTANT**: The current dataset contains **sample XML files for testing only**. For production use, you must obtain real regulatory data from official government sources.
 
-#### OPTION 1: Download from Open Canada Portal (Recommended)
+This section provides comprehensive instructions for obtaining regulatory data from all G7 countries (Canada, USA, UK, France, Germany, Italy, Japan) for a truly international regulatory intelligence platform.
+
+---
+
+## 🇨🇦 Canada
+
+**Alignment Score: ⭐⭐⭐⭐⭐ (Excellent)** - Primary data source for MVP
+
+### OPTION 1: Open Canada Portal (Recommended)
 
 The complete dataset of Canadian federal acts and regulations is available as open data:
 
 1. **Visit**: [Open Canada - Consolidated Federal Acts and Regulations (XML)](https://open.canada.ca/data/en/dataset/1f0aae37-18e4-4bad-bbca-59a4094e44fa)
 
 2. **Download** the complete XML dataset:
-   - File: "Consolidated Federal Acts and Regulations (XML)"
-   - Size: ~50 MB compressed
-   - Format: ZIP archive containing XML files
-   - License: Open Government License - Canada
+   - **File**: "Consolidated Federal Acts and Regulations (XML)"
+   - **Size**: ~50 MB compressed
+   - **Format**: ZIP archive containing XML files
+   - **License**: Open Government License - Canada
+   - **Coverage**: All federal acts and regulations
+   - **Quality**: ⭐⭐⭐⭐⭐ Rich metadata, versioning, amendment tracking
 
 3. **Extract** to: `backend/data/regulations/canadian_laws/`
 
@@ -731,27 +741,378 @@ The complete dataset of Canadian federal acts and regulations is available as op
    python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 500 --validate
    ```
 
-#### OPTION 2: Justice Laws Website (Individual Acts)
+**Data Structure**: XML with sections, subsections, amendments, cross-references, act numbers, effective dates, and consolidation dates.
+
+### OPTION 2: Justice Laws Website (Individual Acts)
 
 For specific acts or smaller datasets:
 
 1. **Visit**: [Justice Laws Website](https://laws-lois.justice.gc.ca/eng/)
-
 2. **Search** for specific acts (e.g., "Employment Insurance Act")
-
 3. **Click "XML" button** on the act page to download individual XML files
+4. **Save** to: `backend/data/regulations/canadian_laws/`
 
-4. **Save** downloaded files to: `backend/data/regulations/canadian_laws/`
-
-5. **Run ingestion** as shown above
-
-#### OPTION 3: Bulk Download (Advanced)
-
-For large-scale deployments or custom datasets:
+### OPTION 3: Bulk Download (Advanced)
 
 - **Contact**: Justice Canada at laws-lois@justice.gc.ca
 - **Request**: XML format for bulk download
 - **Use Cases**: Provincial/territorial regulations, historical versions, custom datasets
+
+---
+
+## 🇬🇧 United Kingdom
+
+**Alignment Score: ⭐⭐⭐⭐⭐ (Excellent)** - Best-in-class semantic search
+
+### UK Legislation Portal
+
+The UK offers one of the most advanced legislative data systems in the world:
+
+1. **Visit**: [UK Legislation Website](https://www.legislation.gov.uk)
+
+2. **API Access**: [UK Legislation API](https://www.legislation.gov.uk/developer)
+   - **Format**: XML, HTML, PDF with structured metadata
+   - **License**: Open Government License (UK)
+   - **Coverage**: All UK legislation since 1267 (Statute of Marlborough)
+   - **Quality**: ⭐⭐⭐⭐⭐ Complete legislative history, amendments, semantic search
+   - **Features**: RESTful API, version control, cross-references
+
+3. **Download Options**:
+   ```bash
+   # Individual act (XML format)
+   wget https://www.legislation.gov.uk/ukpga/1996/18/data.xml
+   
+   # Bulk download via API
+   # See: https://www.legislation.gov.uk/developer/formats/xml
+   ```
+
+4. **Integration**:
+   - Create parser for UK XML format (similar structure to Canadian XML)
+   - Extract: act number, year, sections, amendments, commencement dates
+   - Build knowledge graph with cross-jurisdictional UK-Canada relationships
+
+**Data Structure**: XML with comprehensive metadata including:
+- Act type (primary, secondary legislation)
+- Year and chapter number
+- Sections with heading and text
+- Complete amendment history
+- Cross-references to related legislation
+
+**Use Cases**:
+- Comparative analysis (UK vs Canada employment law)
+- Cross-jurisdictional compliance
+- International precedent research
+- Best practices from UK's semantic search implementation
+
+---
+
+## 🇫🇷 France
+
+**Alignment Score: ⭐⭐⭐⭐ (Very Good)** - Critical for bilingual Canadian context
+
+### Légifrance (Official French Legislation)
+
+1. **Visit**: [Légifrance](https://www.legifrance.gouv.fr)
+
+2. **Open Data Portal**: [data.gouv.fr](https://www.data.gouv.fr/fr/datasets/legi-codes-lois-et-reglements-consolides/)
+   - **Format**: XML, JSON (structured legal documents)
+   - **License**: Licence Ouverte / Open License
+   - **Coverage**: Codes, laws, decrees, regulations
+   - **Quality**: ⭐⭐⭐⭐ Official French legislation, historical corpus
+   - **Language**: French (essential for bilingual Canadian support)
+
+3. **Download Options**:
+   ```bash
+   # Visit data.gouv.fr and search for "LEGI - Codes, lois et règlements consolidés"
+   # Download dataset (large: ~5 GB)
+   # Extract XML files
+   ```
+
+4. **Integration**:
+   - Build French XML parser (Code civil, Code du travail formats)
+   - Extract: article numbers, sections, effective dates
+   - Essential for Quebec civil law references
+   - Train French-language legal NLP models
+
+**Data Structure**: XML with hierarchical structure (Codes → Titles → Chapters → Sections → Articles)
+
+**Use Cases**:
+- Quebec civil law references (Canadian bilingual requirements)
+- French-language legal NLP training
+- Bilingual terminology alignment (English-French legal terms)
+- International comparative law (French legal system)
+
+---
+
+## 🇩🇪 Germany
+
+**Alignment Score: ⭐⭐⭐⭐ (Very Good)** - Excellent for NLP training
+
+### German Federal Law Portal
+
+1. **Visit**: [Gesetze im Internet](https://www.gesetze-im-internet.de)
+   - **Format**: HTML, XML available for download
+   - **License**: Open data (German government license)
+   - **Coverage**: All federal laws and regulations
+   - **Quality**: ⭐⭐⭐⭐ Long-term archives, comprehensive metadata
+
+2. **Alternative Source**: [GovData Portal](https://www.govdata.de)
+   - Search for "Bundesrecht" (federal law)
+   - Download structured legal datasets
+
+3. **Download Options**:
+   ```bash
+   # Individual laws available as XML
+   # Visit https://www.gesetze-im-internet.de/aktuell.html
+   # Download archives or individual acts
+   ```
+
+4. **Integration**:
+   - Create German XML/HTML parser
+   - Extract: law sections (§), paragraphs, amendments
+   - Build German legal terminology database
+   - Train NLP models on large German legal corpus
+
+**Data Structure**: German legal citation system (§ symbol, Absätze/paragraphs, Sätze/sentences)
+
+**Use Cases**:
+- Legal NLP model training (large German corpus)
+- Research on legislative drafting patterns
+- AI governance framework examples (Germany's AI Register)
+- Multi-language legal text analysis
+
+---
+
+## 🇺🇸 United States
+
+**Alignment Score: ⭐⭐⭐⭐ (Very Good)** - Extensive federal and state data
+
+### US Federal Legislation
+
+1. **Visit**: [GovInfo (GPO)](https://www.govinfo.gov)
+   - **Format**: XML, PDF, HTML (USLM - United States Legislative Markup)
+   - **License**: Public domain (US government works)
+   - **Coverage**: US Code, Federal Register, Code of Federal Regulations (CFR)
+   - **Quality**: ⭐⭐⭐⭐ Comprehensive, well-structured, regularly updated
+
+2. **Download Options**:
+   ```bash
+   # US Code (organized by title)
+   # Visit: https://www.govinfo.gov/app/collection/uscode
+   # Bulk download: https://github.com/usgpo/uscode
+   
+   # Code of Federal Regulations
+   # Visit: https://www.govinfo.gov/app/collection/cfr
+   ```
+
+3. **Alternative Sources**:
+   - **Congress.gov**: [https://www.congress.gov](https://www.congress.gov) - Bills, resolutions, legislative history
+   - **Regulations.gov**: [https://www.regulations.gov](https://www.regulations.gov) - Federal rulemaking and comments
+   - **State Laws**: [Justia](https://law.justia.com/codes/) - Free state code repositories
+
+4. **Integration**:
+   - Parse USLM XML format (similar to Canadian XML)
+   - Extract: titles, sections, subsections, amendments
+   - Build knowledge graph with US federal regulations
+   - Link to Canadian regulations for cross-border compliance
+
+**Data Structure**: XML with title, chapter, section hierarchy; extensive cross-references
+
+**Use Cases**:
+- US-Canada cross-border regulatory compliance
+- Federal programs affecting Canadian residents
+- Comparative analysis (US vs Canada regulatory approaches)
+- International trade regulations
+
+---
+
+## 🇮🇹 Italy
+
+**Alignment Score: ⭐⭐⭐ (Good)** - Emerging digital infrastructure
+
+### Italian Legislation Portal
+
+1. **Visit**: [Normattiva](https://www.normattiva.it)
+   - **Format**: HTML, XML (limited availability)
+   - **License**: Italian government open data
+   - **Coverage**: Italian legislation (Gazzetta Ufficiale)
+   - **Quality**: ⭐⭐⭐ Official gazette, comprehensive but less structured
+
+2. **Download Options**:
+   ```bash
+   # Access via web interface
+   # Visit: https://www.normattiva.it
+   # Search for specific acts or browse by date
+   # Export individual documents
+   ```
+
+3. **Integration**:
+   - Build HTML parser for Italian legal documents
+   - Extract: article numbers (Art.), commas, legislation numbers
+   - Handle Italian legal citation system
+   - Create Italian legal terminology database
+
+**Data Structure**: HTML-based with article structure (articoli, commi, lettere)
+
+**Use Cases**:
+- EU regulatory harmonization research
+- Multi-language legal NLP (Italian corpus)
+- Comparative civil law studies
+- International regulatory frameworks
+
+---
+
+## 🇯🇵 Japan
+
+**Alignment Score: ⭐⭐⭐ (Good)** - Specialized legal QA dataset
+
+### Japanese Legal Resources
+
+1. **e-Gov Legal Search**: [https://elaws.e-gov.go.jp](https://elaws.e-gov.go.jp)
+   - **Format**: HTML, XML (limited)
+   - **License**: Japanese government open data
+   - **Coverage**: All Japanese laws and ordinances
+   - **Quality**: ⭐⭐⭐ Official source, Japanese language only
+   - **Language**: Japanese (requires translation for English users)
+
+2. **Japanese Legal QA Dataset** (Research Use):
+   - Multiple-choice QA on Japanese law
+   - LLM-verified accuracy
+   - Available through AI research platforms
+   - **Use Case**: Benchmark Q&A accuracy, learn from QA structure
+
+3. **Integration**:
+   ```bash
+   # Access e-Gov portal
+   # Search for specific laws (法律)
+   # Extract HTML content
+   # Translate using LLM or translation API
+   ```
+
+**Use Cases**:
+- Benchmark Q&A system accuracy
+- Multi-language legal NLP testing
+- G7 regulatory comparison studies
+- International trade law research
+
+---
+
+## 🇪🇺 European Union (Bonus)
+
+**Alignment Score: ⭐⭐⭐⭐ (Very Good)** - Multi-language coverage
+
+### EUR-Lex (EU Legislation)
+
+1. **Visit**: [EUR-Lex](https://eur-lex.europa.eu)
+   - **Format**: XML (Formex/LegalDocML), HTML, PDF
+   - **License**: Free access with EU login
+   - **Coverage**: EU legislation, case law, treaties
+   - **Quality**: ⭐⭐⭐⭐ Multi-language (24 EU languages)
+   - **Languages**: All official EU languages including English, French, German, Italian
+
+2. **Download Options**:
+   - Bulk download available (requires registration)
+   - API access for programmatic retrieval
+   - SPARQL endpoint for semantic queries
+
+3. **Integration**:
+   - Parse LegalDocML XML format
+   - Extract: directives, regulations, decisions
+   - Build EU-Canada regulatory relationship graph
+   - Support multi-language search and Q&A
+
+**Use Cases**:
+- EU-Canada regulatory harmonization
+- International precedent research
+- Multi-language legal corpus
+- GDPR and privacy law compliance
+
+---
+
+## 📊 Data Source Comparison Table
+
+| Country | Source | Format | Quality | License | Coverage | Bilingual | Priority |
+|---------|--------|--------|---------|---------|----------|-----------|----------|
+| 🇨🇦 Canada | Justice Laws | XML | ⭐⭐⭐⭐⭐ | Open Gov | Federal | EN/FR | **HIGH** |
+| 🇬🇧 UK | legislation.gov.uk | XML/API | ⭐⭐⭐⭐⭐ | Open Gov | All UK law | EN only | **MEDIUM** |
+| 🇫🇷 France | Légifrance | XML/JSON | ⭐⭐⭐⭐ | Open License | All French law | FR only | **MEDIUM** |
+| 🇩🇪 Germany | Gesetze im Internet | XML/HTML | ⭐⭐⭐⭐ | Open Data | Federal | DE only | **LOW** |
+| 🇺🇸 USA | GovInfo (GPO) | XML | ⭐⭐⭐⭐ | Public Domain | Federal | EN only | **MEDIUM** |
+| 🇮🇹 Italy | Normattiva | HTML/XML | ⭐⭐⭐ | Open Data | Gazette | IT only | **LOW** |
+| 🇯🇵 Japan | e-Gov | HTML | ⭐⭐⭐ | Open Data | All laws | JA only | **LOW** |
+| 🇪🇺 EU | EUR-Lex | XML | ⭐⭐⭐⭐ | Free Access | EU law | 24 languages | **MEDIUM** |
+
+---
+
+## 🚀 Recommended Implementation Strategy
+
+### Phase 1: MVP (Canada Only)
+- ✅ Focus on Canadian federal regulations (already implemented)
+- Target: 500+ Canadian acts for production
+
+### Phase 2: Bilingual Expansion (Canada + France + UK)
+- Add UK legislation for comparative analysis
+- Add French Légifrance for bilingual support (Quebec)
+- Implement cross-jurisdictional knowledge graph
+
+### Phase 3: North American Integration (+ USA)
+- Add US federal regulations (US Code, CFR)
+- Build US-Canada cross-border compliance checker
+- Support international trade regulations
+
+### Phase 4: Full G7 Coverage (+ Germany, Italy, Japan, EU)
+- Add remaining G7 countries
+- Multi-language support (EN, FR, DE, IT, JA)
+- Comprehensive G7 regulatory comparison tools
+
+---
+
+## 🛠️ Technical Implementation Notes
+
+### Parser Development
+
+Each country requires a custom parser due to different XML/HTML structures:
+
+```python
+# Example: UK Legislation Parser
+class UKLegislationParser:
+    """Parse UK legislation.gov.uk XML format"""
+    
+    def parse_act(self, xml_content):
+        # Extract: year, chapter, sections, amendments
+        # Handle UK-specific citation format (e.g., "1996 c. 18")
+        pass
+
+# Example: French Légifrance Parser
+class LegifranceParser:
+    """Parse French legal codes and laws"""
+    
+    def parse_code(self, xml_content):
+        # Extract: code title, articles, effective dates
+        # Handle French citation format (e.g., "Article L1234-5")
+        pass
+```
+
+### Multi-Language NLP
+
+Train language-specific legal NLP models:
+- **English**: Canada, UK, USA
+- **French**: Canada (Quebec), France
+- **German**: Germany, EU
+- **Italian**: Italy, EU
+- **Japanese**: Japan
+
+### Knowledge Graph Expansion
+
+Extend Neo4j schema for cross-jurisdictional relationships:
+
+```cypher
+// Create international regulatory relationships
+CREATE (can:Regulation {country: "Canada", act: "Employment Insurance Act"})
+CREATE (uk:Regulation {country: "UK", act: "Employment Rights Act 1996"})
+CREATE (can)-[:SIMILAR_TO {similarity: 0.85}]->(uk)
+CREATE (can)-[:REFERENCES_INTERNATIONAL {treaty: "ILO Convention"}]->(uk)
+```
 
 #### Sample Data vs. Real Data
 
