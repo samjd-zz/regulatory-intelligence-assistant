@@ -57,15 +57,15 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 
       // Transform SearchHit[] to SearchResult[] for UI
       const transformedResults: SearchResult[] = response.hits.map((hit) => ({
-        id: hit.id,
-        title: hit.source.title,
+        id: String(hit.source.regulation_id || hit.id), // Use regulation_id for sections, fallback to id for regulations
+        title: String(hit.source.regulation_title || hit.source.title || 'Untitled'), // Use regulation title if available
         snippet: hit.source.summary || hit.source.content?.substring(0, 300) || '',
-        citation: hit.source.citation || hit.source.legislation_name || 'N/A',
+        citation: String(hit.source.citation || hit.source.legislation_name || hit.source.authority || 'Unknown Citation'),
         confidence: hit.score,
         relevance_score: hit.score,
-        effective_date: hit.source.effective_date || '',
-        jurisdiction: hit.source.jurisdiction || 'N/A',
-        document_type: hit.source.document_type,
+        effective_date: String(hit.source.effective_date || ''),
+        jurisdiction: String(hit.source.jurisdiction || 'Federal'),
+        document_type: String(hit.source.document_type || 'regulation'),
         section_number: hit.source.section_number,
       }))
 
