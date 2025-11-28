@@ -16,54 +16,137 @@ import time
 logger = logging.getLogger(__name__)
 
 
-# Priority acts for MVP (50 regulations as per DATA_VERIFICATION_REPORT.md)
+# Priority acts for MVP (100 regulations for comprehensive testing)
 PRIORITY_ACTS = [
-    # Social Services & Employment
+    # Social Services & Employment (10)
     ("Employment Insurance Act", "S.C. 1996, c. 23", "employment-insurance-act"),
     ("Canada Pension Plan", "R.S.C. 1985, c. C-8", "canada-pension-plan"),
     ("Old Age Security Act", "R.S.C. 1985, c. O-9", "old-age-security-act"),
     ("Canada Labour Code", "R.S.C. 1985, c. L-2", "canada-labour-code"),
     ("Employment Equity Act", "S.C. 1995, c. 44", "employment-equity-act"),
+    ("Canada Student Loans Act", "R.S.C. 1985, c. S-23", "canada-student-loans-act"),
+    ("Canada Education Savings Act", "S.C. 2004, c. 26", "canada-education-savings-act"),
+    ("Wage Earner Protection Program Act", "S.C. 2005, c. 47", "wage-earner-protection-act"),
+    ("Public Service Labour Relations Act", "S.C. 2003, c. 22", "public-service-labour-relations-act"),
+    ("Canada Disability Savings Act", "S.C. 2007, c. 35", "canada-disability-savings-act"),
     
-    # Immigration & Citizenship
+    # Immigration & Citizenship (10)
     ("Immigration and Refugee Protection Act", "S.C. 2001, c. 27", "immigration-refugee-protection-act"),
     ("Citizenship Act", "R.S.C. 1985, c. C-29", "citizenship-act"),
+    ("Immigration Act", "R.S.C. 1985, c. I-2", "immigration-act"),
+    ("Balanced Refugee Reform Act", "S.C. 2010, c. 8", "balanced-refugee-reform-act"),
+    ("Protecting Canada's Immigration System Act", "S.C. 2012, c. 17", "protecting-immigration-system-act"),
+    ("Faster Removal of Foreign Criminals Act", "S.C. 2013, c. 16", "faster-removal-foreign-criminals-act"),
+    ("Zero Tolerance for Barbaric Cultural Practices Act", "S.C. 2015, c. 29", "zero-tolerance-barbaric-practices-act"),
+    ("Strengthening Canadian Citizenship Act", "S.C. 2014, c. 22", "strengthening-citizenship-act"),
+    ("Department of Citizenship and Immigration Act", "S.C. 1994, c. 31", "citizenship-immigration-dept-act"),
+    ("Canadian Multiculturalism Act", "R.S.C. 1985, c. 24", "canadian-multiculturalism-act"),
     
-    # Tax & Finance
+    # Tax & Finance (15)
     ("Income Tax Act", "R.S.C. 1985, c. 1", "income-tax-act"),
     ("Excise Tax Act", "R.S.C. 1985, c. E-15", "excise-tax-act"),
     ("Financial Administration Act", "R.S.C. 1985, c. F-11", "financial-administration-act"),
+    ("Bank Act", "S.C. 1991, c. 46", "bank-act"),
+    ("Insurance Companies Act", "S.C. 1991, c. 47", "insurance-companies-act"),
+    ("Trust and Loan Companies Act", "S.C. 1991, c. 45", "trust-loan-companies-act"),
+    ("Canada Deposit Insurance Corporation Act", "R.S.C. 1985, c. C-3", "canada-deposit-insurance-act"),
+    ("Budget Implementation Act", "S.C. 2024, c. 17", "budget-implementation-act"),
+    ("Payment Clearing and Settlement Act", "S.C. 1996, c. 6", "payment-clearing-settlement-act"),
+    ("Proceeds of Crime (Money Laundering) and Terrorist Financing Act", "S.C. 2000, c. 17", "proceeds-crime-money-laundering-act"),
+    ("Customs Act", "R.S.C. 1985, c. 1", "customs-act"),
+    ("Currency Act", "R.S.C. 1985, c. C-52", "currency-act"),
+    ("Federal-Provincial Fiscal Arrangements Act", "R.S.C. 1985, c. F-8", "federal-provincial-fiscal-act"),
+    ("Public Sector Pension Investment Board Act", "S.C. 1999, c. 34", "pension-investment-board-act"),
+    ("Canada Small Business Financing Act", "S.C. 1998, c. 36", "small-business-financing-act"),
     
-    # Transparency & Privacy
+    # Transparency & Privacy (10)
     ("Access to Information Act", "R.S.C. 1985, c. A-1", "access-to-information-act"),
     ("Privacy Act", "R.S.C. 1985, c. P-21", "privacy-act"),
+    ("Personal Information Protection and Electronic Documents Act", "S.C. 2000, c. 5", "pipeda"),
+    ("Lobbying Act", "R.S.C. 1985, c. 44", "lobbying-act"),
+    ("Conflict of Interest Act", "S.C. 2006, c. 9", "conflict-of-interest-act"),
+    ("Parliament of Canada Act", "R.S.C. 1985, c. P-1", "parliament-canada-act"),
+    ("Public Servants Disclosure Protection Act", "S.C. 2005, c. 46", "public-servants-disclosure-act"),
+    ("Library and Archives of Canada Act", "S.C. 2004, c. 11", "library-archives-act"),
+    ("Statistics Act", "R.S.C. 1985, c. S-19", "statistics-act"),
+    ("Federal Accountability Act", "S.C. 2006, c. 9", "federal-accountability-act"),
     
-    # Justice & Rights
+    # Justice & Rights (15)
     ("Canadian Charter of Rights and Freedoms", "Constitution Act, 1982", "charter-rights-freedoms"),
     ("Canadian Human Rights Act", "R.S.C. 1985, c. H-6", "canadian-human-rights-act"),
     ("Criminal Code", "R.S.C. 1985, c. C-46", "criminal-code"),
+    ("Youth Criminal Justice Act", "S.C. 2002, c. 1", "youth-criminal-justice-act"),
+    ("Corrections and Conditional Release Act", "S.C. 1992, c. 20", "corrections-conditional-release-act"),
+    ("Canadian Bill of Rights", "S.C. 1960, c. 44", "canadian-bill-of-rights"),
+    ("Divorce Act", "R.S.C. 1985, c. 3", "divorce-act"),
+    ("Family Orders and Agreements Enforcement Assistance Act", "R.S.C. 1985, c. 4", "family-orders-enforcement-act"),
+    ("Civil Marriage Act", "S.C. 2005, c. 33", "civil-marriage-act"),
+    ("Judges Act", "R.S.C. 1985, c. J-1", "judges-act"),
+    ("Federal Courts Act", "R.S.C. 1985, c. F-7", "federal-courts-act"),
+    ("Supreme Court Act", "R.S.C. 1985, c. S-26", "supreme-court-act"),
+    ("Canada Evidence Act", "R.S.C. 1985, c. C-5", "canada-evidence-act"),
+    ("Victims Bill of Rights Act", "S.C. 2015, c. 13", "victims-bill-rights-act"),
+    ("Not Criminally Responsible Reform Act", "S.C. 2014, c. 6", "not-criminally-responsible-reform-act"),
     
-    # Health & Safety
+    # Health & Safety (10)
     ("Canada Health Act", "R.S.C. 1985, c. C-6", "canada-health-act"),
     ("Food and Drugs Act", "R.S.C. 1985, c. F-27", "food-drugs-act"),
     ("Hazardous Products Act", "R.S.C. 1985, c. H-3", "hazardous-products-act"),
-    ("Occupational Health and Safety Act", "Various", "occupational-health-safety"),
+    ("Controlled Drugs and Substances Act", "S.C. 1996, c. 19", "controlled-drugs-substances-act"),
+    ("Cannabis Act", "S.C. 2018, c. 16", "cannabis-act"),
+    ("Quarantine Act", "S.C. 2005, c. 20", "quarantine-act"),
+    ("Public Health Agency of Canada Act", "S.C. 2006, c. 5", "public-health-agency-act"),
+    ("Pest Control Products Act", "S.C. 2002, c. 28", "pest-control-products-act"),
+    ("Canada Consumer Product Safety Act", "S.C. 2010, c. 21", "consumer-product-safety-act"),
+    ("Radiation Emitting Devices Act", "R.S.C. 1985, c. R-1", "radiation-emitting-devices-act"),
     
-    # Environment
+    # Environment (10)
     ("Canadian Environmental Protection Act", "S.C. 1999, c. 33", "environmental-protection-act"),
     ("Species at Risk Act", "S.C. 2002, c. 29", "species-at-risk-act"),
     ("Fisheries Act", "R.S.C. 1985, c. F-14", "fisheries-act"),
+    ("Oceans Act", "S.C. 1996, c. 31", "oceans-act"),
+    ("Canada National Parks Act", "S.C. 2000, c. 32", "national-parks-act"),
+    ("Canada Wildlife Act", "R.S.C. 1985, c. W-9", "canada-wildlife-act"),
+    ("Migratory Birds Convention Act", "S.C. 1994, c. 22", "migratory-birds-act"),
+    ("Canadian Environmental Assessment Act", "S.C. 2012, c. 19", "environmental-assessment-act"),
+    ("Impact Assessment Act", "S.C. 2019, c. 28", "impact-assessment-act"),
+    ("Canadian Energy Regulator Act", "S.C. 2019, c. 28", "canadian-energy-regulator-act"),
     
-    # Business & Commerce
+    # Business & Commerce (10)
     ("Competition Act", "R.S.C. 1985, c. C-34", "competition-act"),
     ("Bankruptcy and Insolvency Act", "R.S.C. 1985, c. B-3", "bankruptcy-insolvency-act"),
     ("Canada Business Corporations Act", "R.S.C. 1985, c. C-44", "business-corporations-act"),
+    ("Trademarks Act", "R.S.C. 1985, c. T-13", "trademarks-act"),
+    ("Copyright Act", "R.S.C. 1985, c. C-42", "copyright-act"),
+    ("Patent Act", "R.S.C. 1985, c. P-4", "patent-act"),
+    ("Investment Canada Act", "R.S.C. 1985, c. 28", "investment-canada-act"),
+    ("Companies' Creditors Arrangement Act", "R.S.C. 1985, c. C-36", "companies-creditors-arrangement-act"),
+    ("Winding-up and Restructuring Act", "R.S.C. 1985, c. W-11", "winding-up-restructuring-act"),
+    ("Canada Cooperatives Act", "S.C. 1998, c. 1", "canada-cooperatives-act"),
     
-    # Additional Priority Acts (to reach 50)
-    ("Official Languages Act", "R.S.C. 1985, c. 31", "official-languages-act"),
+    # Defense & Security (10)
     ("National Defence Act", "R.S.C. 1985, c. N-5", "national-defence-act"),
-    ("Parliament of Canada Act", "R.S.C. 1985, c. P-1", "parliament-canada-act"),
+    ("Emergencies Act", "R.S.C. 1985, c. 22", "emergencies-act"),
+    ("Canadian Security Intelligence Service Act", "R.S.C. 1985, c. C-23", "csis-act"),
+    ("Anti-terrorism Act", "S.C. 2015, c. 20", "anti-terrorism-act"),
+    ("Security of Canada Information Sharing Act", "S.C. 2015, c. 20", "security-information-sharing-act"),
+    ("Combating Terrorism Act", "S.C. 2013, c. 9", "combating-terrorism-act"),
+    ("Seized Property Management Act", "S.C. 1993, c. 37", "seized-property-management-act"),
+    ("State Immunity Act", "R.S.C. 1985, c. S-18", "state-immunity-act"),
+    ("Visiting Forces Act", "R.S.C. 1985, c. V-2", "visiting-forces-act"),
+    ("War Crimes and Crimes Against Humanity Act", "S.C. 2000, c. 24", "war-crimes-act"),
+    
+    # Government Operations (10)
     ("Public Service Employment Act", "S.C. 2003, c. 22", "public-service-employment-act"),
+    ("Official Languages Act", "R.S.C. 1985, c. 31", "official-languages-act"),
+    ("Public Servants Disclosure Protection Act", "S.C. 2005, c. 46", "disclosure-protection-act"),
+    ("Public Service Superannuation Act", "R.S.C. 1985, c. P-36", "public-service-superannuation-act"),
+    ("Members of Parliament Retiring Allowances Act", "R.S.C. 1985, c. M-5", "mp-retiring-allowances-act"),
+    ("Salaries Act", "R.S.C. 1985, c. S-3", "salaries-act"),
+    ("Government Employees Compensation Act", "R.S.C. 1985, c. G-5", "government-employees-compensation-act"),
+    ("Public Service Modernization Act", "S.C. 2003, c. 22", "public-service-modernization-act"),
+    ("Public Service Rearrangement and Transfer of Duties Act", "R.S.C. 1985, c. P-34", "public-service-rearrangement-act"),
+    ("Shared Services Canada Act", "S.C. 2012, c. 19", "shared-services-canada-act"),
 ]
 
 

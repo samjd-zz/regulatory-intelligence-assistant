@@ -213,6 +213,7 @@ coverage/
 models/
 data/raw/
 data/processed/
+backend/data/
 embeddings/
 
 # Temporary files
