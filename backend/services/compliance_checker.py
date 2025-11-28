@@ -523,23 +523,27 @@ class ComplianceChecker:
             if (datetime.utcnow() - rule_set.last_updated).seconds < 3600:
                 return rule_set.rules
         
-        # Extract requirements for this program
-        extraction_request = RequirementExtractionRequest(
-            program_id=program_id
-        )
+        # For now, use only the hardcoded essential rules since we don't have
+        # a reliable way to filter extracted requirements by program yet
+        # TODO: Implement program-specific regulation filtering in the graph service
         
-        extracted_requirements = await self.requirement_extractor.extract_requirements(
-            extraction_request
-        )
+        # Extract requirements for this program (currently extracts all - needs filtering)
+        # extraction_request = RequirementExtractionRequest(
+        #     program_id=program_id
+        # )
+        # 
+        # extracted_requirements = await self.requirement_extractor.extract_requirements(
+        #     extraction_request
+        # )
+        # 
+        # # Convert to compliance rules
+        # rules = [
+        #     self._requirement_to_rule(req, program_id, workflow_type)
+        #     for req in extracted_requirements
+        # ]
         
-        # Convert to compliance rules
-        rules = [
-            self._requirement_to_rule(req, program_id, workflow_type)
-            for req in extracted_requirements
-        ]
-        
-        # Add hardcoded essential rules for common fields
-        rules.extend(self._get_essential_rules(program_id, workflow_type))
+        # Use hardcoded essential rules for each program
+        rules = self._get_essential_rules(program_id, workflow_type)
         
         # Cache the rule set
         rule_set = ComplianceRuleSet(
