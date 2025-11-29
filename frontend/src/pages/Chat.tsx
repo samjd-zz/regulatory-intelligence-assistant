@@ -31,7 +31,7 @@ export function Chat() {
 			{/* Messages Container */}
 			<div
 				ref={containerRef}
-				className="flex-1 overflow-y-auto px-6 md:px-12 py-8 scroll-smooth"
+				className="flex-1 overflow-y-auto px-6 md:px-12 py-8 scroll-smooth min-h-[400px] justify-center items-center flex"
 			>
 				{messages.length === 0 && (
 					<div className="h-full flex flex-col items-center justify-center text-center animate-scale-in">
@@ -134,7 +134,7 @@ export function Chat() {
 			</div>
 
 			{/* Input Area */}
-			<div className="px-6 md:px-12 py-10 border-t border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 z-10 animate-slide-up delay-100 transition-colors duration-300">
+			<div className="md:px-12 py-10 border-t border-slate-100 dark:border-zinc-800 bg-white dark:bg-zinc-950 z-10 animate-slide-up delay-100 transition-colors duration-300 px-0!">
 				<div className="max-w-4xl mx-auto flex items-end gap-6">
 					<div className="flex-1">
 						<input
