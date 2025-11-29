@@ -1,5 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Briefcase, Baby, Heart, Users, CheckCircle, XCircle, DollarSign } from "lucide-react";
+import {
+	AlertCircle,
+	Briefcase,
+	Baby,
+	Heart,
+	Users,
+	CheckCircle,
+	XCircle,
+	DollarSign,
+} from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -8,18 +17,21 @@ import { PROGRAMS, type ProgramId, type FieldConfig } from "@/config/programs";
 import { useComplianceStore } from "@/store/complianceStore";
 
 // Program icons mapping
-const PROGRAM_ICONS: Record<ProgramId, React.ComponentType<{ className?: string }>> = {
+const PROGRAM_ICONS: Record<
+	ProgramId,
+	React.ComponentType<{ className?: string }>
+> = {
 	"employment-insurance": Briefcase,
 	"cpp-retirement": DollarSign,
 	"canada-child-benefit": Baby,
-	"gis": Heart,
+	gis: Heart,
 	"social-assistance": Users,
 };
 
 export function ComplianceDynamic() {
 	const { report, checking, error, checkCompliance } = useComplianceStore();
 	const [selectedProgramId, setSelectedProgramId] = useState<ProgramId>(
-		"employment-insurance"
+		"employment-insurance",
 	);
 
 	const selectedProgram = PROGRAMS[selectedProgramId];
@@ -410,8 +422,9 @@ export function ComplianceDynamic() {
 									</h3>
 									<div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded p-3">
 										<p className="text-xs text-green-800 dark:text-green-200">
-											{report.passed_requirements} of {report.total_requirements}{" "}
-											compliance requirements have been met.
+											{report.passed_requirements} of{" "}
+											{report.total_requirements} compliance requirements have
+											been met.
 										</p>
 									</div>
 								</div>
