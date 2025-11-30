@@ -313,8 +313,7 @@ regulatory-intelligence-assistant/
 ```
 ├── docker-compose.yml         # Service orchestration
 ├── .clinerules               # AI assistant configuration
-├── DEPLOYMENT_CHECKLIST.md   # Production deployment tasks
-└── GETTING_STARTED.md        # Quick start guide
+└── docker-compose.yml        # Service orchestration
 ```
 
 ### Key Services (Docker)
@@ -340,11 +339,11 @@ All project documentation is organized in the `docs/` directory:
 
 ### Planning & Architecture
 
-- **[Idea Document](./docs/idea.md)**: Initial concept and vision
-- **[PRD](./docs/prd.md)**: Comprehensive product requirements
-- **[Design Document](./docs/design.md)**: Technical architecture and implementation details
-- **[Implementation Plan](./docs/plan.md)**: 2-week sprint plan with detailed steps
-- **[Parallel Execution Plan](./docs/parallel-plan.md)**: Optimized parallel work streams for 4-developer team
+- **[Idea Document](./docs/planning/idea.md)**: Initial concept and vision
+- **[PRD](./docs/planning/prd.md)**: Comprehensive product requirements
+- **[Design Document](./docs/design/design.md)**: Technical architecture and implementation details
+- **[Implementation Plan](./docs/planning/plan.md)**: 2-week sprint plan with detailed steps
+- **[Parallel Execution Plan](./docs/planning/parallel-plan.md)**: Optimized parallel work streams for 4-developer team
 
 ### Technical Documentation
 
@@ -355,7 +354,7 @@ All project documentation is organized in the `docs/` directory:
 
 ### Development Guides
 
-- **[Developer Assignments](./docs/developer-assignments.md)**: Team member responsibilities and work streams
+- **[Developer Assignments](./docs/dev/developer-assignments.md)**: Team member responsibilities and work streams
 
 ## 🚀 Quick Start (MVP)
 
@@ -1918,7 +1917,7 @@ docker compose exec backend python -m ingestion.data_pipeline data/regulations/c
 
 For complete documentation on the data ingestion system, see:
 
-- **[Data Ingestion Complete Guide](./docs/DATA_INGESTION_MVP_COMPLETE.md)** - Full pipeline documentation
+- **[Data Ingestion Complete Guide](./docs/reports/DATA_INGESTION_MVP_COMPLETE.md)** - Full pipeline documentation
 - **[Ingestion README](./backend/ingestion/README.md)** - Technical implementation details
 - **[Canadian Law XML Parser](./backend/ingestion/canadian_law_xml_parser.py)** - Parser documentation
 - **[Data Verification Report](./docs/reports/DATA_VERIFICATION_REPORT.md)** - Data source evaluation and recommendations
@@ -1995,7 +1994,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 - Backend Unit & Integration: 338 tests (100% passing)
 - Frontend E2E Tests: 59 tests (100% passing when services running)
 
-📊 **[View Complete Test Report](./docs/TEST_EXECUTION_REPORT.md)** - Detailed analysis of all test suites with performance metrics and coverage statistics.
+📊 **[View Complete Test Report](./docs/testing/TEST_EXECUTION_REPORT.md)** - Detailed analysis of all test suites with performance metrics and coverage statistics.
 
 ### Frontend E2E Testing (Playwright) ✅
 
