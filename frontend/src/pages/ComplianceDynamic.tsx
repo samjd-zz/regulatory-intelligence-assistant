@@ -1,5 +1,14 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Briefcase, Baby, Heart, Users, CheckCircle, XCircle, DollarSign } from "lucide-react";
+import {
+	AlertCircle,
+	Briefcase,
+	Baby,
+	Heart,
+	Users,
+	CheckCircle,
+	XCircle,
+	DollarSign,
+} from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
@@ -8,18 +17,21 @@ import { PROGRAMS, type ProgramId, type FieldConfig } from "@/config/programs";
 import { useComplianceStore } from "@/store/complianceStore";
 
 // Program icons mapping
-const PROGRAM_ICONS: Record<ProgramId, React.ComponentType<{ className?: string }>> = {
+const PROGRAM_ICONS: Record<
+	ProgramId,
+	React.ComponentType<{ className?: string }>
+> = {
 	"employment-insurance": Briefcase,
 	"cpp-retirement": DollarSign,
 	"canada-child-benefit": Baby,
-	"gis": Heart,
+	gis: Heart,
 	"social-assistance": Users,
 };
 
 export function ComplianceDynamic() {
 	const { report, checking, error, checkCompliance } = useComplianceStore();
 	const [selectedProgramId, setSelectedProgramId] = useState<ProgramId>(
-		"employment-insurance"
+		"employment-insurance",
 	);
 
 	const selectedProgram = PROGRAMS[selectedProgramId];
@@ -45,13 +57,18 @@ export function ComplianceDynamic() {
 		await checkCompliance(selectedProgramId);
 	};
 
-	const renderField = (field: FieldConfig) => {
+	const renderField = (field: FieldConfig, index: number) => {
 		const fieldError = errors[field.name];
+		const animationDelay = `${(index + 1) * 100}ms`;
 
 		switch (field.type) {
 			case "text":
 				return (
-					<div key={field.name} className="group">
+					<div
+						key={field.name}
+						className="group animate-slide-up"
+						style={{ animationDelay, animationFillMode: "both" }}
+					>
 						<label
 							htmlFor={field.name}
 							className="label-kpi block group-focus-within:text-teal-600 dark:group-focus-within:text-teal-400 transition-colors"
@@ -80,7 +97,11 @@ export function ComplianceDynamic() {
 
 			case "number":
 				return (
-					<div key={field.name} className="group">
+					<div
+						key={field.name}
+						className="group animate-slide-up"
+						style={{ animationDelay, animationFillMode: "both" }}
+					>
 						<label
 							htmlFor={field.name}
 							className="label-kpi block group-focus-within:text-teal-600 dark:group-focus-within:text-teal-400 transition-colors"
@@ -113,7 +134,11 @@ export function ComplianceDynamic() {
 
 			case "select":
 				return (
-					<div key={field.name} className="group">
+					<div
+						key={field.name}
+						className="group animate-slide-up"
+						style={{ animationDelay, animationFillMode: "both" }}
+					>
 						<label
 							htmlFor={field.name}
 							className="label-kpi block group-focus-within:text-teal-600 dark:group-focus-within:text-teal-400 transition-colors"
@@ -147,7 +172,11 @@ export function ComplianceDynamic() {
 
 			case "file":
 				return (
-					<div key={field.name} className="group">
+					<div
+						key={field.name}
+						className="group animate-slide-up"
+						style={{ animationDelay, animationFillMode: "both" }}
+					>
 						<label
 							htmlFor={field.name}
 							className="label-kpi block group-focus-within:text-teal-600 dark:group-focus-within:text-teal-400 transition-colors"
@@ -189,21 +218,23 @@ export function ComplianceDynamic() {
 				<p className="text-sm text-slate-400 dark:text-zinc-400 mb-4">
 					Select a government program to check your eligibility
 				</p>
-				<div className="flex gap-2 overflow-x-auto">
+				<div className="flex gap-8 overflow-x-auto pb-1">
 					{Object.values(PROGRAMS).map((program) => {
 						const Icon = PROGRAM_ICONS[program.id];
+						const isActive = selectedProgramId === program.id;
 						return (
 							<button
+								type="button"
 								key={program.id}
 								onClick={() => handleProgramChange(program.id)}
-								className={`px-4 py-2 text-xs font-medium rounded transition-all flex items-center gap-2 whitespace-nowrap ${
-									selectedProgramId === program.id
-										? "bg-teal-600 text-white dark:bg-teal-500"
-										: "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+								className={`nav-btn flex items-center gap-2 whitespace-nowrap pb-3 transition-colors ${
+									isActive
+										? "active text-teal-600 dark:text-teal-400"
+										: "text-slate-500 dark:text-zinc-400 hover:text-slate-800 dark:hover:text-zinc-200"
 								}`}
 							>
-								<Icon className="w-4 h-4" />
-								{program.name}
+								<Icon className="w-5 h-5" />
+								<span className="font-semibold text-sm">{program.name}</span>
 							</button>
 						);
 					})}
@@ -212,8 +243,11 @@ export function ComplianceDynamic() {
 
 			<div className="grid grid-cols-2 gap-24 flex-1">
 				{/* Left: Form */}
-				<div className="flex flex-col justify-center animate-slide-up">
-					<div className="mb-6">
+				<div
+					key={`${selectedProgramId}-form`}
+					className="flex flex-col justify-center"
+				>
+					<div className="mb-6 animate-slide-up">
 						<h2 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">
 							{selectedProgram.name}
 						</h2>
@@ -222,9 +256,17 @@ export function ComplianceDynamic() {
 						</p>
 					</div>
 					<form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-						{selectedProgram.fields.map((field) => renderField(field))}
+						{selectedProgram.fields.map((field, index) =>
+							renderField(field, index),
+						)}
 
-						<div className="pt-6">
+						<div
+							className="pt-6 animate-slide-up"
+							style={{
+								animationDelay: `${(selectedProgram.fields.length + 1) * 100}ms`,
+								animationFillMode: "both",
+							}}
+						>
 							<button
 								type="submit"
 								disabled={checking || !isValid}
@@ -235,7 +277,13 @@ export function ComplianceDynamic() {
 						</div>
 
 						{!isValid && Object.keys(errors).length > 0 && (
-							<p className="text-sm text-amber-600 dark:text-amber-500 text-center animate-slide-up">
+							<p
+								className="text-sm text-amber-600 dark:text-amber-500 text-center animate-slide-up"
+								style={{
+									animationDelay: `${(selectedProgram.fields.length + 2) * 100}ms`,
+									animationFillMode: "both",
+								}}
+							>
 								Please fix validation errors before submitting
 							</p>
 						)}
@@ -243,7 +291,10 @@ export function ComplianceDynamic() {
 				</div>
 
 				{/* Right: Results */}
-				<div className="flex flex-col justify-center border-l border-slate-50 dark:border-zinc-800 pl-24 relative overflow-hidden">
+				<div
+					key={`${selectedProgramId}-results`}
+					className="flex flex-col justify-center border-l border-slate-50 dark:border-zinc-800 pl-24 relative overflow-hidden"
+				>
 					{checking && (
 						<div className="flex justify-center py-12 animate-scale-in">
 							<LoadingSpinner message="Checking compliance..." />
@@ -371,8 +422,9 @@ export function ComplianceDynamic() {
 									</h3>
 									<div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded p-3">
 										<p className="text-xs text-green-800 dark:text-green-200">
-											{report.passed_requirements} of {report.total_requirements}{" "}
-											compliance requirements have been met.
+											{report.passed_requirements} of{" "}
+											{report.total_requirements} compliance requirements have
+											been met.
 										</p>
 									</div>
 								</div>
