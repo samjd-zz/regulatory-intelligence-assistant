@@ -1306,9 +1306,104 @@ See the complete MCP server documentation: **[mcp-server/README.md](./mcp-server
 
 ### Overview
 
-The data ingestion pipeline processes Canadian federal regulations and loads them into all three backend systems (PostgreSQL, Neo4j, Elasticsearch). The MVP includes 10 sample Canadian federal acts.
+The data ingestion pipeline processes Canadian federal regulations and loads them into all three backend systems (PostgreSQL, Neo4j, Elasticsearch). The system includes a powerful shell script that downloads real data from Justice Canada and ingests it with configurable limits.
 
-### Quick Start: Load Sample Data
+### Real Canadian Data Ingestion (Recommended)
+
+The **recommended way** to get fresh, real Canadian regulatory data is using the automated shell script:
+
+```bash
+bash backend/scripts/download_and_ingest_real_data.sh
+```
+
+This script will:
+1. ✅ Download 11,594+ XML files from Justice Canada GitHub (bilingual: English + French)
+2. ✅ Copy files to language-specific directories (en/ and fr/)
+3. ✅ Backup your current data (if any)
+4. ✅ Clear all databases (after confirmation)
+5. ✅ Run ingestion with `--force` flag (bypasses duplicate detection)
+6. ✅ Validate all data across PostgreSQL, Neo4j, and Elasticsearch
+7. ✅ Generate comprehensive verification reports
+
+**Bilingual Support**: The system automatically processes both English and French versions:
+- **English**: 956 acts from `eng/acts/`
+- **French**: 956 acts from `fra/lois/`
+- **Total**: 1,912 regulation files available for bilingual search and analysis 🇨🇦
+
+#### Controlling Ingestion Size with LIMIT Flag
+
+You can control how many files to process by editing the **LIMIT** variable at the top of the script (line 24):
+
+```bash
+# Edit backend/scripts/download_and_ingest_real_data.sh
+LIMIT=500  # Default: Process 500 files
+
+# Options:
+LIMIT=50    # Quick test (10-15 minutes)
+LIMIT=100   # Small dataset (20-30 minutes)
+LIMIT=500   # Demo/testing (1-2 hours) - DEFAULT
+LIMIT=1000  # Medium dataset (2-3 hours)
+LIMIT=0     # ALL files (~10,611 files, 3-4 hours)
+```
+
+**How the LIMIT flag works:**
+- **`LIMIT > 0`**: Processes exactly that many files (e.g., 500 files)
+- **`LIMIT = 0`**: Processes ALL files in the directory (~10,611 files)
+- The limit is automatically passed to the Python ingestion pipeline with `--limit` flag
+- Progress is logged every 10 files
+
+**Example: Quick test with 50 files**
+
+```bash
+# 1. Edit the script
+nano backend/scripts/download_and_ingest_real_data.sh
+# Change line 24: LIMIT=50
+
+# 2. Run the script
+bash backend/scripts/download_and_ingest_real_data.sh
+
+# Expected: ~50 regulations ingested in 10-15 minutes
+```
+
+**Example: Production dataset with 1000 files**
+
+```bash
+# 1. Edit the script
+nano backend/scripts/download_and_ingest_real_data.sh
+# Change line 24: LIMIT=1000
+
+# 2. Run the script
+bash backend/scripts/download_and_ingest_real_data.sh
+
+# Expected: ~1000 regulations ingested in 2-3 hours
+```
+
+**Example: Complete dataset (all files)**
+
+```bash
+# 1. Edit the script
+nano backend/scripts/download_and_ingest_real_data.sh
+# Change line 24: LIMIT=0
+
+# 2. Run the script (WARNING: This takes 3-4 hours!)
+bash backend/scripts/download_and_ingest_real_data.sh
+
+# Expected: ~10,611 regulations ingested in 3-4 hours
+```
+
+#### Expected Results by LIMIT Size
+
+| LIMIT | Files Processed | Time Required | Regulations | Sections | Use Case |
+|-------|----------------|---------------|-------------|----------|----------|
+| 50 | 50 | 10-15 min | ~50 | ~500 | Quick test |
+| 100 | 100 | 20-30 min | ~100 | ~1,000 | Small dataset |
+| 500 | 500 | 1-2 hours | ~500 | ~5,000 | **Demo (default)** |
+| 1000 | 1000 | 2-3 hours | ~1,000 | ~10,000 | Medium dataset |
+| 0 | ~10,611 | 3-4 hours | ~10,000+ | ~100,000+ | Full production |
+
+### Manual Python Ingestion (Alternative)
+
+If you already have XML files and want more control:
 
 **⚠️ IMPORTANT: You must run database migrations first!**
 
@@ -1470,9 +1565,16 @@ curl -X DELETE "localhost:9200/regulatory_documents"
 
 ### Obtaining Real Regulatory Data from G7 Countries
 
-⚠️ **IMPORTANT**: The current dataset contains **sample XML files for testing only**. For production use, you must obtain real regulatory data from official government sources.
+⚠️ **IMPORTANT**: The current dataset contains **100 sample XML files for testing only**. For production use, you must obtain real regulatory data from official government sources.
 
-This section provides comprehensive instructions for obtaining regulatory data from all G7 countries (Canada, USA, UK, France, Germany, Italy, Japan) for a truly international regulatory intelligence platform.
+This section provides comprehensive, verified instructions for obtaining regulatory data from all G7 countries (Canada, USA, UK, France, Germany, Italy, Japan) for a truly international regulatory intelligence platform.
+
+**Data Quality Verification**: All sources listed below have been verified against the [Data Verification Report](./docs/reports/DATA_VERIFICATION_REPORT.md) and are confirmed as:
+- ✅ Officially published by government authorities
+- ✅ Legally authoritative sources
+- ✅ Machine-readable formats (XML, JSON, or structured HTML)
+- ✅ Open licenses suitable for AI/research use
+- ✅ Regularly updated by source agencies
 
 ---
 

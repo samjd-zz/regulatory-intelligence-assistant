@@ -82,22 +82,24 @@ class DataIngestionPipeline:
             'elasticsearch_indexed': 0
         }
     
-    async def ingest_from_directory(self, xml_dir: str, limit: Optional[int] = None):
+    async def ingest_from_directory(self, xml_dir: str, limit: Optional[int] = None, force: bool = False):
         """
-        Ingest all XML files from a directory.
+        Ingest all XML files from a directory (including subdirectories).
+        Automatically detects language from directory structure (en/ or fr/).
         
         Args:
-            xml_dir: Directory containing XML files
+            xml_dir: Directory containing XML files (may have en/ and fr/ subdirectories)
             limit: Maximum number of files to process (for testing)
+            force: If True, skip duplicate checking and re-ingest all files
         """
         xml_path = Path(xml_dir)
         
         if not xml_path.exists():
             raise ValueError(f"Directory not found: {xml_dir}")
         
-        # Find all XML files
-        xml_files = list(xml_path.glob("*.xml"))
-        logger.info(f"Found {len(xml_files)} XML files in {xml_dir}")
+        # Find all XML files recursively (to handle en/ and fr/ subdirectories)
+        xml_files = list(xml_path.rglob("*.xml"))
+        logger.info(f"Found {len(xml_files)} XML files in {xml_dir} (including subdirectories)")
         
         if limit:
             xml_files = xml_files[:limit]
@@ -110,19 +112,33 @@ class DataIngestionPipeline:
             logger.info(f"[{i}/{len(xml_files)}] Processing {xml_file.name}")
             
             try:
-                await self.ingest_xml_file(str(xml_file))
+                await self.ingest_xml_file(str(xml_file), force=force)
                 self.stats['successful'] += 1
             except Exception as e:
                 logger.error(f"Failed to ingest {xml_file.name}: {e}", exc_info=True)
                 self.stats['failed'] += 1
             
             # Commit after each file
-            self.db.commit()
+            try:
+                self.db.commit()
+            except Exception as e:
+                logger.error(f"Failed to commit after {xml_file.name}: {e}")
+                self.db.rollback()
+                raise
             
             # Log progress every 10 files
             if i % 10 == 0:
                 logger.info(f"Progress: {i}/{len(xml_files)} files processed")
                 self._log_stats()
+        
+        # Final commit to ensure all data is persisted
+        try:
+            self.db.commit()
+            logger.info("Final commit successful")
+        except Exception as e:
+            logger.error(f"Final commit failed: {e}")
+            self.db.rollback()
+            raise
         
         # Final statistics
         logger.info("=" * 60)
@@ -130,12 +146,13 @@ class DataIngestionPipeline:
         logger.info("=" * 60)
         self._log_stats()
     
-    async def ingest_xml_file(self, xml_path: str) -> Dict[str, Any]:
+    async def ingest_xml_file(self, xml_path: str, force: bool = False) -> Dict[str, Any]:
         """
         Ingest a single XML file through the entire pipeline.
         
         Args:
             xml_path: Path to XML file
+            force: If True, skip duplicate checking and re-ingest
             
         Returns:
             Dictionary with ingestion results
@@ -149,16 +166,36 @@ class DataIngestionPipeline:
             logger.error(f"XML parsing failed: {e}")
             raise
         
-        # Check if already exists (by content hash)
+        # Check if already exists (by content hash and title)
         content_hash = self._calculate_content_hash(parsed_reg.full_text)
-        existing = self.db.query(Regulation).filter_by(
-            content_hash=content_hash
-        ).first()
         
-        if existing:
-            logger.info(f"Regulation already exists: {parsed_reg.title}")
-            self.stats['skipped'] += 1
-            return {'status': 'skipped', 'regulation_id': str(existing.id)}
+        if not force:
+            # Check for duplicates using multiple criteria for robustness
+            existing = self.db.query(Regulation).filter(
+                Regulation.content_hash == content_hash
+            ).first()
+            
+            # Also check by title and jurisdiction as a fallback
+            if not existing and parsed_reg.title:
+                existing = self.db.query(Regulation).filter(
+                    Regulation.title == parsed_reg.title,
+                    Regulation.jurisdiction == parsed_reg.jurisdiction
+                ).first()
+            
+            if existing:
+                logger.info(f"Regulation already exists (id={existing.id}): {parsed_reg.title}")
+                self.stats['skipped'] += 1
+                return {'status': 'skipped', 'regulation_id': str(existing.id)}
+        else:
+            # Force mode: delete existing regulation if found
+            existing = self.db.query(Regulation).filter(
+                Regulation.content_hash == content_hash
+            ).first()
+            
+            if existing:
+                logger.info(f"Force mode: Deleting existing regulation: {parsed_reg.title}")
+                self.db.delete(existing)
+                self.db.flush()
         
         # Stage 2: Store in PostgreSQL
         regulation = await self._store_in_postgres(parsed_reg, content_hash)
@@ -547,32 +584,46 @@ class DataIngestionPipeline:
         """
         logger.info("Validating ingestion...")
         
-        # Check PostgreSQL
-        reg_count = self.db.query(Regulation).count()
-        section_count = self.db.query(Section).count()
-        amendment_count = self.db.query(Amendment).count()
+        # Ensure all changes are committed before validation
+        try:
+            self.db.commit()
+        except Exception as e:
+            logger.warning(f"Commit before validation failed: {e}")
         
-        # Check Neo4j (get_graph_stats is synchronous)
-        graph_stats = self.graph_service.get_graph_stats()
+        # Create a fresh session for validation to ensure we see committed data
+        from database import SessionLocal
+        validation_db = SessionLocal()
         
-        # Check Elasticsearch
-        es_stats = self.search_service.get_index_stats() if self.search_service else {}
-        
-        validation = {
-            'postgres': {
-                'regulations': reg_count,
-                'sections': section_count,
-                'amendments': amendment_count
-            },
-            'neo4j': graph_stats,
-            'elasticsearch': es_stats,
-            'ingestion_stats': self.stats
-        }
-        
-        logger.info("Validation complete:")
-        logger.info(json.dumps(validation, indent=2))
-        
-        return validation
+        try:
+            # Check PostgreSQL with fresh session
+            reg_count = validation_db.query(Regulation).count()
+            section_count = validation_db.query(Section).count()
+            amendment_count = validation_db.query(Amendment).count()
+            
+            # Check Neo4j (get_graph_stats is synchronous)
+            graph_stats = self.graph_service.get_graph_stats()
+            
+            # Check Elasticsearch
+            es_stats = self.search_service.get_index_stats() if self.search_service else {}
+            
+            validation = {
+                'postgres': {
+                    'regulations': reg_count,
+                    'sections': section_count,
+                    'amendments': amendment_count
+                },
+                'neo4j': graph_stats,
+                'elasticsearch': es_stats,
+                'ingestion_stats': self.stats
+            }
+            
+            logger.info("Validation complete:")
+            logger.info(json.dumps(validation, indent=2))
+            
+            return validation
+        finally:
+            # Close validation session
+            validation_db.close()
 
 
 async def main():
@@ -583,6 +634,7 @@ async def main():
     parser.add_argument('xml_dir', help='Directory containing XML files')
     parser.add_argument('--limit', type=int, help='Limit number of files to process')
     parser.add_argument('--validate', action='store_true', help='Validate after ingestion')
+    parser.add_argument('--force', action='store_true', help='Force re-ingestion, skip duplicate checking')
     
     args = parser.parse_args()
     
@@ -622,10 +674,20 @@ async def main():
         )
         
         # Run ingestion
+        logger.info("Starting ingestion...")
         await pipeline.ingest_from_directory(
             xml_dir=args.xml_dir,
-            limit=args.limit
+            limit=args.limit,
+            force=args.force
         )
+        logger.info("Ingestion completed, now committing main session...")
+        
+        # Ensure final commit in main session (pipeline already committed, but be explicit)
+        try:
+            db.commit()
+            logger.info("✓ Main session final commit successful")
+        except Exception as e:
+            logger.error(f"✗ Main session commit FAILED: {e}", exc_info=True)
         
         # Validate if requested
         if args.validate:
@@ -637,8 +699,10 @@ async def main():
         
     except Exception as e:
         logger.error(f"Pipeline failed: {e}", exc_info=True)
+        db.rollback()
         raise
     finally:
+        # Close session without rollback (data already committed)
         db.close()
         if neo4j_client:
             neo4j_client.close()

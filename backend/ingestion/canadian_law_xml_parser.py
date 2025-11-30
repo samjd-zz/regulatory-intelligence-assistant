@@ -115,7 +115,14 @@ class CanadianLawXMLParser:
             # Detect namespace
             self._detect_namespace(root)
             
-            return self._parse_consolidation(root)
+            # Determine format: Statute (real format) vs Consolidation (test format)
+            root_tag = root.tag.split('}')[-1] if '}' in root.tag else root.tag
+            
+            if root_tag == 'Statute':
+                return self._parse_statute(root)
+            else:
+                # Fall back to old consolidation format
+                return self._parse_consolidation(root)
             
         except ET.ParseError as e:
             logger.error(f"XML parsing error: {e}")
@@ -232,6 +239,268 @@ class CanadianLawXMLParser:
         
         logger.info(f"Parsed {len(sections)} sections, {len(amendments)} amendments")
         return regulation
+    
+    def _parse_statute(self, root: ET.Element) -> ParsedRegulation:
+        """
+        Parse Statute element (real Justice Canada format).
+        
+        Structure:
+        <Statute>
+          <Title>Act Title</Title>
+          <Body>
+            <Section lims:id="...">
+              <MarginalNote>Section Title</MarginalNote>
+              <Label>140</Label>
+              <Subsection>
+                <Label>(1)</Label>
+                <Text>Content...</Text>
+              </Subsection>
+            </Section>
+          </Body>
+        </Statute>
+        """
+        logger.info("Parsing Statute element (Justice Canada format)")
+        
+        # Extract title - check multiple possible locations
+        title = self._extract_statute_title(root)
+        
+        logger.info(f"Parsing regulation: {title}")
+        
+        # Extract chapter/citation
+        chapter = ""
+        chapter_elem = self._find(root, 'ChapterNumber')
+        if chapter_elem is not None:
+            chapter = self._get_text(chapter_elem)
+        
+        # Determine act type
+        act_type = self._determine_act_type(chapter) if chapter else "Act"
+        
+        # Parse body sections
+        body = self._find(root, 'Body')
+        sections = []
+        full_text_parts = []
+        
+        if body is not None:
+            # Find all direct Section elements
+            section_elements = self._findall(body, 'Section')
+            
+            for section_elem in section_elements:
+                section, text = self._parse_statute_section(section_elem)
+                if section:
+                    sections.append(section)
+                    full_text_parts.append(text)
+        
+        # Build full text
+        full_text = "\n\n".join(full_text_parts) if full_text_parts else ""
+        
+        # Extract metadata from attributes
+        metadata = {
+            'chapter': chapter,
+            'act_type': act_type,
+            'source': 'Justice Laws Canada',
+            'format': 'Statute XML'
+        }
+        
+        # Add any attributes from root
+        if hasattr(root, 'attrib'):
+            for key, value in root.attrib.items():
+                clean_key = key.split('}')[-1] if '}' in key else key
+                metadata[f'attr_{clean_key}'] = value
+        
+        regulation = ParsedRegulation(
+            title=title,
+            chapter=chapter,
+            act_type=act_type,
+            enabled_date=None,  # Not in Statute format
+            consolidation_date=None,  # Not in Statute format
+            jurisdiction='federal',
+            full_text=full_text,
+            sections=sections,
+            amendments=[],  # Amendments handled differently in this format
+            cross_references=self._extract_cross_references(sections),
+            metadata=metadata
+        )
+        
+        logger.info(f"Parsed {len(sections)} sections from Statute format")
+        return regulation
+    
+    def _extract_statute_title(self, root: ET.Element) -> str:
+        """
+        Extract title from Statute format XML.
+        
+        Tries multiple strategies in order:
+        1. Direct <Title> element
+        2. <TitleText> element
+        3. First <Heading> with <TitleText>
+        4. Long title from <LongTitle> or <RunningHead>
+        5. Filename-based fallback
+        """
+        # Strategy 1: Direct <Title> element
+        title_elem = self._find(root, 'Title')
+        if title_elem is not None:
+            title = self._get_text(title_elem)
+            if title:
+                return title
+        
+        # Strategy 2: Direct <TitleText> element
+        title_text_elem = self._find(root, 'TitleText')
+        if title_text_elem is not None:
+            title = self._get_text(title_text_elem)
+            if title:
+                return title
+        
+        # Strategy 3: First <Heading> with <TitleText> (usually the act title)
+        headings = self._findall(root, './/Heading')
+        if headings:
+            for heading in headings[:3]:  # Check first 3 headings
+                # Skip headings with Labels (these are part titles, not act titles)
+                if self._find(heading, 'Label') is None:
+                    title_text = self._find(heading, 'TitleText')
+                    if title_text is not None:
+                        title = self._get_text(title_text)
+                        if title and len(title) > 10:  # Act titles are usually longer
+                            return title
+        
+        # Strategy 4: LongTitle or RunningHead
+        long_title = self._find(root, 'LongTitle')
+        if long_title is not None:
+            title = self._get_text(long_title)
+            if title:
+                return title
+        
+        running_head = self._find(root, 'RunningHead')
+        if running_head is not None:
+            title = self._get_text(running_head)
+            if title:
+                return title
+        
+        # Strategy 5: Look in Identification section (some files have this)
+        identification = self._find(root, 'Identification')
+        if identification is not None:
+            id_title = self._find(identification, 'TitleText')
+            if id_title is not None:
+                title = self._get_text(id_title)
+                if title:
+                    return title
+        
+        # Fallback: Return a descriptive default
+        return "Untitled Statute"
+    
+    def _parse_statute_section(
+        self,
+        section_elem: ET.Element,
+        level: int = 1,
+        parent_id: Optional[str] = None
+    ) -> Tuple[Optional[ParsedSection], str]:
+        """
+        Parse a Section element in Statute format.
+        
+        Structure:
+          <Section lims:id="...">
+            <MarginalNote>Section Title</MarginalNote>
+            <Label>140</Label>
+            <Subsection lims:id="...">
+              <MarginalNote>Subsection title (optional)</MarginalNote>
+              <Label>(1)</Label>
+              <Text>Content here...</Text>
+              <Paragraph lims:id="...">
+                <Label>a)</Label>
+                <Text>Paragraph text...</Text>
+              </Paragraph>
+            </Subsection>
+          </Section>
+        """
+        # Get section ID from lims:id attribute
+        section_id = section_elem.get('id', '')
+        if not section_id:
+            # Try with namespace
+            for key in section_elem.attrib:
+                if key.endswith('id'):
+                    section_id = section_elem.attrib[key]
+                    break
+        
+        # Get section number from Label
+        label_elem = self._find(section_elem, 'Label')
+        number = self._get_text(label_elem) if label_elem is not None else ""
+        
+        # Get title from MarginalNote
+        margin_note_elem = self._find(section_elem, 'MarginalNote')
+        title = self._get_text(margin_note_elem) if margin_note_elem is not None else None
+        
+        if not number:
+            return None, ""
+        
+        # Build content and full text
+        content_parts = []
+        full_text_parts = [f"Section {number}"]
+        
+        if title:
+            full_text_parts.append(f"{title}")
+            content_parts.append(title)
+        
+        # Parse subsections
+        subsections = []
+        subsection_elements = self._findall(section_elem, 'Subsection')
+        
+        for subsection_elem in subsection_elements:
+            # Get subsection label
+            sub_label_elem = self._find(subsection_elem, 'Label')
+            sub_label = self._get_text(sub_label_elem) if sub_label_elem is not None else ""
+            
+            # Get subsection text
+            text_elem = self._find(subsection_elem, 'Text')
+            sub_text = self._get_text(text_elem) if text_elem is not None else ""
+            
+            # Get subsection ID
+            sub_id = subsection_elem.get('id', '')
+            if not sub_id:
+                for key in subsection_elem.attrib:
+                    if key.endswith('id'):
+                        sub_id = subsection_elem.attrib[key]
+                        break
+            
+            # Get subsection title (if any)
+            sub_margin_elem = self._find(subsection_elem, 'MarginalNote')
+            sub_title = self._get_text(sub_margin_elem) if sub_margin_elem is not None else None
+            
+            if sub_text:
+                # Create subsection
+                subsection = ParsedSection(
+                    section_id=sub_id or f"{section_id}-{sub_label}",
+                    number=f"{number}{sub_label}",
+                    title=sub_title,
+                    content=sub_text,
+                    level=level + 1,
+                    parent_id=section_id
+                )
+                subsections.append(subsection)
+                
+                content_parts.append(f"{sub_label} {sub_text}")
+                full_text_parts.append(f"  {sub_label} {sub_text}")
+        
+        # If no subsections found, check for direct Text element
+        if not subsections:
+            text_elem = self._find(section_elem, 'Text')
+            if text_elem is not None:
+                text = self._get_text(text_elem)
+                if text:
+                    content_parts.append(text)
+                    full_text_parts.append(f"  {text}")
+        
+        content = "\n".join(content_parts)
+        full_text = "\n".join(full_text_parts)
+        
+        section = ParsedSection(
+            section_id=section_id,
+            number=number,
+            title=title,
+            content=content,
+            level=level,
+            subsections=subsections,
+            parent_id=parent_id
+        )
+        
+        return section, full_text
     
     def _determine_act_type(self, chapter: str) -> str:
         """Determine act type from chapter notation."""
