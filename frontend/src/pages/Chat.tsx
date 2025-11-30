@@ -1,4 +1,6 @@
 import { useCallback, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 import { CitationTag } from "@/components/shared/CitationTag";
 import { ConfidenceBadge } from "@/components/shared/ConfidenceBadge";
@@ -31,7 +33,7 @@ export function Chat() {
 			{/* Messages Container */}
 			<div
 				ref={containerRef}
-				className="flex-1 overflow-y-auto px-6 md:px-12 py-8 scroll-smooth min-h-[400px] justify-center items-center flex"
+				className="flex-1 overflow-y-auto px-6 md:px-12 py-8 scroll-smooth min-h-[400px]"
 			>
 				{messages.length === 0 && (
 					<div className="h-full flex flex-col items-center justify-center text-center animate-scale-in">
@@ -80,9 +82,111 @@ export function Chat() {
 											<ConfidenceBadge score={message.confidence} size="sm" />
 										</div>
 									)}
-									<p className="text-lg text-slate-700 dark:text-zinc-300 leading-relaxed mb-6">
-										{message.content}
-									</p>
+									<div className="prose prose-slate dark:prose-invert prose-lg max-w-none mb-6">
+										<ReactMarkdown
+											remarkPlugins={[remarkGfm]}
+											components={{
+												// Style links
+												a: (props) => (
+													<a
+														{...props}
+														className="text-teal-600 dark:text-teal-400 hover:text-teal-700 dark:hover:text-teal-300 underline"
+														target="_blank"
+														rel="noopener noreferrer"
+													/>
+												),
+												// Style code blocks
+												code(props) {
+													const {children, className, ...rest} = props
+													const match = /language-(\w+)/.exec(className || '')
+													return match ? (
+														<code
+															{...rest}
+															className="block p-4 bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 rounded-lg text-sm font-mono overflow-x-auto"
+														>
+															{String(children).replace(/\n$/, '')}
+														</code>
+													) : (
+														<code
+															{...rest}
+															className="px-1.5 py-0.5 bg-slate-100 dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 rounded text-sm font-mono"
+														>
+															{children}
+														</code>
+													)
+												},
+												// Style lists
+												ul: (props) => (
+													<ul
+														{...props}
+														className="list-disc list-inside space-y-2 text-slate-700 dark:text-zinc-300"
+													/>
+												),
+												ol: (props) => (
+													<ol
+														{...props}
+														className="list-decimal list-inside space-y-2 text-slate-700 dark:text-zinc-300"
+													/>
+												),
+												// Style paragraphs
+												p: (props) => (
+													<p
+														{...props}
+														className="text-slate-700 dark:text-zinc-300 leading-relaxed"
+													/>
+												),
+												// Style headings
+												h1: (props) => (
+													<h1
+														{...props}
+														className="text-2xl font-semibold text-slate-900 dark:text-zinc-100 mt-6 mb-4"
+													/>
+												),
+												h2: (props) => (
+													<h2
+														{...props}
+														className="text-xl font-semibold text-slate-900 dark:text-zinc-100 mt-5 mb-3"
+													/>
+												),
+												h3: (props) => (
+													<h3
+														{...props}
+														className="text-lg font-semibold text-slate-900 dark:text-zinc-100 mt-4 mb-2"
+													/>
+												),
+												// Style blockquotes
+												blockquote: (props) => (
+													<blockquote
+														{...props}
+														className="border-l-4 border-teal-600 dark:border-teal-500 pl-4 italic text-slate-600 dark:text-zinc-400"
+													/>
+												),
+												// Style tables
+												table: (props) => (
+													<div className="overflow-x-auto">
+														<table
+															{...props}
+															className="min-w-full divide-y divide-slate-200 dark:divide-zinc-700"
+														/>
+													</div>
+												),
+												th: (props) => (
+													<th
+														{...props}
+														className="px-4 py-2 bg-slate-50 dark:bg-zinc-800 text-left text-sm font-semibold text-slate-900 dark:text-zinc-100"
+													/>
+												),
+												td: (props) => (
+													<td
+														{...props}
+														className="px-4 py-2 text-sm text-slate-700 dark:text-zinc-300"
+													/>
+												),
+											}}
+										>
+											{message.content}
+										</ReactMarkdown>
+									</div>
 									{message.citations && message.citations.length > 0 && (
 										<div className="space-y-3 mb-4">
 											{message.citations.map((citation) => (
