@@ -53,6 +53,7 @@ class Regulation(Base):
     title = Column(String(500), nullable=False, index=True)
     jurisdiction = Column(String(100), nullable=False, index=True)
     authority = Column(String(255), nullable=True)
+    language = Column(String(10), nullable=False, default="en", index=True)
     effective_date = Column(Date, nullable=True)
     status = Column(String(50), default="active", index=True)
     full_text = Column(Text, nullable=True)
@@ -94,12 +95,16 @@ class Section(Base):
     # Relationships
     regulation = relationship("Regulation", back_populates="sections")
     citations = relationship(
-        "Citation", back_populates="section", foreign_keys="Citation.section_id"
+        "Citation",
+        back_populates="section",
+        foreign_keys="Citation.section_id",
+        cascade="all, delete-orphan",
     )
     cited_by = relationship(
         "Citation",
         back_populates="cited_section",
         foreign_keys="Citation.cited_section_id",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (

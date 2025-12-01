@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
@@ -23,6 +24,7 @@ interface RegulationData {
 }
 
 export function RegulationDetail() {
+	const { t } = useTranslation();
 	const { id } = useParams<{ id: string }>();
 	const [regulation, setRegulation] = useState<RegulationData | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -77,7 +79,7 @@ export function RegulationDetail() {
 						error
 					</span>
 					<h2 className="text-lg font-medium text-red-900 dark:text-red-100 mb-2">
-						Error Loading Regulation
+						{t('regulation.errorLoading')}
 					</h2>
 					<p className="text-sm text-red-700 dark:text-red-300 mb-4">
 						{error}
@@ -89,7 +91,7 @@ export function RegulationDetail() {
 						<span className="material-symbols-outlined text-base">
 							arrow_back
 						</span>
-						Back to Search
+						{t('regulation.backToSearch')}
 					</Link>
 				</div>
 			</div>
@@ -104,7 +106,7 @@ export function RegulationDetail() {
 						description
 					</span>
 					<h2 className="text-lg font-medium text-slate-700 dark:text-zinc-300 mb-2">
-						Regulation Not Found
+						{t('regulation.notFound')}
 					</h2>
 					<Link
 						to="/search"
@@ -113,7 +115,7 @@ export function RegulationDetail() {
 						<span className="material-symbols-outlined text-base">
 							arrow_back
 						</span>
-						Back to Search
+						{t('regulation.backToSearch')}
 					</Link>
 				</div>
 			</div>
@@ -131,7 +133,7 @@ export function RegulationDetail() {
 					<span className="material-symbols-outlined text-base">
 						arrow_back
 					</span>
-					Back to Search
+					{t('regulation.backToSearch')}
 				</Link>
 
 				{/* Header */}
@@ -150,7 +152,7 @@ export function RegulationDetail() {
 								gavel
 							</span>
 							<span>
-								<span className="font-medium">Citation:</span>{" "}
+								<span className="font-medium">{t('regulation.citation')}:</span>{" "}
 								{regulation.citation}
 							</span>
 						</div>
@@ -159,7 +161,7 @@ export function RegulationDetail() {
 								account_balance
 							</span>
 							<span>
-								<span className="font-medium">Authority:</span>{" "}
+								<span className="font-medium">{t('regulation.authority')}:</span>{" "}
 								{regulation.authority}
 							</span>
 						</div>
@@ -169,7 +171,7 @@ export function RegulationDetail() {
 									event
 								</span>
 								<span>
-									<span className="font-medium">Effective:</span>{" "}
+									<span className="font-medium">{t('regulation.effectiveDate')}:</span>{" "}
 									{formatDate(regulation.effective_date)}
 								</span>
 							</div>
@@ -182,7 +184,7 @@ export function RegulationDetail() {
 					{regulation.sections && regulation.sections.length > 0 ? (
 						<div className="space-y-8">
 							<h2 className="text-2xl font-light text-slate-800 dark:text-zinc-200 mb-6">
-								Sections
+								{t('regulation.sections')}
 							</h2>
 							{regulation.sections.map((section, idx) => (
 								<div
@@ -191,7 +193,7 @@ export function RegulationDetail() {
 									style={{ animationDelay: `${idx * 50}ms` }}
 								>
 									<h3 className="text-lg font-medium text-slate-700 dark:text-zinc-300 mb-2">
-										Section {section.number}
+										{t('regulation.section')} {section.number}
 										{section.title && `: ${section.title}`}
 									</h3>
 									<div className="prose prose-slate dark:prose-invert max-w-none text-sm text-slate-600 dark:text-zinc-400 leading-relaxed">
@@ -203,7 +205,7 @@ export function RegulationDetail() {
 					) : (
 						<div className="animate-slide-up">
 							<h2 className="text-2xl font-light text-slate-800 dark:text-zinc-200 mb-6">
-								Full Text
+								{t('regulation.fullText')}
 							</h2>
 							<div className="prose prose-slate dark:prose-invert max-w-none text-sm text-slate-600 dark:text-zinc-400 leading-relaxed">
 								<p className="whitespace-pre-wrap">{regulation.full_text}</p>
