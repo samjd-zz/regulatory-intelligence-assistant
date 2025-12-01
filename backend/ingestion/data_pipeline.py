@@ -114,17 +114,38 @@ class DataIngestionPipeline:
             try:
                 await self.ingest_xml_file(str(xml_file), force=force)
                 self.stats['successful'] += 1
+                
+                # Commit after successful ingestion
+                try:
+                    self.db.commit()
+                    logger.debug(f"Committed {xml_file.name} successfully")
+                except Exception as commit_error:
+                    logger.error(f"Failed to commit after {xml_file.name}: {commit_error}")
+                    self.db.rollback()
+                    self.stats['failed'] += 1
+                    self.stats['successful'] -= 1  # Revert the success count
+                    # Continue processing other files
+                    
             except Exception as e:
                 logger.error(f"Failed to ingest {xml_file.name}: {e}", exc_info=True)
                 self.stats['failed'] += 1
-            
-            # Commit after each file
-            try:
-                self.db.commit()
-            except Exception as e:
-                logger.error(f"Failed to commit after {xml_file.name}: {e}")
-                self.db.rollback()
-                raise
+                
+                # Rollback the failed transaction to clean up the session
+                try:
+                    self.db.rollback()
+                    logger.debug(f"Rolled back failed transaction for {xml_file.name}")
+                except Exception as rollback_error:
+                    logger.error(f"Rollback also failed: {rollback_error}")
+                    # Session is in bad state, try to recover by starting fresh
+                    try:
+                        self.db.close()
+                        # Reopen session using the session maker from database module
+                        from database import SessionLocal
+                        self.db = SessionLocal()
+                        logger.info("Recovered database session after rollback failure")
+                    except Exception as recovery_error:
+                        logger.critical(f"Failed to recover session: {recovery_error}")
+                        raise
             
             # Log progress every 10 files
             if i % 10 == 0:
