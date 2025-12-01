@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
 import { ConfidenceBadge } from "@/components/shared/ConfidenceBadge";
@@ -7,6 +8,7 @@ import { formatDate } from "@/lib/utils";
 import { useSearchStore } from "@/store/searchStore";
 
 export function Search() {
+	const { t } = useTranslation();
 	const { query, results, loading, error, search, total, processingTime } =
 		useSearchStore();
 	const [localQuery, setLocalQuery] = useState("");
@@ -29,16 +31,16 @@ export function Search() {
 						showFilters ? "mb-12" : "mb-8"
 					}`}
 				>
-					<p className="label-kpi mb-4">Semantic Search</p>
+					<p className="label-kpi mb-4">{t('search.title')}</p>
 					<form onSubmit={handleSearch} className="relative group">
 						<input
 							type="text"
 							id="search-input"
 							value={localQuery}
 							onChange={(e) => setLocalQuery(e.target.value)}
-							placeholder="e.g. eligibility requirements for employment insurance..."
+							placeholder={t('search.placeholder')}
 							className="w-full text-3xl font-light text-slate-900 dark:text-zinc-100 border-b border-slate-200 dark:border-zinc-800 pb-4 px-2 outline-none focus:border-teal-600 dark:focus:border-teal-500 placeholder-slate-300 dark:placeholder-zinc-500 bg-transparent transition-colors duration-300"
-							aria-label="Search regulations"
+							aria-label={t('search.title')}
 						/>
 						<button
 							type="submit"
@@ -61,7 +63,7 @@ export function Search() {
 					<div className="overflow-hidden">
 						<div className="grid grid-cols-2 gap-16 mb-12">
 							<div>
-								<p className="label-kpi mb-4">Jurisdiction</p>
+								<p className="label-kpi mb-4">{t('search.jurisdiction')}</p>
 								<div className="space-y-3">
 									<label className="checkbox-wrapper group">
 										<input
@@ -70,25 +72,25 @@ export function Search() {
 											className="checkbox-custom"
 										/>
 										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
-											Federal
+											{t('search.federal')}
 										</span>
 									</label>
 									<label className="checkbox-wrapper group">
 										<input type="checkbox" className="checkbox-custom" />
 										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
-											Provincial
+											{t('search.provincial')}
 										</span>
 									</label>
 									<label className="checkbox-wrapper group">
 										<input type="checkbox" className="checkbox-custom" />
 										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
-											Municipal
+											{t('search.municipal')}
 										</span>
 									</label>
 								</div>
 							</div>
 							<div>
-								<p className="label-kpi mb-4">Document Type</p>
+								<p className="label-kpi mb-4">{t('search.documentType')}</p>
 								<div className="space-y-3">
 									<label className="checkbox-wrapper group">
 										<input
@@ -97,7 +99,7 @@ export function Search() {
 											className="checkbox-custom"
 										/>
 										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
-											Act
+											{t('search.act')}
 										</span>
 									</label>
 									<label className="checkbox-wrapper group">
@@ -107,13 +109,13 @@ export function Search() {
 											className="checkbox-custom"
 										/>
 										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
-											Regulation
+											{t('search.regulation')}
 										</span>
 									</label>
 									<label className="checkbox-wrapper group">
 										<input type="checkbox" className="checkbox-custom" />
 										<span className="text-sm text-slate-600 dark:text-zinc-300 group-hover:text-slate-900 dark:group-hover:text-zinc-100 transition-colors">
-											Policy
+											{t('search.policy')}
 										</span>
 									</label>
 								</div>
@@ -129,7 +131,7 @@ export function Search() {
 						onClick={() => setShowFilters(!showFilters)}
 						className="text-xs font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wide hover:text-teal-700 dark:hover:text-teal-300 flex items-center gap-2 transition-colors"
 					>
-						{showFilters ? "Hide Filters" : "Show Filters"}
+						{showFilters ? t('search.hideFilters') : t('search.showFilters')}
 						<span
 							className="material-symbols-outlined text-sm transition-transform duration-300"
 							style={{
@@ -146,15 +148,15 @@ export function Search() {
 					{/* Results Count */}
 					{!loading && !error && results.length > 0 && (
 						<div className="mb-6 text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wide">
-							Found{" "}
+							{t('search.found')}{" "}
 							<span className="font-semibold text-slate-700 dark:text-zinc-200">
 								{total}
 							</span>{" "}
-							results for "
+							{t('search.resultsFor')} "
 							<span className="font-semibold text-slate-700 dark:text-zinc-200">
 								{query}
 							</span>
-							" in{" "}
+							" {t('search.in')}{" "}
 							<span className="font-semibold text-teal-600 dark:text-teal-400">
 								{processingTime}ms
 							</span>
@@ -172,7 +174,7 @@ export function Search() {
 							</span>
 							<div>
 								<p className="font-medium text-red-900 dark:text-red-100">
-									Error
+									{t('errors.error')}
 								</p>
 								<p className="text-sm text-red-700 dark:text-red-300">
 									{error}
@@ -222,11 +224,10 @@ export function Search() {
 								</span>
 							</div>
 							<h3 className="text-lg font-medium text-slate-700 dark:text-zinc-300 mb-2">
-								No results found
+								{t('search.noResults')}
 							</h3>
 							<p className="text-sm text-slate-400 dark:text-zinc-400 max-w-[300px] leading-relaxed">
-								We couldn't find any regulations matching "{query}". Try
-								refining your search terms.
+								{t('search.noResultsDesc', { query })}
 							</p>
 						</div>
 					)}
@@ -241,11 +242,10 @@ export function Search() {
 								</span>
 							</div>
 							<h3 className="text-lg font-medium text-slate-700 dark:text-zinc-300 mb-2">
-								Ready to Search
+								{t('search.readyToSearch')}
 							</h3>
 							<p className="text-sm text-slate-400 dark:text-zinc-400 max-w-[250px] leading-relaxed">
-								Enter keywords above to search through thousands of regulatory
-								documents.
+								{t('search.readyToSearchDesc')}
 							</p>
 						</div>
 					)}

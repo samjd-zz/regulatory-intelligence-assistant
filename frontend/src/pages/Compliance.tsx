@@ -2,6 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
@@ -33,6 +34,7 @@ const complianceSchema = z.object({
 type ComplianceFormData = z.infer<typeof complianceSchema>;
 
 export function Compliance() {
+	const { t } = useTranslation();
 	const { report, checking, error, checkCompliance } = useComplianceStore();
 	const [programId] = useState("employment-insurance");
 
@@ -77,10 +79,10 @@ export function Compliance() {
 				<div className="flex flex-col justify-center animate-slide-up">
 					<div className="mb-10">
 						<h2 className="text-xl font-semibold text-slate-900 dark:text-zinc-100">
-							Compliance Check
+							{t('compliance.title')}
 						</h2>
 						<p className="text-sm text-slate-400 dark:text-zinc-400 mt-1">
-							Employment Insurance Application
+							{t('compliance.subtitle')}
 						</p>
 					</div>
 					<form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
@@ -90,7 +92,7 @@ export function Compliance() {
 								htmlFor="comp-name"
 								className="label-kpi block group-focus-within:text-teal-600 dark:group-focus-within:text-teal-400 transition-colors"
 							>
-								Full Legal Name
+								{t('compliance.fullName')}
 							</label>
 							<input
 								type="text"
@@ -112,7 +114,7 @@ export function Compliance() {
 								htmlFor="comp-sin"
 								className="label-kpi block group-focus-within:text-teal-600 dark:group-focus-within:text-teal-400 transition-colors"
 							>
-								Social Insurance Number (SIN)
+								{t('compliance.sin')}
 							</label>
 							<input
 								type="text"
@@ -135,7 +137,7 @@ export function Compliance() {
 								htmlFor="comp-residency"
 								className="label-kpi block group-focus-within:text-teal-600 dark:group-focus-within:text-teal-400 transition-colors"
 							>
-								Residency Status
+								{t('compliance.residencyStatus')}
 							</label>
 							<div className="relative">
 								<select
@@ -169,7 +171,7 @@ export function Compliance() {
 								htmlFor="comp-hours"
 								className="label-kpi block group-focus-within:text-teal-600 dark:group-focus-within:text-teal-400 transition-colors"
 							>
-								Hours Worked (Last 52 Weeks)
+								{t('compliance.hoursWorked')}
 							</label>
 							<div className="flex items-center gap-4">
 								<input
@@ -197,7 +199,7 @@ export function Compliance() {
 								disabled={checking || !isValid}
 								className="w-full bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 py-4 text-xs font-bold uppercase tracking-widest hover:bg-teal-700 dark:hover:bg-teal-400 hover:shadow-lg transition-all transform hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed"
 							>
-								{checking ? "Analyzing..." : "Analyze Compliance"}
+								{checking ? t('compliance.analyzing') : t('compliance.analyzeButton')}
 							</button>
 						</div>
 
@@ -214,7 +216,7 @@ export function Compliance() {
 					{/* Loading State */}
 					{checking && (
 						<div className="flex justify-center py-12 animate-scale-in">
-							<LoadingSpinner message="Checking compliance..." />
+							<LoadingSpinner message={t('compliance.checkingCompliance')} />
 						</div>
 					)}
 
@@ -224,7 +226,7 @@ export function Compliance() {
 							<div className="flex items-start gap-2">
 								<XCircle className="w-5 h-5 mt-0.5 shrink-0" />
 								<div>
-									<p className="font-medium">Error</p>
+									<p className="font-medium">{t('errors.error')}</p>
 									<p className="text-sm">{error}</p>
 								</div>
 							</div>
@@ -241,11 +243,10 @@ export function Compliance() {
 								</span>
 							</div>
 							<h3 className="text-lg font-medium text-slate-700 dark:text-zinc-300 mb-2">
-								Ready for Analysis
+								{t('compliance.readyForAnalysis')}
 							</h3>
 							<p className="text-sm text-slate-400 dark:text-zinc-400 max-w-[200px] leading-relaxed">
-								Fill out the applicant details to generate a real-time
-								compliance report.
+								{t('compliance.fillOutDetails')}
 							</p>
 						</div>
 					)}
@@ -254,7 +255,7 @@ export function Compliance() {
 					{!checking && !error && report && (
 						<div className="animate-scale-in">
 							<p className="label-kpi mb-4 text-teal-600 dark:text-teal-400">
-								Evaluation Result
+								{t('compliance.evaluationResult')}
 							</p>
 
 							{/* Status Header */}
@@ -262,19 +263,19 @@ export function Compliance() {
 								{report.compliant ? (
 									<>
 										<h3 className="text-4xl font-semibold text-teal-700 dark:text-teal-400 mb-2 animate-slide-up">
-											Likely Eligible
+											{t('compliance.likelyEligible')}
 										</h3>
 										<p className="text-sm text-teal-600 dark:text-teal-500 animate-slide-up delay-100">
-											Meets regional requirements
+											{t('compliance.meetsRequirements')}
 										</p>
 									</>
 								) : (
 									<>
 										<h3 className="text-4xl font-semibold text-red-600 dark:text-red-400 mb-2 animate-slide-up">
-											Not Eligible
+											{t('compliance.notEligible')}
 										</h3>
 										<p className="text-sm text-red-500 dark:text-red-400 animate-slide-up delay-100">
-											Issues found in application
+											{t('compliance.issuesFound')}
 										</p>
 									</>
 								)}
@@ -327,7 +328,7 @@ export function Compliance() {
 								<div className="mt-8 animate-slide-up delay-300">
 									<h3 className="font-semibold text-slate-900 dark:text-zinc-100 mb-3 flex items-center gap-2 text-sm">
 										<XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-										Issues ({report.issues.length})
+										{t('compliance.issues')} ({report.issues.length})
 									</h3>
 									<div className="space-y-2 max-h-40 overflow-y-auto">
 											{report.issues.map((issue) => {
@@ -412,11 +413,11 @@ export function Compliance() {
 								<div className="mt-6 animate-slide-up delay-300">
 									<h3 className="font-semibold text-slate-900 dark:text-zinc-100 mb-3 flex items-center gap-2 text-sm">
 										<CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-										Requirements Met ({report.passed_requirements}/{report.total_requirements})
+										{t('compliance.requirementsMet')} ({report.passed_requirements}/{report.total_requirements})
 									</h3>
 									<div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded p-3">
 										<p className="text-xs text-green-800 dark:text-green-200">
-											{report.passed_requirements} of {report.total_requirements} compliance requirements have been met.
+											{t('compliance.requirementsMetDesc', { passed: report.passed_requirements, total: report.total_requirements })}
 										</p>
 									</div>
 								</div>

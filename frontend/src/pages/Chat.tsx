@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -9,6 +10,7 @@ import { formatDate } from "@/lib/utils";
 import { useChatStore } from "@/store/chatStore";
 
 export function Chat() {
+	const { t } = useTranslation();
 	const { messages, loading, error, sendMessage } = useChatStore();
 	const [input, setInput] = useState("");
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -44,11 +46,10 @@ export function Chat() {
 							</span>
 						</div>
 						<h2 className="text-2xl font-light text-slate-900 dark:text-zinc-100 mb-3">
-							Regulatory Assistant
+							{t('chat.title')}
 						</h2>
 						<p className="text-sm text-slate-400 dark:text-zinc-400 max-w-md mx-auto leading-relaxed">
-							Ask questions about specific mandates. Citations included
-							automatically.
+							{t('chat.description')}
 						</p>
 					</div>
 				)}
@@ -68,7 +69,7 @@ export function Chat() {
 										{message.content}
 									</div>
 									<p className="text-[10px] font-bold text-slate-300 dark:text-zinc-400 uppercase tracking-widest mt-3">
-										You • {formatDate(message.timestamp)}
+										{t('chat.you')} • {formatDate(message.timestamp)}
 									</p>
 								</div>
 								<div className="w-1 h-full min-h-6 bg-slate-200 dark:bg-zinc-700 shrink-0" />
@@ -216,7 +217,7 @@ export function Chat() {
 						<div className="flex gap-6 max-w-3xl">
 							<div className="w-1 h-full min-h-6 bg-teal-600 dark:bg-teal-500 shrink-0 animate-pulse" />
 							<div>
-								<LoadingSpinner size="sm" message="Thinking..." />
+								<LoadingSpinner size="sm" message={t('chat.thinking')} />
 							</div>
 						</div>
 					</div>
@@ -229,7 +230,7 @@ export function Chat() {
 						</span>
 						<div>
 							<p className="font-medium text-red-900 dark:text-red-100">
-								Error
+								{t('errors.error')}
 							</p>
 							<p className="text-sm text-red-700 dark:text-red-300">{error}</p>
 						</div>
@@ -252,10 +253,10 @@ export function Chat() {
 									handleSend(e);
 								}
 							}}
-							placeholder="Type your question here..."
+							placeholder={t('chat.inputPlaceholder')}
 							className="w-full text-xl font-light text-slate-900 dark:text-zinc-100 border-b border-slate-200 dark:border-zinc-800 pb-4 px-2 outline-none focus:border-teal-600 dark:focus:border-teal-500 placeholder-slate-300 dark:placeholder-zinc-500 bg-transparent transition-colors duration-300"
 							disabled={loading}
-							aria-label="Question input"
+							aria-label={t('chat.inputPlaceholder')}
 						/>
 					</div>
 					<button

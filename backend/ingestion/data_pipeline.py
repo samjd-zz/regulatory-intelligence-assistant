@@ -159,6 +159,21 @@ class DataIngestionPipeline:
         """
         logger.info(f"Ingesting: {xml_path}")
         
+        # Detect language from path (en/ or fr/ subdirectory)
+        language = 'en'  # default to English
+        xml_path_obj = Path(xml_path)
+        # Check if path contains /en/ or /fr/ directory
+        if '/fr/' in str(xml_path) or '\\fr\\' in str(xml_path):
+            language = 'fr'
+        elif any(part == 'fr' for part in xml_path_obj.parts):
+            language = 'fr'
+        elif '/en/' in str(xml_path) or '\\en\\' in str(xml_path):
+            language = 'en'
+        elif any(part == 'en' for part in xml_path_obj.parts):
+            language = 'en'
+        
+        logger.info(f"Detected language: {language}")
+        
         # Stage 1: Parse XML
         try:
             parsed_reg = self.xml_parser.parse_file(xml_path)
@@ -198,7 +213,7 @@ class DataIngestionPipeline:
                 self.db.flush()
         
         # Stage 2: Store in PostgreSQL
-        regulation = await self._store_in_postgres(parsed_reg, content_hash)
+        regulation = await self._store_in_postgres(parsed_reg, content_hash, language)
         self.stats['regulations_created'] += 1
         
         # Stage 3: Build knowledge graph
@@ -233,7 +248,8 @@ class DataIngestionPipeline:
     async def _store_in_postgres(
         self,
         parsed_reg: ParsedRegulation,
-        content_hash: str
+        content_hash: str,
+        language: str = 'en'
     ) -> Regulation:
         """
         Store parsed regulation in PostgreSQL.
@@ -241,11 +257,12 @@ class DataIngestionPipeline:
         Args:
             parsed_reg: Parsed regulation data
             content_hash: Content hash for deduplication
+            language: Language of the regulation (en or fr)
             
         Returns:
             Created Regulation object
         """
-        logger.info(f"Storing in PostgreSQL: {parsed_reg.title}")
+        logger.info(f"Storing in PostgreSQL: {parsed_reg.title} (language: {language})")
         
         # Parse effective date
         effective_date = None
@@ -262,6 +279,7 @@ class DataIngestionPipeline:
             title=parsed_reg.title,
             jurisdiction=parsed_reg.jurisdiction,
             authority=parsed_reg.chapter,
+            language=language,
             effective_date=effective_date,
             status='active',
             full_text=parsed_reg.full_text,

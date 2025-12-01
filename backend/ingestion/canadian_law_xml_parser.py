@@ -259,21 +259,28 @@ class CanadianLawXMLParser:
           </Body>
         </Statute>
         """
-        logger.info("Parsing Statute element (Justice Canada format)")
+        logger.info("Parsing Statute element (Justice Canada LIMS format)")
         
-        # Extract title - check multiple possible locations
+        # Parse Identification section (required in official format)
+        identification = self._find(root, 'Identification')
+        if identification is None:
+            raise ValueError("No Identification section found in Statute")
+        
+        # Extract title from Identification section
         title = self._extract_statute_title(root)
         
-        logger.info(f"Parsing regulation: {title}")
+        logger.info(f"Parsing statute: {title}")
         
-        # Extract chapter/citation
+        # Extract chapter/citation from Chapter/ConsolidatedNumber (official structure)
         chapter = ""
-        chapter_elem = self._find(root, 'ChapterNumber')
+        chapter_elem = self._find(identification, 'Chapter')
         if chapter_elem is not None:
-            chapter = self._get_text(chapter_elem)
+            consolidated_num = self._find(chapter_elem, 'ConsolidatedNumber')
+            if consolidated_num is not None:
+                chapter = self._get_text(consolidated_num)
         
         # Determine act type
-        act_type = self._determine_act_type(chapter) if chapter else "Act"
+        act_type = self._determine_act_type(chapter) if chapter else "Statute"
         
         # Parse body sections
         body = self._find(root, 'Body')
@@ -293,30 +300,34 @@ class CanadianLawXMLParser:
         # Build full text
         full_text = "\n\n".join(full_text_parts) if full_text_parts else ""
         
-        # Extract metadata from attributes
+        # Parse RecentAmendments if present (official format)
+        amendments = self._parse_recent_amendments(root)
+        
+        # Extract metadata from attributes and dates
         metadata = {
             'chapter': chapter,
             'act_type': act_type,
             'source': 'Justice Laws Canada',
-            'format': 'Statute XML'
+            'format': 'Statute XML (LIMS)'
         }
         
-        # Add any attributes from root
+        # Add LIMS-specific attributes from root
         if hasattr(root, 'attrib'):
             for key, value in root.attrib.items():
                 clean_key = key.split('}')[-1] if '}' in key else key
-                metadata[f'attr_{clean_key}'] = value
+                if clean_key in ['pit-date', 'lastAmendedDate', 'current-date', 'inforce-start-date']:
+                    metadata[clean_key] = value
         
         regulation = ParsedRegulation(
             title=title,
             chapter=chapter,
             act_type=act_type,
-            enabled_date=None,  # Not in Statute format
-            consolidation_date=None,  # Not in Statute format
+            enabled_date=None,  # Use inforce-start-date from metadata
+            consolidation_date=metadata.get('current-date'),
             jurisdiction='federal',
             full_text=full_text,
             sections=sections,
-            amendments=[],  # Amendments handled differently in this format
+            amendments=amendments,
             cross_references=self._extract_cross_references(sections),
             metadata=metadata
         )
@@ -328,63 +339,110 @@ class CanadianLawXMLParser:
         """
         Extract title from Statute format XML.
         
+        Official structure (LIMS format):
+        <Statute>
+          <Identification>
+            <LongTitle>Full official title</LongTitle>
+            <ShortTitle>Short Title Act</ShortTitle>
+            <RunningHead>Running Head</RunningHead>
+          </Identification>
+        </Statute>
+        
         Tries multiple strategies in order:
-        1. Direct <Title> element
-        2. <TitleText> element
-        3. First <Heading> with <TitleText>
-        4. Long title from <LongTitle> or <RunningHead>
-        5. Filename-based fallback
+        1. Identification/LongTitle (official full name - most reliable)
+        2. Identification/ShortTitle (official short title)
+        3. Identification/RunningHead (header title)
+        4. Body section with "Short Title" - extract from content
+        5. Document ID from attributes (last resort)
         """
-        # Strategy 1: Direct <Title> element
-        title_elem = self._find(root, 'Title')
-        if title_elem is not None:
-            title = self._get_text(title_elem)
-            if title:
-                return title
+        import re
         
-        # Strategy 2: Direct <TitleText> element
-        title_text_elem = self._find(root, 'TitleText')
-        if title_text_elem is not None:
-            title = self._get_text(title_text_elem)
-            if title:
-                return title
-        
-        # Strategy 3: First <Heading> with <TitleText> (usually the act title)
-        headings = self._findall(root, './/Heading')
-        if headings:
-            for heading in headings[:3]:  # Check first 3 headings
-                # Skip headings with Labels (these are part titles, not act titles)
-                if self._find(heading, 'Label') is None:
-                    title_text = self._find(heading, 'TitleText')
-                    if title_text is not None:
-                        title = self._get_text(title_text)
-                        if title and len(title) > 10:  # Act titles are usually longer
-                            return title
-        
-        # Strategy 4: LongTitle or RunningHead
-        long_title = self._find(root, 'LongTitle')
-        if long_title is not None:
-            title = self._get_text(long_title)
-            if title:
-                return title
-        
-        running_head = self._find(root, 'RunningHead')
-        if running_head is not None:
-            title = self._get_text(running_head)
-            if title:
-                return title
-        
-        # Strategy 5: Look in Identification section (some files have this)
+        # Get Identification section first (required in official LIMS format)
         identification = self._find(root, 'Identification')
+        
+        # Strategy 1: LongTitle in Identification (most reliable for full act name)
         if identification is not None:
-            id_title = self._find(identification, 'TitleText')
-            if id_title is not None:
-                title = self._get_text(id_title)
-                if title:
+            long_title = self._find(identification, 'LongTitle')
+            if long_title is not None:
+                # LongTitle contains direct text (no TitleText child)
+                title = self._get_text(long_title)
+                if title and len(title) > 5 and title.lower() not in ['untitled', 'title']:
+                    logger.info(f"Found title from Identification/LongTitle: {title}")
                     return title
         
-        # Fallback: Return a descriptive default
-        return "Untitled Statute"
+        # Strategy 2: ShortTitle in Identification (official short title)
+        if identification is not None:
+            short_title = self._find(identification, 'ShortTitle')
+            if short_title is not None:
+                title = self._get_text(short_title)
+                if title and len(title) > 5 and title.lower() not in ['untitled', 'title', 'short title']:
+                    logger.info(f"Found title from Identification/ShortTitle: {title}")
+                    return title
+        
+        # Strategy 3: RunningHead in Identification (official short title for headers)
+        if identification is not None:
+            running_head = self._find(identification, 'RunningHead')
+            if running_head is not None:
+                title = self._get_text(running_head)
+                if title and len(title) > 5 and title.lower() not in ['untitled', 'title']:
+                    logger.info(f"Found title from Identification/RunningHead: {title}")
+                    return title
+        
+        # Strategy 4: Extract from "Short Title" section content
+        # This is a common pattern in Canadian legislation
+        body = self._find(root, 'Body')
+        if body is not None:
+            sections = self._findall(body, './/Section')
+            for section in sections[:10]:  # Check first 10 sections
+                margin_note = self._find(section, 'MarginalNote')
+                if margin_note is not None:
+                    note_text = self._get_text(margin_note).lower()
+                    # Look for "short title" sections (not just "title")
+                    if 'short title' in note_text:
+                        # Get the text content from this section or its subsections
+                        text_elems = self._findall(section, './/Text')
+                        if not text_elems:
+                            text_elems = [self._find(section, 'Text')]
+                        
+                        for text_elem in text_elems:
+                            if text_elem is not None:
+                                section_text = self._get_text(text_elem)
+                                if not section_text:
+                                    continue
+                                
+                                # Extract title from patterns like:
+                                # "This Act may be cited as the Employment Insurance Act"
+                                # "This Act may be cited as the « Employment Insurance Act »"
+                                # Multiple patterns for bilingual content
+                                patterns = [
+                                    r'(?:cited as|known as|called|intitulée)\s+(?:the\s+)?["\u00ab\u201c]([^"\u00bb\u201d]+)["\u00bb\u201d]',
+                                    r'(?:cited as|known as|called|intitulée)\s+(?:the\s+)?([A-Z][^.]+Act)',
+                                    r'(?:cited as|known as|called|intitulée)\s+(?:the\s+)?([A-Z][^.]+Loi)',
+                                ]
+                                
+                                for pattern in patterns:
+                                    match = re.search(pattern, section_text, re.IGNORECASE)
+                                    if match:
+                                        title = match.group(1).strip()
+                                        # Clean up the title
+                                        title = title.replace('\u00a0', ' ')  # Non-breaking space
+                                        title = title.strip()
+                                        if title and len(title) > 5 and len(title) < 200:
+                                            logger.info(f"Extracted title from Short Title section: {title}")
+                                            return title
+        
+        # Strategy 5: Extract from document ID in attributes (last resort)
+        if hasattr(root, 'attrib'):
+            for key, value in root.attrib.items():
+                clean_key = key.split('}')[-1] if '}' in key else key
+                if clean_key in ['id', 'xml:id', 'docNumber'] and value:
+                    # Try to extract a readable title from the ID
+                    logger.info(f"Using document ID as fallback title: {value}")
+                    return f"Act {value}"
+        
+        # Final fallback: Return generic but descriptive
+        logger.warning("Could not extract title from XML, using generic fallback")
+        return "Canadian Federal Statute"
     
     def _parse_statute_section(
         self,
@@ -663,6 +721,44 @@ class CanadianLawXMLParser:
                 ))
         
         logger.info(f"Found {len(amendments)} amendments")
+        return amendments
+    
+    def _parse_recent_amendments(self, root: ET.Element) -> List[ParsedAmendment]:
+        """
+        Parse RecentAmendments section (official LIMS format).
+        
+        Structure:
+        <RecentAmendments>
+          <Amendment>
+            <AmendmentCitation link="2023_29">2023, c. 29</AmendmentCitation>
+            <AmendmentDate>2024-01-22</AmendmentDate>
+          </Amendment>
+        </RecentAmendments>
+        """
+        amendments = []
+        
+        recent_amendments = self._find(root, 'RecentAmendments')
+        if recent_amendments is None:
+            return amendments
+        
+        amendment_elements = self._findall(recent_amendments, 'Amendment')
+        
+        for amendment_elem in amendment_elements:
+            citation_elem = self._find(amendment_elem, 'AmendmentCitation')
+            date_elem = self._find(amendment_elem, 'AmendmentDate')
+            
+            if citation_elem is not None and date_elem is not None:
+                citation = self._get_text(citation_elem)
+                date = self._get_text(date_elem)
+                
+                if date and citation:
+                    amendments.append(ParsedAmendment(
+                        date=date,
+                        bill_number=citation,  # Use citation as bill reference
+                        description=f"Amendment by {citation}"
+                    ))
+        
+        logger.info(f"Found {len(amendments)} recent amendments")
         return amendments
     
     def _extract_cross_references(self, sections: List[ParsedSection]) -> List[ParsedCrossReference]:

@@ -230,9 +230,10 @@ This project addresses the challenge of navigating complex regulatory environmen
 - **Backend**: FastAPI (Python 3.11+)
 - **Graph Database**: Neo4j 5.15 (Community Edition with APOC + GDS plugins)
 - **Search**: Elasticsearch (keyword + vector)
-- **Relational DB**: PostgreSQL
+- **Relational DB**: PostgreSQL 16 with CASCADE DELETE constraints
 - **Cache**: Redis
 - **AI Services**: Gemini API (RAG + embeddings)
+- **Database Migrations**: Alembic (latest: a2171c414458 - CASCADE DELETE for citations)
 
 ### System Components
 
@@ -416,7 +417,7 @@ docker compose ps
 # All services are already running from `docker compose up -d`
 # Now run setup commands inside the backend container:
 
-# Run database migrations
+# Run database migrations (includes CASCADE DELETE constraints for citations)
 docker compose exec backend alembic upgrade head
 
 # Load sample Canadian federal regulations (REQUIRED for testing)
@@ -462,7 +463,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Run database migrations (PostgreSQL)
+# Run database migrations (PostgreSQL) - includes CASCADE DELETE constraints
 alembic upgrade head
 
 # Load sample Canadian federal regulations (REQUIRED for testing)
@@ -1425,8 +1426,9 @@ python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 100 --v
 # 5. Generate validation report
 ```
 
-**✅ Data Status (as of November 27, 2025):**
+**✅ Data Status (as of November 30, 2025):**
 - **PostgreSQL**: 103 regulations, 703 sections, 101 amendments loaded
+- **Database Schema**: 11 models with CASCADE DELETE constraints on citations table
 - **Elasticsearch**: 806 documents indexed (103 regulations + 703 sections)
 - **Neo4j**: 820 nodes, 1,114 relationships
 
@@ -1533,6 +1535,18 @@ python -m ingestion.data_pipeline --help
 cd backend
 source venv/bin/activate
 alembic upgrade head
+```
+
+**Issue**: Foreign key constraint errors during re-ingestion  
+**Solution**: CASCADE DELETE constraints have been added (migration a2171c414458). When sections are deleted, related citations are automatically removed. Ensure you've run the latest migration:
+```bash
+# Check current migration version
+docker compose exec backend alembic current
+
+# Expected output: a2171c414458 (head)
+
+# If not on latest, upgrade:
+docker compose exec backend alembic upgrade head
 ```
 
 **Issue**: `Directory not found: backend/data/regulations/canadian_laws`  
@@ -2313,7 +2327,7 @@ For questions or support, please refer to the project documentation or contact t
 ---
 
 **Status**: 🎉 MVP Development Complete - Data Loaded & Ready for Testing!  
-**Last Updated**: November 26, 2025
+**Last Updated**: November 30, 2025
 
 ### Current Progress Summary
 
@@ -2448,7 +2462,14 @@ For questions or support, please refer to the project documentation or contact t
 - ⏳ Demo video production
 - ⏳ Final documentation review
 
-**Data Ingestion Status (Nov 27, 2025):**
+**Data Ingestion Status (Nov 30, 2025):**
 - ✅ PostgreSQL: 103 regulations, 703 sections, 101 amendments loaded
+- ✅ Database Migrations: a2171c414458 (head) - CASCADE DELETE constraints applied
 - ✅ Elasticsearch: 806 documents indexed, fully searchable
 - ✅ Neo4j: 820 nodes, 1,114 relationships
+
+**Database Architecture Improvements (Nov 30, 2025):**
+- ✅ CASCADE DELETE constraints added to citations table foreign keys
+  - When sections are deleted, related citations are automatically removed
+  - Prevents foreign key constraint errors during data re-ingestion
+  - Migration: `a2171c414458_add_cascade_delete_to_citations`

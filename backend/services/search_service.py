@@ -432,6 +432,10 @@ class SearchService:
             tags = filters['tags'] if isinstance(filters['tags'], list) else [filters['tags']]
             filter_clauses.append({"terms": {"tags": tags}})
 
+        # Language filter
+        if 'language' in filters:
+            filter_clauses.append({"term": {"language": filters['language']}})
+
         return filter_clauses
 
     def _format_search_response(self, es_response: Dict, search_type: str) -> Dict[str, Any]:
