@@ -24,7 +24,7 @@ REPO_URL="https://github.com/justicecanada/laws-lois-xml.git"
 STAGING_DIR="backend/data/staging/canadian_laws"
 TARGET_DIR="backend/data/regulations/canadian_laws"
 BACKUP_DIR="backend/data/regulations/canadian_laws.sample.backup"
-LIMIT=50  # Number of files to process (set to 0 for all)
+LIMIT=10  # Number of files to process (set to 0 for all)
 
 # =============================================================================
 # Helper Functions

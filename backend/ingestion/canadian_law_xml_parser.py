@@ -266,10 +266,19 @@ class CanadianLawXMLParser:
         if identification is None:
             raise ValueError("No Identification section found in Statute")
         
-        # Extract title from Identification section
+        # Extract title from Identification section (prefers ShortTitle)
         title = self._extract_statute_title(root)
         
+        # Also extract LongTitle for metadata (the formal "An Act respecting..." version)
+        long_title = None
+        if identification is not None:
+            long_title_elem = self._find(identification, 'LongTitle')
+            if long_title_elem is not None:
+                long_title = self._get_text(long_title_elem)
+        
         logger.info(f"Parsing statute: {title}")
+        if long_title and long_title != title:
+            logger.info(f"  Long title: {long_title}")
         
         # Extract chapter/citation from Chapter/ConsolidatedNumber (official structure)
         chapter = ""
@@ -308,7 +317,8 @@ class CanadianLawXMLParser:
             'chapter': chapter,
             'act_type': act_type,
             'source': 'Justice Laws Canada',
-            'format': 'Statute XML (LIMS)'
+            'format': 'Statute XML (LIMS)',
+            'long_title': long_title  # Store formal title for reference
         }
         
         # Add LIMS-specific attributes from root
@@ -349,28 +359,21 @@ class CanadianLawXMLParser:
         </Statute>
         
         Tries multiple strategies in order:
-        1. Identification/LongTitle (official full name - most reliable)
-        2. Identification/ShortTitle (official short title)
-        3. Identification/RunningHead (header title)
-        4. Body section with "Short Title" - extract from content
+        1. Identification/ShortTitle (user-friendly official short title) ⭐ PREFERRED
+        2. Identification/RunningHead (header title)
+        3. Body section with "Short Title" - extract from content
+        4. Identification/LongTitle (full formal title - fallback)
         5. Document ID from attributes (last resort)
+        
+        Note: ShortTitle is preferred over LongTitle for better UX.
+        The LongTitle (formal "An Act respecting...") is stored in metadata.
         """
         import re
         
         # Get Identification section first (required in official LIMS format)
         identification = self._find(root, 'Identification')
         
-        # Strategy 1: LongTitle in Identification (most reliable for full act name)
-        if identification is not None:
-            long_title = self._find(identification, 'LongTitle')
-            if long_title is not None:
-                # LongTitle contains direct text (no TitleText child)
-                title = self._get_text(long_title)
-                if title and len(title) > 5 and title.lower() not in ['untitled', 'title']:
-                    logger.info(f"Found title from Identification/LongTitle: {title}")
-                    return title
-        
-        # Strategy 2: ShortTitle in Identification (official short title)
+        # Strategy 1: ShortTitle in Identification (official short title - PREFERRED)
         if identification is not None:
             short_title = self._find(identification, 'ShortTitle')
             if short_title is not None:
@@ -379,7 +382,7 @@ class CanadianLawXMLParser:
                     logger.info(f"Found title from Identification/ShortTitle: {title}")
                     return title
         
-        # Strategy 3: RunningHead in Identification (official short title for headers)
+        # Strategy 2: RunningHead in Identification (official short title for headers)
         if identification is not None:
             running_head = self._find(identification, 'RunningHead')
             if running_head is not None:
@@ -388,7 +391,7 @@ class CanadianLawXMLParser:
                     logger.info(f"Found title from Identification/RunningHead: {title}")
                     return title
         
-        # Strategy 4: Extract from "Short Title" section content
+        # Strategy 3: Extract from "Short Title" section content
         # This is a common pattern in Canadian legislation
         body = self._find(root, 'Body')
         if body is not None:
@@ -430,6 +433,16 @@ class CanadianLawXMLParser:
                                         if title and len(title) > 5 and len(title) < 200:
                                             logger.info(f"Extracted title from Short Title section: {title}")
                                             return title
+        
+        # Strategy 4: LongTitle in Identification (full formal title - fallback only)
+        # This gives "An Act respecting..." format which is less user-friendly
+        if identification is not None:
+            long_title = self._find(identification, 'LongTitle')
+            if long_title is not None:
+                title = self._get_text(long_title)
+                if title and len(title) > 5 and title.lower() not in ['untitled', 'title']:
+                    logger.info(f"Found title from Identification/LongTitle (using as fallback): {title}")
+                    return title
         
         # Strategy 5: Extract from document ID in attributes (last resort)
         if hasattr(root, 'attrib'):
