@@ -193,11 +193,11 @@ export function Search() {
 									className="group cursor-pointer animate-slide-up block"
 									style={{ animationDelay: `${idx * 100}ms` }}
 								>
-									<div className="flex items-center gap-3 mb-2">
-										<span className="text-[10px] font-bold bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-300 px-1 py-0.5 rounded transition-colors group-hover:bg-teal-50 dark:group-hover:bg-teal-900/30 group-hover:text-teal-600 dark:group-hover:text-teal-400 uppercase">
+									<div className="flex items-start gap-3 mb-2">
+										<span className="text-[10px] font-bold bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-300 px-1 py-0.5 rounded transition-colors group-hover:bg-teal-50 dark:group-hover:bg-teal-900/30 group-hover:text-teal-600 dark:group-hover:text-teal-400 uppercase flex-shrink-0 mt-1">
 											{result.jurisdiction} {result.document_type}
 										</span>
-										<h3 className="text-lg font-medium text-teal-700 dark:text-teal-400 group-hover:underline transition-all">
+										<h3 className="text-lg font-medium text-teal-700 dark:text-teal-400 group-hover:underline transition-all truncate flex-1 min-w-0" title={result.title}>
 											{result.title}
 										</h3>
 										<ConfidenceBadge score={result.confidence} />
