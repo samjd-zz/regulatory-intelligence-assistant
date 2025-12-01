@@ -1579,7 +1579,13 @@ curl -X DELETE "localhost:9200/regulatory_documents"
 
 ### Obtaining Real Regulatory Data from G7 Countries
 
-⚠️ **IMPORTANT**: The current dataset contains **100 sample XML files for testing only**. For production use, you must obtain real regulatory data from official government sources.
+✅ **REAL DATA AVAILABLE**: The system includes a fully automated pipeline for downloading and ingesting **real Canadian federal regulations** from Justice Canada's official XML repository (11,594+ bilingual acts).
+
+**Quick Start - Real Canadian Data**:
+```bash
+# Download and ingest real Canadian laws automatically
+bash backend/scripts/download_and_ingest_real_data.sh
+```
 
 This section provides comprehensive, verified instructions for obtaining regulatory data from all G7 countries (Canada, USA, UK, France, Germany, Italy, Japan) for a truly international regulatory intelligence platform.
 
