@@ -85,12 +85,14 @@ This project addresses the challenge of navigating complex regulatory environmen
 ### ✅ Fully Implemented Features
 
 **Core Infrastructure**
+
 - ✅ **Database Architecture**: PostgreSQL (11 models), Neo4j knowledge graph, Elasticsearch, Redis cache
 - ✅ **API Layer**: 50+ REST endpoints across 10 routers, comprehensive health checks
 - ✅ **Docker Deployment**: Complete docker-compose orchestration for all services
 - ✅ **Testing Framework**: 397 tests (100% passing) - 338 backend (pytest) + 59 frontend (Playwright E2E)
 
 **Regulatory Knowledge Graph** (Neo4j)
+
 - ✅ **Graph Schema**: 6 node types, 9 relationship types fully defined
 - ✅ **Graph Service**: Full CRUD operations with connection pooling
 - ✅ **Sample Data**: 20 nodes, 14 relationships loaded
@@ -98,6 +100,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - ✅ **Visual Exploration**: Neo4j Browser integration at http://localhost:7474
 
 **Semantic Search**
+
 - ✅ **Hybrid Search**: BM25 keyword + vector semantic search with <500ms latency
 - ✅ **Elasticsearch Integration**: Custom legal analyzers, 80 documents indexed
 - ✅ **Faceted Filtering**: Jurisdiction, date, type, department filters working
@@ -105,6 +108,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - ✅ **Performance**: <100ms keyword search, <400ms vector search (targets met)
 
 **AI-Powered Q&A** (RAG System)
+
 - ✅ **Gemini API Integration**: Working with gemini-1.5-flash-latest model
 - ✅ **Citation Extraction**: 2 pattern types extracting legal citations
 - ✅ **Confidence Scoring**: 4-factor system with 0.0-1.0 range
@@ -113,6 +117,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - ✅ **RAG API**: 6 REST endpoints for Q&A operations
 
 **Compliance Checking**
+
 - ✅ **Requirement Extraction**: Pattern-based extraction with 4 pattern types
 - ✅ **Rule Engine**: 8 validation types (required, pattern, length, range, etc.)
 - ✅ **Real-time Validation**: <50ms field-level validation as users type
@@ -122,6 +127,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - ✅ **Confidence Scoring**: 0.5-0.95 range for extracted requirements
 
 **Data Ingestion Pipeline**
+
 - ✅ **Canadian Law XML Parser**: Specialized parser for Justice Laws Canada format
 - ✅ **Multi-Database Loading**: PostgreSQL, Neo4j, Elasticsearch integration
 - ✅ **Sample Dataset**: 100 Canadian federal acts loaded and searchable
@@ -129,6 +135,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - ✅ **Validation Reporting**: Comprehensive post-ingestion validation
 
 **Frontend Application**
+
 - ✅ **Modern Stack**: React 19 + TypeScript 5.9 + Vite 7 + Tailwind CSS v4
 - ✅ **4 Core Pages**: Dashboard, Search, Chat (Q&A), Compliance (static + dynamic)
 - ✅ **State Management**: Zustand stores with localStorage persistence
@@ -138,6 +145,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - ✅ **E2E Testing**: 59 Playwright tests across 6 browsers/devices (4 test suites covering all pages)
 
 **Legal NLP Processing**
+
 - ✅ **Entity Extraction**: 8 legal entity types (89% accuracy)
 - ✅ **Intent Classification**: 8 query intent types (87.5% accuracy)
 - ✅ **Legal Terminology**: Synonym expansion database
@@ -147,6 +155,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 ### 📋 Documented but NOT Implemented
 
 **Guided Workflows** ⚠️
+
 - ❌ **Step-by-Step Assistance**: User-facing workflow UI does not exist
 - ❌ **Contextual Help**: Dynamic help system not implemented
 - ❌ **Progress Tracking**: No visual workflow progress indicators
@@ -154,11 +163,13 @@ This project addresses the challenge of navigating complex regulatory environmen
 - ❌ **Decision Trees**: Eligibility guidance system not built
 
 **What Actually Exists for "Workflows":**
+
 - ✅ Database models only: `WorkflowSession` and `WorkflowStep` tables in PostgreSQL
 - ✅ Compliance parameter: `workflow_type` used for categorizing compliance rules (e.g., "ei_application", "general")
 - ✅ E2E test suite: `test_e2e_workflows.py` tests system workflows (search → NLP → RAG pipeline), NOT user-facing guided workflows
 
 **Gap Summary:** The database schema supports workflow tracking, but no workflow engine, UI components, or API endpoints exist. The feature would require:
+
 1. Workflow engine to orchestrate multi-step processes
 2. Frontend workflow pages with step navigation
 3. API routes for workflow CRUD operations (`/api/workflows/...`)
@@ -170,14 +181,17 @@ This project addresses the challenge of navigating complex regulatory environmen
 ### 🔄 Partially Implemented Features
 
 **Visual Exploration**
+
 - ✅ Neo4j Browser provides graph visualization at http://localhost:7474
 - ❌ Custom React-based interactive graph UI not built (future enhancement)
 
 **Change Monitoring**
+
 - ✅ Amendment tracking in database (`amendments` table with `amendment_date`, `summary`)
 - ❌ Real-time change alerts and notifications not implemented
 
 **Multi-Jurisdiction Support**
+
 - ✅ Database schema supports jurisdiction field
 - ✅ Search filters include jurisdiction
 - ❌ Only Canadian federal regulations currently loaded (no provincial/territorial data)
@@ -185,12 +199,14 @@ This project addresses the challenge of navigating complex regulatory environmen
 ### 🎯 Production Readiness Status
 
 **Ready for MVP Demo** ✅
+
 - Core search, Q&A, and compliance features fully functional
 - 100 sample Canadian federal acts loaded and searchable
 - Frontend UI complete with responsive design
 - All 397 tests passing (100% pass rate)
 
 **Not Production-Ready** ⚠️
+
 - Limited dataset (100 acts, need 500+ for production)
 - No authentication/authorization system
 - No audit logging for regulatory queries
@@ -199,6 +215,7 @@ This project addresses the challenge of navigating complex regulatory environmen
 - No multi-jurisdiction data
 
 **Recommended Next Steps for Production:**
+
 1. Expand dataset to 500+ regulations across jurisdictions
 2. Implement JWT authentication + RBAC
 3. Add audit trail for all queries and compliance checks
@@ -217,7 +234,10 @@ This project addresses the challenge of navigating complex regulatory environmen
   - Neo4j: Automatic knowledge graph construction
   - Elasticsearch: Hybrid search indexing
   - Gemini API: RAG document corpus preparation
-- **Sample Data Generation**: Creates 50 priority Canadian federal acts for testing
+- **Production Data Loaded**: 1,912 Canadian federal acts (English + French)
+  - 1,817 regulations in PostgreSQL
+  - 275,995 sections with full text
+  - 28,518 cross-references in knowledge graph
 - **Comprehensive Testing**: 23 unit tests with 100% pass rate
 - **📚 Documentation**: See [Data Ingestion README](./backend/ingestion/README.md) for complete guide
 
@@ -374,13 +394,16 @@ All project documentation is organized in the `docs/` directory:
 The RAG system uses Google's Gemini API for question answering. You'll need:
 
 1. **Get a Gemini API key**: Visit [Google AI Studio](https://makersuite.google.com/app/apikey) to create a free API key
+
 2. **Configure environment variables** in `backend/.env`:
+   
    ```bash
    GEMINI_API_KEY=your_api_key_here
    GEMINI_MODEL=gemini-1.5-flash-latest  # Default model
    ```
 
 **Available Models** (can be changed in `.env`):
+
 - `gemini-1.5-flash-latest` (default - fastest, good for most use cases)
 - `gemini-1.5-pro-latest` (more capable, slightly slower)
 - `gemini-pro` (stable baseline model)
@@ -551,18 +574,18 @@ The backend provides **50+ REST endpoints** across **10 routers** for comprehens
 
 ### API Overview
 
-| Service | Base Path | Endpoints | Description |
-|---------|-----------|-----------|-------------|
-| Search | `/api/search` | 13 | Keyword, vector, and hybrid search |
-| RAG Q&A | `/api/rag` | 6 | AI-powered question answering with citations |
-| Compliance | `/api/compliance` | 6 | Regulatory compliance checking and validation |
-| Graph | `/graph` | 10 | Knowledge graph operations and queries |
-| NLP | `/api/nlp` | 7 | Legal entity extraction and query parsing |
-| Documents | `/documents` | 8 | Document upload, parsing, and management |
-| Health | `/health` | 6 | System health checks and monitoring |
-| Batch | `/api/batch` | 3 | Batch processing operations |
-| Config | `/api/config` | 2 | System configuration management |
-| Suggestions | `/api/suggestions` | 2 | Query and workflow suggestions |
+| Service     | Base Path          | Endpoints | Description                                   |
+| ----------- | ------------------ | --------- | --------------------------------------------- |
+| Search      | `/api/search`      | 13        | Keyword, vector, and hybrid search            |
+| RAG Q&A     | `/api/rag`         | 6         | AI-powered question answering with citations  |
+| Compliance  | `/api/compliance`  | 6         | Regulatory compliance checking and validation |
+| Graph       | `/graph`           | 10        | Knowledge graph operations and queries        |
+| NLP         | `/api/nlp`         | 7         | Legal entity extraction and query parsing     |
+| Documents   | `/documents`       | 8         | Document upload, parsing, and management      |
+| Health      | `/health`          | 6         | System health checks and monitoring           |
+| Batch       | `/api/batch`       | 3         | Batch processing operations                   |
+| Config      | `/api/config`      | 2         | System configuration management               |
+| Suggestions | `/api/suggestions` | 2         | Query and workflow suggestions                |
 
 ---
 
@@ -573,6 +596,7 @@ The backend provides **50+ REST endpoints** across **10 routers** for comprehens
 #### Core Search Endpoints
 
 **`POST /api/search/keyword`** - Keyword-based search using BM25 algorithm
+
 ```bash
 curl -X POST "http://localhost:8000/api/search/keyword" \
   -H "Content-Type: application/json" \
@@ -582,11 +606,13 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
     "filters": {"jurisdiction": "federal"}
   }'
 ```
+
 - **Use Case**: Exact term matching, known legal terminology
 - **Performance**: <100ms average response time
 - **Returns**: Search results with BM25 relevance scores
 
 **`POST /api/search/vector`** - Semantic search using embeddings
+
 ```bash
 curl -X POST "http://localhost:8000/api/search/vector" \
   -H "Content-Type: application/json" \
@@ -595,11 +621,13 @@ curl -X POST "http://localhost:8000/api/search/vector" \
     "size": 10
   }'
 ```
+
 - **Use Case**: Conceptual searches, natural language queries
 - **Performance**: <400ms average response time
 - **Returns**: Semantically similar documents with cosine similarity scores
 
 **`POST /api/search/hybrid`** - Combined keyword + vector search (recommended)
+
 ```bash
 curl -X POST "http://localhost:8000/api/search/hybrid" \
   -H "Content-Type: application/json" \
@@ -610,14 +638,17 @@ curl -X POST "http://localhost:8000/api/search/hybrid" \
     "size": 10
   }'
 ```
+
 - **Use Case**: Best of both worlds - term matching + semantic understanding
 - **Performance**: <500ms average response time
 - **Returns**: Ranked results with combined scores
 
 **`GET /api/search/regulation/{regulation_id}`** ⭐ **NEW** - Get full regulation details
+
 ```bash
 curl "http://localhost:8000/api/search/regulation/550e8400-e29b-41d4-a716-446655440000"
 ```
+
 - **Use Case**: Fetch complete regulation with all sections
 - **Returns**: Full regulation text, metadata, citations, all sections
 - **Frontend**: Powers the RegulationDetail page (v0.1.6-alpha)
@@ -640,6 +671,7 @@ curl "http://localhost:8000/api/search/regulation/550e8400-e29b-41d4-a716-446655
 **Purpose**: Retrieval-Augmented Generation for answering legal questions with citations using Gemini API.
 
 **`POST /api/rag/ask`** - Ask a question and get AI-generated answer
+
 ```bash
 curl -X POST "http://localhost:8000/api/rag/ask" \
   -H "Content-Type: application/json" \
@@ -649,7 +681,9 @@ curl -X POST "http://localhost:8000/api/rag/ask" \
     "temperature": 0.3
   }'
 ```
+
 **Response includes:**
+
 - Generated answer with legal citations
 - Confidence score (0.0-1.0)
 - Source documents used for context
@@ -657,6 +691,7 @@ curl -X POST "http://localhost:8000/api/rag/ask" \
 - Processing time and cache status
 
 **`POST /api/rag/ask/batch`** - Ask multiple questions (up to 10)
+
 ```bash
 curl -X POST "http://localhost:8000/api/rag/ask/batch" \
   -H "Content-Type: application/json" \
@@ -674,6 +709,7 @@ curl -X POST "http://localhost:8000/api/rag/ask/batch" \
 **`GET /api/rag/info`** - RAG configuration and capabilities
 
 **Key Features:**
+
 - 24-hour answer caching with LRU eviction
 - Citation extraction with 2 pattern types
 - 4-factor confidence scoring system
@@ -687,6 +723,7 @@ curl -X POST "http://localhost:8000/api/rag/ask/batch" \
 **Purpose**: Regulatory compliance checking, field validation, and requirement extraction.
 
 **`POST /api/compliance/check`** - Full compliance validation
+
 ```bash
 curl -X POST "http://localhost:8000/api/compliance/check" \
   -H "Content-Type: application/json" \
@@ -700,7 +737,9 @@ curl -X POST "http://localhost:8000/api/compliance/check" \
     }
   }'
 ```
+
 **Returns:**
+
 - Overall compliance status (passed/failed)
 - Compliance issues (critical, high, medium, low severity)
 - Field-specific violations with suggestions
@@ -709,6 +748,7 @@ curl -X POST "http://localhost:8000/api/compliance/check" \
 - Confidence scores (0.5-0.95 range)
 
 **`POST /api/compliance/validate-field`** - Real-time field validation
+
 ```bash
 curl -X POST "http://localhost:8000/api/compliance/validate-field" \
   -H "Content-Type: application/json" \
@@ -718,6 +758,7 @@ curl -X POST "http://localhost:8000/api/compliance/validate-field" \
     "field_value": "123-456-789"
   }'
 ```
+
 - **Performance**: <50ms response time for instant feedback
 - **Use Case**: As-you-type validation in forms
 
@@ -727,6 +768,7 @@ curl -X POST "http://localhost:8000/api/compliance/validate-field" \
 **`DELETE /api/compliance/cache/{program_id}`** - Clear rule cache
 
 **Validation Types Supported:**
+
 - Required fields
 - Pattern matching (regex)
 - Length constraints
@@ -743,6 +785,7 @@ curl -X POST "http://localhost:8000/api/compliance/validate-field" \
 **Purpose**: Neo4j knowledge graph operations for exploring regulatory relationships.
 
 **`POST /graph/build`** - Build graph from processed documents (async)
+
 ```bash
 curl -X POST "http://localhost:8000/graph/build" \
   -H "Content-Type: application/json" \
@@ -754,10 +797,13 @@ curl -X POST "http://localhost:8000/graph/build" \
 
 **`POST /graph/build/{document_id}`** - Build graph for single document (sync)
 **`GET /graph/stats`** - Get graph statistics (node/relationship counts)
+
 ```bash
 curl "http://localhost:8000/graph/stats"
 ```
+
 **Returns:**
+
 ```json
 {
   "nodes": [
@@ -781,6 +827,7 @@ curl "http://localhost:8000/graph/stats"
 **`DELETE /graph/clear`** - Clear entire graph (requires confirm=true)
 
 **Graph Schema:**
+
 - **6 Node Types**: Legislation, Section, Regulation, Program, Situation, Policy
 - **9 Relationship Types**: HAS_SECTION, REFERENCES, AMENDED_BY, APPLIES_TO, etc.
 
@@ -791,6 +838,7 @@ curl "http://localhost:8000/graph/stats"
 **Purpose**: Natural language processing for legal text - entity extraction and query parsing.
 
 **`POST /api/nlp/extract-entities`** - Extract legal entities from text
+
 ```bash
 curl -X POST "http://localhost:8000/api/nlp/extract-entities" \
   -H "Content-Type: application/json" \
@@ -799,7 +847,9 @@ curl -X POST "http://localhost:8000/api/nlp/extract-entities" \
     "entity_types": ["person_type", "program"]
   }'
 ```
+
 **Returns:**
+
 ```json
 {
   "entities": [
@@ -824,12 +874,15 @@ curl -X POST "http://localhost:8000/api/nlp/extract-entities" \
 ```
 
 **`POST /api/nlp/parse-query`** - Parse natural language query
+
 ```bash
 curl -X POST "http://localhost:8000/api/nlp/parse-query" \
   -H "Content-Type: application/json" \
   -d '{"query": "Can I apply for EI?"}'
 ```
+
 **Returns:**
+
 - Intent classification (search, eligibility, compliance, etc.)
 - Extracted entities with confidence scores
 - Keywords and filters
@@ -843,6 +896,7 @@ curl -X POST "http://localhost:8000/api/nlp/parse-query" \
 **`GET /api/nlp/health`** - NLP service health check
 
 **Supported Entity Types:**
+
 - `person_type`: citizen, permanent resident, temporary resident, etc.
 - `program`: EI, CPP, OAS, GIS, etc.
 - `jurisdiction`: federal, provincial, municipal
@@ -859,13 +913,16 @@ curl -X POST "http://localhost:8000/api/nlp/parse-query" \
 **Purpose**: Document upload, parsing, and processing for multi-format legal documents.
 
 **`POST /documents/upload`** - Upload and parse a document
+
 ```bash
 curl -X POST "http://localhost:8000/documents/upload" \
   -F "file=@employment-insurance-act.pdf" \
   -F "document_type=legislation" \
   -F "jurisdiction=federal"
 ```
+
 **Supported Formats:**
+
 - PDF (with text extraction)
 - DOCX (Microsoft Word)
 - TXT (plain text)
@@ -881,6 +938,7 @@ curl -X POST "http://localhost:8000/documents/upload" \
 **`GET /documents/stats`** - Document statistics
 
 **Processing Pipeline:**
+
 1. Upload → Parse structure → Extract sections
 2. Build knowledge graph relationships
 3. Index in Elasticsearch for search
@@ -893,15 +951,19 @@ curl -X POST "http://localhost:8000/documents/upload" \
 **Purpose**: System monitoring and service health checks.
 
 **`GET /health`** - General health check
+
 ```bash
 curl "http://localhost:8000/health"
 ```
 
 **`GET /health/all`** - Comprehensive health check (all services)
+
 ```bash
 curl "http://localhost:8000/health/all"
 ```
+
 **Returns:**
+
 ```json
 {
   "status": "healthy",
@@ -943,19 +1005,23 @@ curl "http://localhost:8000/health/all"
 ### 🔄 Additional APIs
 
 #### Batch Processing (`/api/batch`)
+
 - `POST /api/batch/process` - Process multiple operations in batch
 - `GET /api/batch/status/{job_id}` - Check batch job status
 - `GET /api/batch/results/{job_id}` - Get batch results
 
 #### Configuration (`/api/config`)
+
 - `GET /api/config` - Get system configuration
 - `PUT /api/config` - Update system configuration
 
 #### Suggestions (`/api/suggestions`)
+
 - `GET /api/suggestions/queries` - Get query suggestions
 - `GET /api/suggestions/workflows/{program_id}` - Get workflow suggestions
 
 #### Version (`/api/version`)
+
 - `GET /api/version` - Get API version information
 
 ---
@@ -1022,11 +1088,13 @@ curl -X POST "http://localhost:8000/api/nlp/extract-entities" \
 ### 🔐 API Authentication & Rate Limiting
 
 **Current Status (MVP):**
+
 - ✅ All endpoints publicly accessible (for demo/development)
 - ❌ Authentication not yet implemented
 - ❌ Rate limiting not yet enforced
 
 **Production Roadmap:**
+
 - JWT-based authentication with refresh tokens
 - Role-based access control (RBAC)
 - Rate limiting: 1000 requests/hour for authenticated users
@@ -1037,38 +1105,40 @@ curl -X POST "http://localhost:8000/api/nlp/extract-entities" \
 
 ### 📈 API Performance Metrics
 
-| Endpoint Type | Target Latency | Current Performance | Status |
-|--------------|----------------|---------------------|---------|
-| Keyword Search | <100ms | ~80ms | ✅ Met |
-| Vector Search | <400ms | ~350ms | ✅ Met |
-| Hybrid Search | <500ms | ~450ms | ✅ Met |
-| RAG Q&A | <3s | ~2.5s | ✅ Met |
-| Field Validation | <50ms | ~35ms | ✅ Met |
-| Full Compliance Check | <200ms | ~175ms | ✅ Met |
-| NLP Entity Extraction | <100ms | ~75ms | ✅ Met |
-| Graph Query | <200ms | ~150ms | ✅ Met |
+| Endpoint Type         | Target Latency | Current Performance | Status |
+| --------------------- | -------------- | ------------------- | ------ |
+| Keyword Search        | <100ms         | ~80ms               | ✅ Met  |
+| Vector Search         | <400ms         | ~350ms              | ✅ Met  |
+| Hybrid Search         | <500ms         | ~450ms              | ✅ Met  |
+| RAG Q&A               | <3s            | ~2.5s               | ✅ Met  |
+| Field Validation      | <50ms          | ~35ms               | ✅ Met  |
+| Full Compliance Check | <200ms         | ~175ms              | ✅ Met  |
+| NLP Entity Extraction | <100ms         | ~75ms               | ✅ Met  |
+| Graph Query           | <200ms         | ~150ms              | ✅ Met  |
 
 ---
 
 ### 🛠️ API Development Tools
 
 **Swagger UI**: http://localhost:8000/docs
+
 - Interactive API documentation
 - Test endpoints directly in browser
 - View request/response schemas
 - Generate code snippets
 
 **ReDoc**: http://localhost:8000/redoc
+
 - Clean, responsive API documentation
 - Organized by tags
 - Search functionality
 - Markdown support
 
 **OpenAPI Spec**: http://localhost:8000/openapi.json
+
 - Machine-readable API specification
 - Import into Postman, Insomnia, etc.
 - Generate client libraries
-
 
 ## 🔌 MCP Server Integration
 
@@ -1090,6 +1160,7 @@ The Model Context Protocol (MCP) is a standardized protocol that allows AI assis
 ### Quick Start
 
 **Prerequisites:**
+
 - Backend API running at `http://localhost:8000`
 - Node.js 18+ installed
 - npm package manager
@@ -1165,6 +1236,7 @@ The MCP server provides 7 powerful tools:
 Once configured, AI assistants can use these tools naturally:
 
 **Example 1: Search for Regulations**
+
 ```
 User: "Find regulations about employment insurance eligibility"
 
@@ -1177,6 +1249,7 @@ Returns: Top 5 relevant regulations with citations and relevance scores
 ```
 
 **Example 2: Answer Legal Questions**
+
 ```
 User: "Can a temporary resident apply for employment insurance?"
 
@@ -1188,6 +1261,7 @@ Returns: AI-generated answer with legal citations and confidence score
 ```
 
 **Example 3: Check Compliance**
+
 ```
 User: "Check if this EI application meets requirements: 
       SIN: 123-456-789, employment_status: unemployed, hours_worked: 700"
@@ -1200,6 +1274,7 @@ Returns: Detailed compliance report with pass/fail status, issues, and recommend
 ```
 
 **Example 4: Extract Legal Entities**
+
 ```
 User: "Extract entities from: 'Canadian citizens and permanent residents may apply for OAS benefits'"
 
@@ -1237,6 +1312,7 @@ The MCP server acts as a translation layer between the Model Context Protocol an
 ### Development
 
 **Project Structure:**
+
 ```
 mcp-server/
 ├── src/
@@ -1251,12 +1327,14 @@ mcp-server/
 ```
 
 **Building:**
+
 ```bash
 cd mcp-server
 npm run build
 ```
 
 **Watching for Changes:**
+
 ```bash
 npm run watch
 ```
@@ -1266,7 +1344,9 @@ npm run watch
 **"Cannot connect to backend API" Warning**
 
 - **Cause**: Backend server is not running
+
 - **Solution**: Start the backend server:
+  
   ```bash
   cd backend
   docker-compose up
@@ -1293,6 +1373,7 @@ npm run watch
 ### Complete Documentation
 
 For detailed documentation including:
+
 - All tool parameters and return types
 - Advanced configuration options
 - Adding custom tools
@@ -1318,6 +1399,7 @@ bash backend/scripts/download_and_ingest_real_data.sh
 ```
 
 This script will:
+
 1. ✅ Download 11,594+ XML files from Justice Canada GitHub (bilingual: English + French)
 2. ✅ Copy files to language-specific directories (en/ and fr/)
 3. ✅ Backup your current data (if any)
@@ -1327,6 +1409,7 @@ This script will:
 7. ✅ Generate comprehensive verification reports
 
 **Bilingual Support**: The system automatically processes both English and French versions:
+
 - **English**: 956 acts from `eng/acts/`
 - **French**: 956 acts from `fra/lois/`
 - **Total**: 1,912 regulation files available for bilingual search and analysis 🇨🇦
@@ -1348,6 +1431,7 @@ LIMIT=0     # ALL files (~10,611 files, 3-4 hours)
 ```
 
 **How the LIMIT flag works:**
+
 - **`LIMIT > 0`**: Processes exactly that many files (e.g., 500 files)
 - **`LIMIT = 0`**: Processes ALL files in the directory (~10,611 files)
 - The limit is automatically passed to the Python ingestion pipeline with `--limit` flag
@@ -1394,13 +1478,13 @@ bash backend/scripts/download_and_ingest_real_data.sh
 
 #### Expected Results by LIMIT Size
 
-| LIMIT | Files Processed | Time Required | Regulations | Sections | Use Case |
-|-------|----------------|---------------|-------------|----------|----------|
-| 50 | 50 | 10-15 min | ~50 | ~500 | Quick test |
-| 100 | 100 | 20-30 min | ~100 | ~1,000 | Small dataset |
-| 500 | 500 | 1-2 hours | ~500 | ~5,000 | **Demo (default)** |
-| 1000 | 1000 | 2-3 hours | ~1,000 | ~10,000 | Medium dataset |
-| 0 | ~10,611 | 3-4 hours | ~10,000+ | ~100,000+ | Full production |
+| LIMIT | Files Processed | Time Required | Regulations | Sections  | Use Case           |
+| ----- | --------------- | ------------- | ----------- | --------- | ------------------ |
+| 50    | 50              | 10-15 min     | ~50         | ~500      | Quick test         |
+| 100   | 100             | 20-30 min     | ~100        | ~1,000    | Small dataset      |
+| 500   | 500             | 1-2 hours     | ~500        | ~5,000    | **Demo (default)** |
+| 1000  | 1000            | 2-3 hours     | ~1,000      | ~10,000   | Medium dataset     |
+| 0     | ~10,611         | 3-4 hours     | ~10,000+    | ~100,000+ | Full production    |
 
 ### Manual Python Ingestion (Alternative)
 
@@ -1427,6 +1511,7 @@ python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 100 --v
 ```
 
 **✅ Data Status (as of November 30, 2025):**
+
 - **PostgreSQL**: 103 regulations, 703 sections, 101 amendments loaded
 - **Database Schema**: 11 models with CASCADE DELETE constraints on citations table
 - **Elasticsearch**: 806 documents indexed (103 regulations + 703 sections)
@@ -1437,6 +1522,7 @@ python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 100 --v
 The pipeline ingests **100 Canadian Federal Acts** with full text and structure:
 
 The 100 acts cover major areas of Canadian federal law including:
+
 - Social services and benefits (EI, OAS, CPP)
 - Immigration and citizenship
 - Tax and finance (Income Tax Act, Excise Tax Act)
@@ -1518,10 +1604,12 @@ Validation Report:
 
 ```bash
 # Test with limited files
-python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 5 --validate
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 5 --validate
 
 # Re-run ingestion (already-loaded files will be skipped)
-python -m ingestion.data_pipeline data/regulations/canadian_laws --validate
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --validate
+
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 500 --validate
 
 # View pipeline help
 python -m ingestion.data_pipeline --help
@@ -1531,6 +1619,7 @@ python -m ingestion.data_pipeline --help
 
 **Issue**: `column regulations.extra_metadata does not exist`  
 **Solution**: You need to run the latest migration:
+
 ```bash
 cd backend
 source venv/bin/activate
@@ -1539,6 +1628,7 @@ alembic upgrade head
 
 **Issue**: Foreign key constraint errors during re-ingestion  
 **Solution**: CASCADE DELETE constraints have been added (migration a2171c414458). When sections are deleted, related citations are automatically removed. Ensure you've run the latest migration:
+
 ```bash
 # Check current migration version
 docker compose exec backend alembic current
@@ -1557,6 +1647,7 @@ docker compose exec backend alembic upgrade head
 
 **Issue**: `'GraphService' object has no attribute 'query'`  
 **Solution**: This is a known issue with the Neo4j graph building step. The data is still loaded successfully into PostgreSQL and Elasticsearch. You can populate the Neo4j graph separately:
+
 ```bash
 cd backend
 python scripts/init_neo4j.py
@@ -1584,6 +1675,7 @@ curl -X DELETE "localhost:9200/regulatory_documents"
 This section provides comprehensive, verified instructions for obtaining regulatory data from all G7 countries (Canada, USA, UK, France, Germany, Italy, Japan) for a truly international regulatory intelligence platform.
 
 **Data Quality Verification**: All sources listed below have been verified against the [Data Verification Report](./docs/reports/DATA_VERIFICATION_REPORT.md) and are confirmed as:
+
 - ✅ Officially published by government authorities
 - ✅ Legally authoritative sources
 - ✅ Machine-readable formats (XML, JSON, or structured HTML)
@@ -1603,6 +1695,7 @@ The complete dataset of Canadian federal acts and regulations is available as op
 1. **Visit**: [Open Canada - Consolidated Federal Acts and Regulations (XML)](https://open.canada.ca/data/en/dataset/1f0aae37-18e4-4bad-bbca-59a4094e44fa)
 
 2. **Download** the complete XML dataset:
+   
    - **File**: "Consolidated Federal Acts and Regulations (XML)"
    - **Size**: ~50 MB compressed
    - **Format**: ZIP archive containing XML files
@@ -1613,6 +1706,7 @@ The complete dataset of Canadian federal acts and regulations is available as op
 3. **Extract** to: `backend/data/regulations/canadian_laws/`
 
 4. **Run ingestion pipeline**:
+   
    ```bash
    cd backend
    python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 500 --validate
@@ -1648,6 +1742,7 @@ The UK offers one of the most advanced legislative data systems in the world:
 1. **Visit**: [UK Legislation Website](https://www.legislation.gov.uk)
 
 2. **API Access**: [UK Legislation API](https://www.legislation.gov.uk/developer)
+   
    - **Format**: XML, HTML, PDF with structured metadata
    - **License**: Open Government License (UK)
    - **Coverage**: All UK legislation since 1267 (Statute of Marlborough)
@@ -1655,6 +1750,7 @@ The UK offers one of the most advanced legislative data systems in the world:
    - **Features**: RESTful API, version control, cross-references
 
 3. **Download Options**:
+   
    ```bash
    # Individual act (XML format)
    wget https://www.legislation.gov.uk/ukpga/1996/18/data.xml
@@ -1664,11 +1760,13 @@ The UK offers one of the most advanced legislative data systems in the world:
    ```
 
 4. **Integration**:
+   
    - Create parser for UK XML format (similar structure to Canadian XML)
    - Extract: act number, year, sections, amendments, commencement dates
    - Build knowledge graph with cross-jurisdictional UK-Canada relationships
 
 **Data Structure**: XML with comprehensive metadata including:
+
 - Act type (primary, secondary legislation)
 - Year and chapter number
 - Sections with heading and text
@@ -1676,6 +1774,7 @@ The UK offers one of the most advanced legislative data systems in the world:
 - Cross-references to related legislation
 
 **Use Cases**:
+
 - Comparative analysis (UK vs Canada employment law)
 - Cross-jurisdictional compliance
 - International precedent research
@@ -1692,6 +1791,7 @@ The UK offers one of the most advanced legislative data systems in the world:
 1. **Visit**: [Légifrance](https://www.legifrance.gouv.fr)
 
 2. **Open Data Portal**: [data.gouv.fr](https://www.data.gouv.fr/fr/datasets/legi-codes-lois-et-reglements-consolides/)
+   
    - **Format**: XML, JSON (structured legal documents)
    - **License**: Licence Ouverte / Open License
    - **Coverage**: Codes, laws, decrees, regulations
@@ -1699,6 +1799,7 @@ The UK offers one of the most advanced legislative data systems in the world:
    - **Language**: French (essential for bilingual Canadian support)
 
 3. **Download Options**:
+   
    ```bash
    # Visit data.gouv.fr and search for "LEGI - Codes, lois et règlements consolidés"
    # Download dataset (large: ~5 GB)
@@ -1706,6 +1807,7 @@ The UK offers one of the most advanced legislative data systems in the world:
    ```
 
 4. **Integration**:
+   
    - Build French XML parser (Code civil, Code du travail formats)
    - Extract: article numbers, sections, effective dates
    - Essential for Quebec civil law references
@@ -1714,6 +1816,7 @@ The UK offers one of the most advanced legislative data systems in the world:
 **Data Structure**: XML with hierarchical structure (Codes → Titles → Chapters → Sections → Articles)
 
 **Use Cases**:
+
 - Quebec civil law references (Canadian bilingual requirements)
 - French-language legal NLP training
 - Bilingual terminology alignment (English-French legal terms)
@@ -1728,16 +1831,19 @@ The UK offers one of the most advanced legislative data systems in the world:
 ### German Federal Law Portal
 
 1. **Visit**: [Gesetze im Internet](https://www.gesetze-im-internet.de)
+   
    - **Format**: HTML, XML available for download
    - **License**: Open data (German government license)
    - **Coverage**: All federal laws and regulations
    - **Quality**: ⭐⭐⭐⭐ Long-term archives, comprehensive metadata
 
 2. **Alternative Source**: [GovData Portal](https://www.govdata.de)
+   
    - Search for "Bundesrecht" (federal law)
    - Download structured legal datasets
 
 3. **Download Options**:
+   
    ```bash
    # Individual laws available as XML
    # Visit https://www.gesetze-im-internet.de/aktuell.html
@@ -1745,6 +1851,7 @@ The UK offers one of the most advanced legislative data systems in the world:
    ```
 
 4. **Integration**:
+   
    - Create German XML/HTML parser
    - Extract: law sections (§), paragraphs, amendments
    - Build German legal terminology database
@@ -1753,6 +1860,7 @@ The UK offers one of the most advanced legislative data systems in the world:
 **Data Structure**: German legal citation system (§ symbol, Absätze/paragraphs, Sätze/sentences)
 
 **Use Cases**:
+
 - Legal NLP model training (large German corpus)
 - Research on legislative drafting patterns
 - AI governance framework examples (Germany's AI Register)
@@ -1767,12 +1875,14 @@ The UK offers one of the most advanced legislative data systems in the world:
 ### US Federal Legislation
 
 1. **Visit**: [GovInfo (GPO)](https://www.govinfo.gov)
+   
    - **Format**: XML, PDF, HTML (USLM - United States Legislative Markup)
    - **License**: Public domain (US government works)
    - **Coverage**: US Code, Federal Register, Code of Federal Regulations (CFR)
    - **Quality**: ⭐⭐⭐⭐ Comprehensive, well-structured, regularly updated
 
 2. **Download Options**:
+   
    ```bash
    # US Code (organized by title)
    # Visit: https://www.govinfo.gov/app/collection/uscode
@@ -1783,11 +1893,13 @@ The UK offers one of the most advanced legislative data systems in the world:
    ```
 
 3. **Alternative Sources**:
+   
    - **Congress.gov**: [https://www.congress.gov](https://www.congress.gov) - Bills, resolutions, legislative history
    - **Regulations.gov**: [https://www.regulations.gov](https://www.regulations.gov) - Federal rulemaking and comments
    - **State Laws**: [Justia](https://law.justia.com/codes/) - Free state code repositories
 
 4. **Integration**:
+   
    - Parse USLM XML format (similar to Canadian XML)
    - Extract: titles, sections, subsections, amendments
    - Build knowledge graph with US federal regulations
@@ -1796,6 +1908,7 @@ The UK offers one of the most advanced legislative data systems in the world:
 **Data Structure**: XML with title, chapter, section hierarchy; extensive cross-references
 
 **Use Cases**:
+
 - US-Canada cross-border regulatory compliance
 - Federal programs affecting Canadian residents
 - Comparative analysis (US vs Canada regulatory approaches)
@@ -1810,12 +1923,14 @@ The UK offers one of the most advanced legislative data systems in the world:
 ### Italian Legislation Portal
 
 1. **Visit**: [Normattiva](https://www.normattiva.it)
+   
    - **Format**: HTML, XML (limited availability)
    - **License**: Italian government open data
    - **Coverage**: Italian legislation (Gazzetta Ufficiale)
    - **Quality**: ⭐⭐⭐ Official gazette, comprehensive but less structured
 
 2. **Download Options**:
+   
    ```bash
    # Access via web interface
    # Visit: https://www.normattiva.it
@@ -1824,6 +1939,7 @@ The UK offers one of the most advanced legislative data systems in the world:
    ```
 
 3. **Integration**:
+   
    - Build HTML parser for Italian legal documents
    - Extract: article numbers (Art.), commas, legislation numbers
    - Handle Italian legal citation system
@@ -1832,6 +1948,7 @@ The UK offers one of the most advanced legislative data systems in the world:
 **Data Structure**: HTML-based with article structure (articoli, commi, lettere)
 
 **Use Cases**:
+
 - EU regulatory harmonization research
 - Multi-language legal NLP (Italian corpus)
 - Comparative civil law studies
@@ -1846,6 +1963,7 @@ The UK offers one of the most advanced legislative data systems in the world:
 ### Japanese Legal Resources
 
 1. **e-Gov Legal Search**: [https://elaws.e-gov.go.jp](https://elaws.e-gov.go.jp)
+   
    - **Format**: HTML, XML (limited)
    - **License**: Japanese government open data
    - **Coverage**: All Japanese laws and ordinances
@@ -1853,12 +1971,14 @@ The UK offers one of the most advanced legislative data systems in the world:
    - **Language**: Japanese (requires translation for English users)
 
 2. **Japanese Legal QA Dataset** (Research Use):
+   
    - Multiple-choice QA on Japanese law
    - LLM-verified accuracy
    - Available through AI research platforms
    - **Use Case**: Benchmark Q&A accuracy, learn from QA structure
 
 3. **Integration**:
+   
    ```bash
    # Access e-Gov portal
    # Search for specific laws (法律)
@@ -1867,6 +1987,7 @@ The UK offers one of the most advanced legislative data systems in the world:
    ```
 
 **Use Cases**:
+
 - Benchmark Q&A system accuracy
 - Multi-language legal NLP testing
 - G7 regulatory comparison studies
@@ -1881,6 +2002,7 @@ The UK offers one of the most advanced legislative data systems in the world:
 ### EUR-Lex (EU Legislation)
 
 1. **Visit**: [EUR-Lex](https://eur-lex.europa.eu)
+   
    - **Format**: XML (Formex/LegalDocML), HTML, PDF
    - **License**: Free access with EU login
    - **Coverage**: EU legislation, case law, treaties
@@ -1888,17 +2010,20 @@ The UK offers one of the most advanced legislative data systems in the world:
    - **Languages**: All official EU languages including English, French, German, Italian
 
 2. **Download Options**:
+   
    - Bulk download available (requires registration)
    - API access for programmatic retrieval
    - SPARQL endpoint for semantic queries
 
 3. **Integration**:
+   
    - Parse LegalDocML XML format
    - Extract: directives, regulations, decisions
    - Build EU-Canada regulatory relationship graph
    - Support multi-language search and Q&A
 
 **Use Cases**:
+
 - EU-Canada regulatory harmonization
 - International precedent research
 - Multi-language legal corpus
@@ -1908,36 +2033,40 @@ The UK offers one of the most advanced legislative data systems in the world:
 
 ## 📊 Data Source Comparison Table
 
-| Country | Source | Format | Quality | License | Coverage | Bilingual | Priority |
-|---------|--------|--------|---------|---------|----------|-----------|----------|
-| 🇨🇦 Canada | Justice Laws | XML | ⭐⭐⭐⭐⭐ | Open Gov | Federal | EN/FR | **HIGH** |
-| 🇬🇧 UK | legislation.gov.uk | XML/API | ⭐⭐⭐⭐⭐ | Open Gov | All UK law | EN only | **MEDIUM** |
-| 🇫🇷 France | Légifrance | XML/JSON | ⭐⭐⭐⭐ | Open License | All French law | FR only | **MEDIUM** |
-| 🇩🇪 Germany | Gesetze im Internet | XML/HTML | ⭐⭐⭐⭐ | Open Data | Federal | DE only | **LOW** |
-| 🇺🇸 USA | GovInfo (GPO) | XML | ⭐⭐⭐⭐ | Public Domain | Federal | EN only | **MEDIUM** 
-| 🇮🇹 Italy | Normattiva | HTML/XML | ⭐⭐⭐ | Open Data | Gazette | IT only | **LOW** |
-| 🇯🇵 Japan | e-Gov | HTML | ⭐⭐⭐ | Open Data | All laws | JA only | **LOW** |
-| 🇪🇺 EU | EUR-Lex | XML | ⭐⭐⭐⭐ | Free Access | EU law | 24 languages | **MEDIUM** |
+| Country      | Source              | Format   | Quality | License       | Coverage       | Bilingual    | Priority   |
+| ------------ | ------------------- | -------- | ------- | ------------- | -------------- | ------------ | ---------- |
+| 🇨🇦 Canada  | Justice Laws        | XML      | ⭐⭐⭐⭐⭐   | Open Gov      | Federal        | EN/FR        | **HIGH**   |
+| 🇬🇧 UK      | legislation.gov.uk  | XML/API  | ⭐⭐⭐⭐⭐   | Open Gov      | All UK law     | EN only      | **MEDIUM** |
+| 🇫🇷 France  | Légifrance          | XML/JSON | ⭐⭐⭐⭐    | Open License  | All French law | FR only      | **MEDIUM** |
+| 🇩🇪 Germany | Gesetze im Internet | XML/HTML | ⭐⭐⭐⭐    | Open Data     | Federal        | DE only      | **LOW**    |
+| 🇺🇸 USA     | GovInfo (GPO)       | XML      | ⭐⭐⭐⭐    | Public Domain | Federal        | EN only      | **MEDIUM** |
+| 🇮🇹 Italy   | Normattiva          | HTML/XML | ⭐⭐⭐     | Open Data     | Gazette        | IT only      | **LOW**    |
+| 🇯🇵 Japan   | e-Gov               | HTML     | ⭐⭐⭐     | Open Data     | All laws       | JA only      | **LOW**    |
+| 🇪🇺 EU      | EUR-Lex             | XML      | ⭐⭐⭐⭐    | Free Access   | EU law         | 24 languages | **MEDIUM** |
 
 ---
 
 ## 🚀 Recommended Implementation Strategy
 
 ### Phase 1: MVP (Canada Only)
+
 - ✅ Focus on Canadian federal regulations (already implemented)
 - Target: 500+ Canadian acts for production
 
 ### Phase 2: Bilingual Expansion (Canada + France + UK)
+
 - Add UK legislation for comparative analysis
 - Add French Légifrance for bilingual support (Quebec)
 - Implement cross-jurisdictional knowledge graph
 
 ### Phase 3: North American Integration (+ USA)
+
 - Add US federal regulations (US Code, CFR)
 - Build US-Canada cross-border compliance checker
 - Support international trade regulations
 
 ### Phase 4: Full G7 Coverage (+ Germany, Italy, Japan, EU)
+
 - Add remaining G7 countries
 - Multi-language support (EN, FR, DE, IT, JA)
 - Comprehensive G7 regulatory comparison tools
@@ -1954,7 +2083,7 @@ Each country requires a custom parser due to different XML/HTML structures:
 # Example: UK Legislation Parser
 class UKLegislationParser:
     """Parse UK legislation.gov.uk XML format"""
-    
+
     def parse_act(self, xml_content):
         # Extract: year, chapter, sections, amendments
         # Handle UK-specific citation format (e.g., "1996 c. 18")
@@ -1963,7 +2092,7 @@ class UKLegislationParser:
 # Example: French Légifrance Parser
 class LegifranceParser:
     """Parse French legal codes and laws"""
-    
+
     def parse_code(self, xml_content):
         # Extract: code title, articles, effective dates
         # Handle French citation format (e.g., "Article L1234-5")
@@ -1973,6 +2102,7 @@ class LegifranceParser:
 ### Multi-Language NLP
 
 Train language-specific legal NLP models:
+
 - **English**: Canada, UK, USA
 - **French**: Canada (Quebec), France
 - **German**: Germany, EU
@@ -1994,11 +2124,13 @@ CREATE (can)-[:REFERENCES_INTERNATIONAL {treaty: "ILO Convention"}]->(uk)
 #### Sample Data vs. Real Data
 
 **Current Sample Data** (for testing):
+
 - 100 generated XML files with basic structure
 - NOT real legal content
 - Suitable for: Pipeline testing, system validation, demos
 
 **Real Data** (for production):
+
 - Official Justice Laws Canada XML files
 - Legally authoritative content
 - Includes: Full text, amendments, cross-references, metadata
@@ -2107,6 +2239,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 **Overall Status**: 100% Tests Passing (397/397 tests)
 
 **Total Test Coverage**: 397 tests
+
 - Backend Unit & Integration: 338 tests (100% passing)
 - Frontend E2E Tests: 59 tests (100% passing when services running)
 
@@ -2115,9 +2248,13 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 ### Frontend E2E Testing (Playwright) ✅
 
 - **Framework**: Playwright with TypeScript
+
 - **Coverage**: Dashboard, Search, Chat, and Compliance pages
+
 - **Browsers**: Chromium, Firefox, WebKit + Mobile (Pixel 5, iPhone 12) + Tablet (iPad Pro)
+
 - **Test Suites**:
+  
   - `dashboard.spec.ts`: 9 tests (navigation, responsive design, keyboard accessibility)
   - `search.spec.ts`: 8 tests (search interface, filters, mobile layout)
   - `chat.spec.ts`: 12 tests (messaging, button states, interactions)
@@ -2126,9 +2263,13 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
     - Dynamic compliance page: 12 tests (multi-program selector with 5 programs)
     - Error handling: 3 tests (API errors, incomplete forms)
     - Results display: 3 tests (success/failure states, issues reporting)
+
 - **Total Tests**: 59 E2E tests across 4 pages
+
 - **Test Helpers**: 15 reusable functions for common operations
+
 - **Commands**:
+  
   ```bash
   cd frontend
   npm test              # Run all tests headless
@@ -2138,6 +2279,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
   ```
 
 **Compliance Test Coverage**:
+
 - Form validation (full name, SIN format, hours worked, residency status)
 - Real-time field validation with react-hook-form + zod
 - Multi-program selector (EI, CPP, Child Benefit, GIS, Social Assistance)
@@ -2154,6 +2296,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 - **Execution Time**: ~75 seconds
 
 #### ✅ All Test Suites Passing (100%)
+
 - **Search Service**: 29/29 unit tests + 26/26 integration tests ✅
 - **Compliance Checker**: 45/45 tests ✅
 - **Query Parser**: 32/32 tests ✅
@@ -2169,6 +2312,7 @@ curl -X POST "http://localhost:8000/api/search/keyword" \
 **Achievement**: All test suites now passing with robust error handling and graceful degradation for API rate limits and data availability.
 
 #### Coverage by Service
+
 - **Search Service**: 95% coverage
 - **NLP Service**: 92% coverage
 - **Query Parser**: 94% coverage  
@@ -2448,6 +2592,7 @@ For questions or support, please refer to the project documentation or contact t
 - ✅ **E2E workflow tests (14/14 tests, 100% passing - validates complete user journeys)** ✅
 
 **Performance Metrics** (All Targets Met ✅):
+
 - Keyword Search: <100ms (target: <100ms) ✅
 - Vector Search: <400ms (target: <400ms) ✅
 - Hybrid Search: <500ms (target: <500ms) ✅
@@ -2463,12 +2608,14 @@ For questions or support, please refer to the project documentation or contact t
 - ⏳ Final documentation review
 
 **Data Ingestion Status (Nov 30, 2025):**
+
 - ✅ PostgreSQL: 103 regulations, 703 sections, 101 amendments loaded
 - ✅ Database Migrations: a2171c414458 (head) - CASCADE DELETE constraints applied
 - ✅ Elasticsearch: 806 documents indexed, fully searchable
 - ✅ Neo4j: 820 nodes, 1,114 relationships
 
 **Database Architecture Improvements (Nov 30, 2025):**
+
 - ✅ CASCADE DELETE constraints added to citations table foreign keys
   - When sections are deleted, related citations are automatically removed
   - Prevents foreign key constraint errors during data re-ingestion
