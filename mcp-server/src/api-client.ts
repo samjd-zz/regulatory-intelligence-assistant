@@ -97,7 +97,7 @@ export class RegulatoryAPIClient {
       from: 0,
       keyword_weight: 0.5,
       vector_weight: 0.5,
-      parse_query: true,
+      parse_query: false,  // Disable query parsing - it extracts overly restrictive filters
     });
     return response.data;
   }

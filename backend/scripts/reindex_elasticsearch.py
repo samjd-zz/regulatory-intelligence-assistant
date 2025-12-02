@@ -21,6 +21,13 @@ def main():
     db = SessionLocal()
     search_service = SearchService()
     
+    # Ensure index exists with proper mappings
+    print("Creating/recreating Elasticsearch index with proper mappings...")
+    if not search_service.create_index(force_recreate=True):
+        print("ERROR: Failed to create index. Exiting.")
+        return
+    print("Index created successfully with custom mappings")
+    
     try:
         # Get all regulations
         regulations = db.query(Regulation).all()
@@ -66,3 +73,45 @@ def main():
                 # Index sections
                 sections = db.query(Section).filter_by(regulation_id=regulation.id).all()
                 for section in sections:
+                    section_doc = {
+                        'id': str(section.id),
+                        'section_id': str(section.id),
+                        'regulation_id': str(regulation.id),
+                        'section_number': section.section_number,
+                        'title': section.title or '',
+                        'content': section.content,
+                        'document_type': 'section',
+                        'jurisdiction': regulation.jurisdiction,
+                        'authority': regulation.authority,
+                        'citation': citation,
+                        'legislation_name': regulation.title,
+                        'metadata': section.extra_metadata or {}
+                    }
+                    
+                    search_service.index_document(
+                        doc_id=str(section.id),
+                        document=section_doc
+                    )
+                    section_count += 1
+                
+                # Progress indicator
+                if i % 100 == 0:
+                    print(f"Progress: {i}/{len(regulations)} regulations indexed ({section_count} sections)")
+                    
+            except Exception as e:
+                print(f"Error indexing regulation {regulation.id}: {str(e)}")
+                continue
+        
+        print(f"\nRe-indexing complete!")
+        print(f"Indexed {indexed_count} regulations")
+        print(f"Indexed {section_count} sections")
+        print(f"Total documents: {indexed_count + section_count}")
+        
+    except Exception as e:
+        print(f"Error during re-indexing: {str(e)}")
+        raise
+    finally:
+        db.close()
+
+if __name__ == '__main__':
+    main()
