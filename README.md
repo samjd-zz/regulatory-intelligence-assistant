@@ -2470,6 +2470,128 @@ Copyright © 2025 Regulatory Intelligence Assistant Team
 - Track amendments and versions
 - Export citations
 
+## 🔧 Troubleshooting
+
+### RAG Assistant Can't Find Regulations / Limited Search Results
+
+**Symptom**: Your RAG assistant only finds a handful of sections instead of accessing all 1,900+ regulations, or search queries return very few results.
+
+**Example**:
+```
+User: "list all the laws you know"
+Assistant: "I found 5 regulations..." (should be 1,900+)
+```
+
+**Diagnosis**: Elasticsearch index is missing or incomplete.
+
+**Root Cause**: During data ingestion, Elasticsearch indexing may fail silently while PostgreSQL and Neo4j succeed. The pipeline has error handling that allows it to continue even if Elasticsearch fails:
+
+```python
+# From data_pipeline.py
+try:
+    await self._index_in_elasticsearch(regulation, parsed_reg)
+    self.stats['elasticsearch_indexed'] += 1
+except Exception as e:
+    logger.error(f"Elasticsearch indexing failed: {e}")
+    # Continue even if ES fails  <-- Silent failure
+```
+
+This means your data successfully loaded into PostgreSQL (where regulations are stored) and Neo4j (knowledge graph), but never made it into Elasticsearch (which powers search and RAG).
+
+**How to Verify**:
+
+```bash
+# Check if Elasticsearch index exists and has documents
+curl -s http://localhost:9200/regulations/_count | jq
+
+# If you see "index_not_found_exception", the index is missing
+# If document count is 0 or very low, reindexing is needed
+```
+
+**Solution**: Run the Elasticsearch reindexing script to copy all regulations from PostgreSQL into Elasticsearch:
+
+```bash
+# Run inside Docker container (recommended)
+docker compose exec backend python scripts/reindex_elasticsearch.py
+
+# Expected output:
+# Starting re-indexing process...
+# Found 1817 regulations to index
+# Progress: 100/1817 regulations indexed (15234 sections)
+# Progress: 200/1817 regulations indexed (30456 sections)
+# ...
+# Re-indexing complete!
+# Indexed 1817 regulations
+# Indexed 275995 sections
+# Total documents: 277812
+```
+
+**Time Required**: 
+- 100 regulations: ~5 minutes
+- 1,817 regulations: ~10-20 minutes
+- Progress updates every 100 regulations
+
+**Verification After Reindexing**:
+
+```bash
+# 1. Check document count
+curl -s http://localhost:9200/regulations/_count | jq
+# Should show: ~277,000+ documents (regulations + sections)
+
+# 2. Test search
+curl -X POST "http://localhost:8000/api/search/keyword" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "employment insurance", "size": 5}'
+
+# 3. Test RAG assistant
+# Visit http://localhost:5173/chat
+# Ask: "What laws do you know about?"
+# Should now return comprehensive results
+```
+
+**Prevention**: Next time you run the data ingestion pipeline, monitor the logs carefully for Elasticsearch errors:
+
+```bash
+# When running ingestion, watch for these errors:
+ERROR - Elasticsearch indexing failed: <error details>
+```
+
+If you see Elasticsearch errors during ingestion, the reindexing script can backfill the data afterward.
+
+### Other Common Issues
+
+**Database Migration Errors**
+
+**Issue**: `column regulations.extra_metadata does not exist`
+
+**Solution**: Run the latest database migration:
+```bash
+cd backend
+alembic upgrade head
+```
+
+**Issue**: `Cannot connect to Neo4j` or `Cannot connect to Elasticsearch`
+
+**Solution**: Ensure Docker services are running:
+```bash
+docker compose ps
+# All services should show "running" status
+
+# If not running:
+docker compose up -d
+```
+
+**Issue**: `Foreign key constraint violation` during re-ingestion
+
+**Solution**: CASCADE DELETE constraints have been added (migration a2171c414458). Ensure you're on the latest migration:
+```bash
+docker compose exec backend alembic current
+# Expected: a2171c414458 (head)
+
+# If not:
+docker compose exec backend alembic upgrade head
+```
+
 ## 📞 Contact
 
 For questions or support, please refer to the project documentation or contact the development team.
