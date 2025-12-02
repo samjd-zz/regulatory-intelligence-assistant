@@ -498,8 +498,17 @@ class CanadianLawXMLParser:
         margin_note_elem = self._find(section_elem, 'MarginalNote')
         title = self._get_text(margin_note_elem) if margin_note_elem is not None else None
         
+        # Improved fallback: If no Label found, use section_id or generate a unique number
+        # instead of using the full title which can be too long
         if not number:
-            return None, ""
+            if section_id:
+                # Use the section ID as the number (e.g., "476027")
+                number = section_id
+                logger.warning(f"Section missing Label, using section_id as number: {section_id}")
+            else:
+                # Last resort: skip this section
+                logger.warning(f"Section missing both Label and ID, skipping")
+                return None, ""
         
         # Build content and full text
         content_parts = []

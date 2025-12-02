@@ -85,7 +85,7 @@ class Section(Base):
     regulation_id = Column(
         UUID(as_uuid=True), ForeignKey("regulations.id"), nullable=False
     )
-    section_number = Column(String(50), nullable=False)
+    section_number = Column(String(255), nullable=False)  # Increased from 50 to handle long titles
     title = Column(String(500), nullable=True)
     content = Column(Text, nullable=True)
     extra_metadata = Column(JSON, default=dict)
