@@ -117,11 +117,55 @@ class GeminiClient:
                 safety_settings=safety_settings
             )
 
-            return response.text
+            return self._extract_text_from_response(response)
 
         except Exception as e:
             logger.error(f"Content generation failed: {e}")
             return None
+
+    def _extract_text_from_response(self, response) -> Optional[str]:
+        """
+        Safely extract text from a Gemini API response.
+        Handles both simple (single-part) and complex (multi-part) responses.
+
+        Args:
+            response: Gemini API response object
+
+        Returns:
+            Extracted text or None if extraction fails
+        """
+        try:
+            # Try the simple accessor first
+            return response.text
+        except (ValueError, AttributeError) as e:
+            # Handle multi-part responses
+            logger.debug(f"Simple text accessor failed, trying multi-part extraction: {e}")
+            
+            try:
+                # Extract text from all parts
+                if hasattr(response, 'candidates') and response.candidates:
+                    texts = []
+                    for candidate in response.candidates:
+                        if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
+                            for part in candidate.content.parts:
+                                if hasattr(part, 'text'):
+                                    texts.append(part.text)
+                    
+                    if texts:
+                        return ' '.join(texts)
+                
+                # If that doesn't work, try response.parts directly
+                if hasattr(response, 'parts'):
+                    texts = [part.text for part in response.parts if hasattr(part, 'text')]
+                    if texts:
+                        return ' '.join(texts)
+                
+                logger.error("Could not extract text from multi-part response")
+                return None
+                
+            except Exception as extract_error:
+                logger.error(f"Failed to extract text from multi-part response: {extract_error}")
+                return None
 
     def chat(
         self,
@@ -168,7 +212,7 @@ class GeminiClient:
                 }
             )
 
-            return response.text
+            return self._extract_text_from_response(response)
 
         except Exception as e:
             logger.error(f"Chat generation failed: {e}")
