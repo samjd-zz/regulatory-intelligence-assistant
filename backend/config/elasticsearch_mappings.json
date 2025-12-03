@@ -108,6 +108,9 @@
       "program": {
         "type": "keyword"
       },
+      "programs": {
+        "type": "keyword"
+      },
       "legislation_name": {
         "type": "text",
         "analyzer": "legal_text_analyzer",
