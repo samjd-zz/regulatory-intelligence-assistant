@@ -165,7 +165,7 @@ class ElasticsearchConfig:
     password: Optional[str] = field(default_factory=lambda: os.getenv("ELASTICSEARCH_PASSWORD"))
 
     # Index settings
-    index_name: str = "regulations"
+    index_name: str = "regulatory_documents"
     number_of_shards: int = 1
     number_of_replicas: int = 0  # 0 for dev, 1+ for prod
 

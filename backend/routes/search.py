@@ -16,9 +16,13 @@ from fastapi import APIRouter, HTTPException, status, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+import logging
 
 from services.search_service import SearchService
 from services.query_parser import LegalQueryParser
+from services.legal_nlp import EntityType
+
+logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/search", tags=["Search"])
@@ -177,8 +181,22 @@ async def keyword_search(request: SearchRequest):
 
         if request.parse_query:
             parsed = query_parser.parse_query(request.query)
-            # Merge parsed filters with provided filters
-            filters.update(parsed.filters)
+            
+            # Only apply program filters if entity confidence is high (> 0.8)
+            # This prevents false negatives from low-confidence program detection
+            parsed_filters = parsed.filters.copy()
+            if 'program' in parsed_filters:
+                # Check confidence of program entities
+                program_entities = parsed.get_entities_by_type(EntityType.PROGRAM)
+                if program_entities:
+                    max_confidence = max(e.confidence for e in program_entities)
+                    if max_confidence < 0.8:
+                        # Remove low-confidence program filter
+                        del parsed_filters['program']
+                        logger.info(f"Skipped low-confidence program filter (confidence: {max_confidence:.2f})")
+            
+            # Merge high-confidence parsed filters with provided filters
+            filters.update(parsed_filters)
             query_info = {
                 "intent": parsed.intent.value,
                 "intent_confidence": parsed.intent_confidence,
@@ -236,7 +254,18 @@ async def vector_search(request: SearchRequest):
 
         if request.parse_query:
             parsed = query_parser.parse_query(request.query)
-            filters.update(parsed.filters)
+            
+            # Only apply program filters if entity confidence is high (> 0.8)
+            parsed_filters = parsed.filters.copy()
+            if 'program' in parsed_filters:
+                program_entities = parsed.get_entities_by_type(EntityType.PROGRAM)
+                if program_entities:
+                    max_confidence = max(e.confidence for e in program_entities)
+                    if max_confidence < 0.8:
+                        del parsed_filters['program']
+                        logger.info(f"Skipped low-confidence program filter (confidence: {max_confidence:.2f})")
+            
+            filters.update(parsed_filters)
             query_info = {
                 "intent": parsed.intent.value,
                 "intent_confidence": parsed.intent_confidence,
@@ -293,7 +322,18 @@ async def hybrid_search(request: HybridSearchRequest):
 
         if request.parse_query:
             parsed = query_parser.parse_query(request.query)
-            filters.update(parsed.filters)
+            
+            # Only apply program filters if entity confidence is high (> 0.8)
+            parsed_filters = parsed.filters.copy()
+            if 'program' in parsed_filters:
+                program_entities = parsed.get_entities_by_type(EntityType.PROGRAM)
+                if program_entities:
+                    max_confidence = max(e.confidence for e in program_entities)
+                    if max_confidence < 0.8:
+                        del parsed_filters['program']
+                        logger.info(f"Skipped low-confidence program filter (confidence: {max_confidence:.2f})")
+            
+            filters.update(parsed_filters)
             query_info = {
                 "intent": parsed.intent.value,
                 "intent_confidence": parsed.intent_confidence,
