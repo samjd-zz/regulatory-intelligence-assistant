@@ -400,10 +400,13 @@ class SearchService:
         if 'jurisdiction' in filters:
             filter_clauses.append({"term": {"jurisdiction": filters['jurisdiction']}})
 
-        # Program filter
+        # Program filter (supports both 'program' and 'programs' for backwards compatibility)
         if 'program' in filters:
             programs = filters['program'] if isinstance(filters['program'], list) else [filters['program']]
-            filter_clauses.append({"terms": {"program": programs}})
+            filter_clauses.append({"terms": {"programs": programs}})
+        elif 'programs' in filters:
+            programs = filters['programs'] if isinstance(filters['programs'], list) else [filters['programs']]
+            filter_clauses.append({"terms": {"programs": programs}})
 
         # Document type filter
         if 'document_type' in filters:

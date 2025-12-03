@@ -25,6 +25,7 @@ from services.graph_builder import GraphBuilder
 from services.graph_service import GraphService
 from services.search_service import SearchService
 from ingestion.canadian_law_xml_parser import CanadianLawXMLParser, ParsedRegulation
+from config.program_mappings import get_program_detector
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ class DataIngestionPipeline:
         self.search_service = search_service
         self.data_dir = Path(data_dir)
         self.xml_parser = CanadianLawXMLParser()
+        self.program_detector = get_program_detector()
         
         # Create data directory
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -295,17 +297,45 @@ class DataIngestionPipeline:
             except ValueError:
                 logger.warning(f"Could not parse date: {parsed_reg.enabled_date}")
         
+        # Detect applicable government programs
+        detected_programs = self.program_detector.detect_programs(
+            title=parsed_reg.title,
+            content=parsed_reg.full_text[:2000]  # Use first 2000 chars for detection
+        )
+        
+        # Detect jurisdiction (use program detector as fallback/validation)
+        detected_jurisdiction = self.program_detector.detect_jurisdiction(
+            title=parsed_reg.title,
+            content=parsed_reg.full_text[:1000],
+            authority=parsed_reg.chapter or ""
+        )
+        
+        # Use detected jurisdiction if parsed jurisdiction is missing or generic
+        final_jurisdiction = parsed_reg.jurisdiction
+        if not final_jurisdiction or final_jurisdiction == 'unknown':
+            final_jurisdiction = detected_jurisdiction
+            logger.info(f"Using detected jurisdiction: {detected_jurisdiction}")
+        
+        # Log detected programs
+        if detected_programs:
+            logger.info(f"Detected programs: {detected_programs}")
+        
+        # Merge detected programs and jurisdiction into metadata
+        metadata = parsed_reg.metadata.copy() if parsed_reg.metadata else {}
+        metadata['programs'] = detected_programs
+        metadata['detected_jurisdiction'] = detected_jurisdiction
+        
         # Create regulation record
         regulation = Regulation(
             title=parsed_reg.title,
-            jurisdiction=parsed_reg.jurisdiction,
+            jurisdiction=final_jurisdiction,
             authority=parsed_reg.chapter,
             language=language,
             effective_date=effective_date,
             status='active',
             full_text=parsed_reg.full_text,
             content_hash=content_hash,
-            extra_metadata=parsed_reg.metadata
+            extra_metadata=metadata
         )
         
         self.db.add(regulation)
@@ -447,6 +477,9 @@ class DataIngestionPipeline:
         """
         logger.info(f"Indexing in Elasticsearch: {parsed_reg.title}")
         
+        # Extract programs from metadata
+        programs = regulation.extra_metadata.get('programs', []) if regulation.extra_metadata else []
+        
         # Index the full regulation
         doc = {
             'id': str(regulation.id),
@@ -460,9 +493,11 @@ class DataIngestionPipeline:
             'legislation_name': regulation.title,
             'effective_date': regulation.effective_date.isoformat() if regulation.effective_date else None,
             'status': regulation.status,
+            'programs': programs,  # Add programs field for filtering
             'metadata': {
                 'chapter': parsed_reg.chapter,
                 'act_type': parsed_reg.act_type,
+                'programs': programs,
                 **parsed_reg.metadata
             }
         }
@@ -478,7 +513,7 @@ class DataIngestionPipeline:
             regulation_id=regulation.id
         ).all()
         
-        # Extract citation for sections (same as regulation)
+        # Extract citation and programs for sections (same as regulation)
         section_citation = parsed_reg.chapter or regulation.authority or f"{regulation.title}"
         
         for section in sections:
@@ -495,6 +530,7 @@ class DataIngestionPipeline:
                 'citation': section_citation,
                 'legislation_name': regulation.title,
                 'regulation_title': regulation.title,
+                'programs': programs,  # Inherit programs from regulation
                 'metadata': section.extra_metadata or {}
             }
             
@@ -545,8 +581,9 @@ class DataIngestionPipeline:
         
         for regulation in regulations:
             try:
-                # Extract citation from extra_metadata
+                # Extract citation and programs from extra_metadata
                 citation = regulation.authority
+                programs = []
                 if regulation.extra_metadata:
                     citation = (
                         regulation.extra_metadata.get('chapter') or
@@ -554,6 +591,7 @@ class DataIngestionPipeline:
                         regulation.authority or
                         regulation.title
                     )
+                    programs = regulation.extra_metadata.get('programs', [])
                 
                 # Index the regulation
                 doc = {
@@ -568,6 +606,7 @@ class DataIngestionPipeline:
                     'legislation_name': regulation.title,
                     'effective_date': regulation.effective_date.isoformat() if regulation.effective_date else None,
                     'status': regulation.status,
+                    'programs': programs,  # Add programs field
                     'metadata': regulation.extra_metadata or {}
                 }
                 
@@ -595,6 +634,7 @@ class DataIngestionPipeline:
                         'citation': citation,
                         'legislation_name': regulation.title,
                         'regulation_title': regulation.title,
+                        'programs': programs,  # Inherit programs from regulation
                         'metadata': section.extra_metadata or {}
                     }
                     

@@ -158,13 +158,14 @@ Remember: You are providing informational guidance, not legal advice. Users shou
                 logger.info(f"Returning cached answer for: {question[:50]}...")
                 return cached_answer
 
-        # Parse query to understand intent and extract filters
+        # Parse query to understand intent
         parsed_query = self.query_parser.parse_query(question)
         intent = parsed_query.intent.value
 
-        # Merge parsed filters with provided filters
+        # Use only user-provided filters, NOT auto-extracted filters
+        # Auto-extracted filters cause issues when documents lack metadata
         combined_filters = filters or {}
-        combined_filters.update(parsed_query.filters)
+        # Don't merge: combined_filters.update(parsed_query.filters)
 
         # Retrieve relevant documents
         logger.info(f"Searching for context: {question[:50]}...")
