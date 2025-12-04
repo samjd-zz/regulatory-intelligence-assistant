@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Background -->
+  <rect width="32" height="32" rx="4" fill="#0ea5e9"/>
+  
+  <!-- Chat bubble -->
+  <path d="M6 10 Q6 7 9 7 h14 Q26 7 26 10 v10 Q26 23 23 23 h-8 l-4 3 v-3 h-2 Q6 23 6 20 Z" 
+        fill="#fff" opacity="0.95"/>
+  
+  <!-- AI sparkle/star elements inside bubble -->
+  <path d="M12 14 l0.5 1.5 l1.5 0.5 l-1.5 0.5 l-0.5 1.5 l-0.5 -1.5 l-1.5 -0.5 l1.5 -0.5 Z" 
+        fill="#fbbf24" opacity="0.9"/>
+  <path d="M20 12 l0.3 1 l1 0.3 l-1 0.3 l-0.3 1 l-0.3 -1 l-1 -0.3 l1 -0.3 Z" 
+        fill="#fbbf24" opacity="0.9"/>
+  
+  <!-- Question mark (Q&A) -->
+  <text x="16" y="19" font-family="Arial, sans-serif" font-size="8" font-weight="bold" 
+        text-anchor="middle" fill="#0ea5e9">?</text>
+  
+  <!-- Small citation marks -->
+  <text x="10" y="12" font-family="serif" font-size="5" fill="#64748b" opacity="0.6">"</text>
+  <text x="20" y="18" font-family="serif" font-size="5" fill="#64748b" opacity="0.6">"</text>
+</svg>

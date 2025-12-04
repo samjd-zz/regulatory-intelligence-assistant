@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Background -->
+  <defs>
+    <radialGradient id="graphGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#1e40af;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+  
+  <rect width="32" height="32" rx="4" fill="url(#graphGrad)"/>
+  
+  <!-- Connection lines (glowing effect) -->
+  <line x1="16" y1="8" x2="10" y2="16" stroke="#3b82f6" stroke-width="1.5" opacity="0.6"/>
+  <line x1="16" y1="8" x2="22" y2="16" stroke="#3b82f6" stroke-width="1.5" opacity="0.6"/>
+  <line x1="10" y1="16" x2="16" y2="24" stroke="#3b82f6" stroke-width="1.5" opacity="0.6"/>
+  <line x1="22" y1="16" x2="16" y2="24" stroke="#3b82f6" stroke-width="1.5" opacity="0.6"/>
+  <line x1="10" y1="16" x2="22" y2="16" stroke="#3b82f6" stroke-width="1.5" opacity="0.6"/>
+  
+  <!-- Graph nodes (regulations, sections, programs) -->
+  <circle cx="16" cy="8" r="3" fill="#ef4444" opacity="0.95"/>
+  <circle cx="10" cy="16" r="3" fill="#10b981" opacity="0.95"/>
+  <circle cx="22" cy="16" r="3" fill="#10b981" opacity="0.95"/>
+  <circle cx="16" cy="24" r="3" fill="#fbbf24" opacity="0.95"/>
+  
+  <!-- Small inner circles for detail -->
+  <circle cx="16" cy="8" r="1.2" fill="#fff" opacity="0.8"/>
+  <circle cx="10" cy="16" r="1.2" fill="#fff" opacity="0.8"/>
+  <circle cx="22" cy="16" r="1.2" fill="#fff" opacity="0.8"/>
+  <circle cx="16" cy="24" r="1.2" fill="#fff" opacity="0.8"/>
+</svg>

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Background -->
+  <rect width="32" height="32" rx="4" fill="#0f172a"/>
+  
+  <!-- Knowledge graph nodes -->
+  <circle cx="12" cy="10" r="2" fill="#60a5fa" opacity="0.8"/>
+  <circle cx="20" cy="10" r="2" fill="#60a5fa" opacity="0.8"/>
+  <circle cx="12" cy="18" r="2" fill="#60a5fa" opacity="0.8"/>
+  <circle cx="8" cy="14" r="2" fill="#60a5fa" opacity="0.8"/>
+  
+  <!-- Graph connections -->
+  <line x1="12" y1="10" x2="20" y2="10" stroke="#3b82f6" stroke-width="1" opacity="0.5"/>
+  <line x1="12" y1="10" x2="8" y2="14" stroke="#3b82f6" stroke-width="1" opacity="0.5"/>
+  <line x1="12" y1="10" x2="12" y2="18" stroke="#3b82f6" stroke-width="1" opacity="0.5"/>
+  <line x1="8" y1="14" x2="12" y2="18" stroke="#3b82f6" stroke-width="1" opacity="0.5"/>
+  
+  <!-- Search magnifying glass -->
+  <circle cx="20" cy="20" r="4" fill="none" stroke="#fbbf24" stroke-width="2"/>
+  <line x1="23" y1="23" x2="27" y2="27" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+</svg>
