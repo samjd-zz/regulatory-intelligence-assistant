@@ -136,7 +136,7 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         num_context_docs: int = 5,
         use_cache: bool = True,
         temperature: float = 0.3,
-        max_tokens: int = 1024
+        max_tokens: int = 4096
     ) -> RAGAnswer:
         """
         Answer a question using RAG.
@@ -363,8 +363,14 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             )
     
     def _build_context_string(self, context_docs: List[Dict[str, Any]]) -> str:
-        """Build context string from documents"""
+        """
+        Build context string from documents with intelligent truncation.
+        
+        Limits content length to prevent input token overflow while maintaining
+        the most relevant information for each document.
+        """
         context_parts = []
+        MAX_CONTENT_LENGTH = 1500  # ~375 tokens per doc, allows 5 docs + system prompt + answer
 
         for i, doc in enumerate(context_docs, 1):
             doc_str = f"Document {i}: {doc['title']}\n"
@@ -375,9 +381,18 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             if doc.get('section_number'):
                 doc_str += f"Section: {doc['section_number']}\n"
 
-            doc_str += f"Content: {doc['content']}\n"
+            # Truncate content if too long
+            content = doc['content']
+            if len(content) > MAX_CONTENT_LENGTH:
+                content = content[:MAX_CONTENT_LENGTH] + "... [truncated]"
+                logger.debug(f"Truncated document {i} content from {len(doc['content'])} to {MAX_CONTENT_LENGTH} chars")
+
+            doc_str += f"Content: {content}\n"
 
             context_parts.append(doc_str)
+
+        total_length = sum(len(part) for part in context_parts)
+        logger.info(f"Built context with {len(context_parts)} documents, {total_length:,} total characters (~{total_length//4:,} tokens)")
 
         return "\n---\n".join(context_parts)
 
