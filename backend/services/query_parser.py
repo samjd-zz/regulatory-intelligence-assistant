@@ -39,6 +39,7 @@ class QueryIntent(str, Enum):
     PROCEDURE = "procedure"  # How to do something
     DEFINITION = "definition"  # What does a term mean
     COMPARISON = "comparison"  # Comparing regulations or options
+    STATISTICS = "statistics"  # Asking about counts, totals, numbers, statistics
     UNKNOWN = "unknown"  # Cannot determine intent
 
 
@@ -123,6 +124,14 @@ class LegalQueryParser:
             r'\b(compare|comparison|difference between|versus|vs)\b',
             r'\b(which is better|which should i|or)\b',
             r'\b(what\'s the difference)\b',
+        ],
+        QueryIntent.STATISTICS: [
+            r'\b(how many|how much|count|total|number of|amount of)\b',
+            r'\b(statistics|stats|metrics|data about)\b',
+            r'\b(quantity|volume|size)\b.*\b(database|system|collection)\b',
+            r'\b(access to|have|contain|includes?)\b.*\b(how many|count|total|number)\b',
+            r'\b(total number|total count|total amount)\b',
+            r'\bwhat\s+(is|are)\s+the\s+total\b',
         ],
     }
 
@@ -270,9 +279,17 @@ class LegalQueryParser:
         if not intent_scores:
             return self._infer_intent_from_structure(query)
 
-        # Get intent with highest score
-        best_intent = max(intent_scores, key=intent_scores.get)
-        confidence = intent_scores[best_intent]
+        # PRIORITY RULE: STATISTICS takes precedence over DEFINITION
+        # When both match (e.g., "What is the total number of..."), choose STATISTICS
+        if (QueryIntent.STATISTICS in intent_scores and 
+            QueryIntent.DEFINITION in intent_scores):
+            # If both matched, prefer STATISTICS
+            best_intent = QueryIntent.STATISTICS
+            confidence = intent_scores[QueryIntent.STATISTICS]
+        else:
+            # Get intent with highest score
+            best_intent = max(intent_scores, key=intent_scores.get)
+            confidence = intent_scores[best_intent]
 
         # Boost confidence if multiple strong signals
         if confidence > 0.5:

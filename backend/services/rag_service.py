@@ -21,7 +21,8 @@ from dataclasses import dataclass, field
 
 from services.search_service import SearchService
 from services.gemini_client import GeminiClient, get_gemini_client
-from services.query_parser import LegalQueryParser
+from services.query_parser import LegalQueryParser, QueryIntent
+from services.statistics_service import StatisticsService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -107,7 +108,8 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         self,
         search_service: Optional[SearchService] = None,
         gemini_client: Optional[GeminiClient] = None,
-        query_parser: Optional[LegalQueryParser] = None
+        query_parser: Optional[LegalQueryParser] = None,
+        statistics_service: Optional[StatisticsService] = None
     ):
         """
         Initialize RAG service.
@@ -116,10 +118,12 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             search_service: Search service instance
             gemini_client: Gemini client instance
             query_parser: Query parser instance
+            statistics_service: Statistics service instance
         """
         self.search_service = search_service or SearchService()
         self.gemini_client = gemini_client or get_gemini_client()
         self.query_parser = query_parser or LegalQueryParser(use_spacy=False)
+        self.statistics_service = statistics_service or StatisticsService()
 
         # Simple in-memory cache (would use Redis in production)
         self.cache: Dict[str, Tuple[RAGAnswer, datetime]] = {}
@@ -166,6 +170,16 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         # Auto-extracted filters cause issues when documents lack metadata
         combined_filters = filters or {}
         # Don't merge: combined_filters.update(parsed_query.filters)
+
+        # STATISTICS ROUTING: Route count/statistics questions to database
+        # instead of RAG which is limited by context window
+        if parsed_query.intent == QueryIntent.STATISTICS:
+            logger.info(f"Detected STATISTICS intent - routing to database query instead of RAG")
+            return self._answer_statistics_question(
+                question=question,
+                filters=combined_filters,
+                start_time=start_time
+            )
 
         # Retrieve relevant documents
         logger.info(f"Searching for context: {question[:50]}...")
@@ -274,6 +288,80 @@ Remember: You are providing informational guidance, not legal advice. Users shou
 
         return rag_answer
 
+    def _answer_statistics_question(
+        self,
+        question: str,
+        filters: Dict[str, Any],
+        start_time: datetime
+    ) -> RAGAnswer:
+        """
+        Answer statistics/count questions by querying database directly.
+        
+        This bypasses RAG's context window limitation to provide accurate counts.
+        
+        Args:
+            question: User's question
+            filters: Optional search filters
+            start_time: When processing started
+            
+        Returns:
+            RAGAnswer with database statistics
+        """
+        logger.info("Querying database for statistics...")
+        
+        try:
+            # Get comprehensive statistics
+            if filters:
+                # Filtered statistics
+                stats = self.statistics_service.get_total_documents(filters=filters)
+            else:
+                # Full database summary
+                stats = self.statistics_service.get_database_summary()
+            
+            # Format answer
+            answer_text = self.statistics_service.format_statistics_answer(
+                question=question,
+                statistics=stats
+            )
+            
+            # High confidence for database queries (they're accurate!)
+            confidence = 0.95
+            
+            # Build metadata
+            metadata = {
+                "method": "database_query",
+                "bypassed_rag": True,
+                "reason": "Statistics questions answered directly from database for accuracy",
+                "statistics": stats,
+                "filters_used": filters
+            }
+            
+            return RAGAnswer(
+                question=question,
+                answer=answer_text,
+                citations=[],  # No document citations for statistics
+                confidence_score=confidence,
+                source_documents=[],  # No specific documents
+                intent="statistics",
+                processing_time_ms=(datetime.now() - start_time).total_seconds() * 1000,
+                metadata=metadata
+            )
+            
+        except Exception as e:
+            logger.error(f"Error querying statistics: {e}")
+            
+            # Return error answer
+            return RAGAnswer(
+                question=question,
+                answer=f"I encountered an error while querying the database for statistics: {str(e)}. Please try again or contact support.",
+                citations=[],
+                confidence_score=0.0,
+                source_documents=[],
+                intent="statistics",
+                processing_time_ms=(datetime.now() - start_time).total_seconds() * 1000,
+                metadata={"error": str(e), "method": "database_query"}
+            )
+    
     def _build_context_string(self, context_docs: List[Dict[str, Any]]) -> str:
         """Build context string from documents"""
         context_parts = []
