@@ -327,9 +327,18 @@ class StatisticsService:
         
         # Detect what kind of count question this is
         if "total" in question_lower or "how many" in question_lower:
-            total_searchable = statistics.get("total_searchable_documents", 0)
-            total_regs = statistics.get("total_regulations", 0)
-            total_sections = statistics.get("total_sections", 0)
+            # Handle both direct stats and nested summary format
+            if "summary" in statistics:
+                # Nested format from get_database_summary()
+                summary = statistics["summary"]
+                total_searchable = summary.get("total_searchable_documents", 0)
+                total_regs = summary.get("total_regulations", 0)
+                total_sections = summary.get("total_sections", 0)
+            else:
+                # Direct format from get_total_documents()
+                total_searchable = statistics.get("total_searchable_documents", 0)
+                total_regs = statistics.get("total_regulations", 0)
+                total_sections = statistics.get("total_sections", 0)
             
             # Build comprehensive answer
             answer_parts = []
@@ -385,9 +394,18 @@ class StatisticsService:
             return answer.strip()
         
         # Default response
+        # Handle both direct stats and nested summary format
+        if "summary" in statistics:
+            summary = statistics["summary"]
+            total_searchable = summary.get("total_searchable_documents", 0)
+            total_regs = summary.get("total_regulations", 0)
+        else:
+            total_searchable = statistics.get("total_searchable_documents", 0)
+            total_regs = statistics.get("total_regulations", 0)
+        
         return (
-            f"The knowledge base contains {statistics.get('total_searchable_documents', 0):,} searchable documents "
-            f"from {statistics.get('total_regulations', 0):,} regulations."
+            f"The knowledge base contains {total_searchable:,} searchable documents "
+            f"from {total_regs:,} regulations."
         )
 
 

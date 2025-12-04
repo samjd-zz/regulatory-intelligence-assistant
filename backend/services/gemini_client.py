@@ -22,6 +22,34 @@ from google.generativeai.types import HarmCategory, HarmBlockThreshold
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Gemini API pricing (per million tokens) - Updated December 2024
+# Prices from: https://ai.google.dev/pricing
+GEMINI_PRICING = {
+    "gemini-1.5-pro": {
+        "input_price_per_million": 1.25,  # Prompts up to 128K tokens
+        "input_price_per_million_long": 2.50,  # Prompts over 128K tokens
+        "output_price_per_million": 5.00,
+        "context_caching_storage_per_million": 0.00,  # Free during preview
+    },
+    "gemini-1.5-flash": {
+        "input_price_per_million": 0.075,  # Prompts up to 128K tokens
+        "input_price_per_million_long": 0.15,  # Prompts over 128K tokens
+        "output_price_per_million": 0.30,
+        "context_caching_storage_per_million": 0.00,  # Free during preview
+    },
+    "gemini-2.0-flash-exp": {
+        "input_price_per_million": 0.00,  # Free during preview
+        "output_price_per_million": 0.00,
+        "context_caching_storage_per_million": 0.00,
+    },
+    "gemini-2.5-flash": {
+        "input_price_per_million": 0.00,  # Free during preview (experimental)
+        "input_price_per_million_long": 0.00,
+        "output_price_per_million": 0.00,
+        "context_caching_storage_per_million": 0.00,
+    }
+}
+
 
 class GeminiClient:
     """
@@ -62,6 +90,96 @@ class GeminiClient:
     def is_available(self) -> bool:
         """Check if Gemini API is available"""
         return self.available
+
+    def _calculate_cost(self, input_tokens: int, output_tokens: int, cached_tokens: int = 0) -> Dict[str, float]:
+        """
+        Calculate the cost of API usage based on token counts.
+        
+        Args:
+            input_tokens: Number of input tokens
+            output_tokens: Number of output tokens
+            cached_tokens: Number of cached tokens (for context caching)
+            
+        Returns:
+            Dict with cost breakdown
+        """
+        pricing = GEMINI_PRICING.get(self.model_name, GEMINI_PRICING["gemini-1.5-pro"])
+        
+        # Determine if long context pricing applies (over 128K tokens)
+        threshold = 128_000
+        use_long_pricing = input_tokens > threshold
+        
+        input_price = pricing["input_price_per_million_long"] if use_long_pricing else pricing["input_price_per_million"]
+        
+        # Calculate costs
+        input_cost = (input_tokens / 1_000_000) * input_price
+        output_cost = (output_tokens / 1_000_000) * pricing["output_price_per_million"]
+        cached_cost = (cached_tokens / 1_000_000) * pricing["context_caching_storage_per_million"]
+        
+        total_cost = input_cost + output_cost + cached_cost
+        
+        return {
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "cached_tokens": cached_tokens,
+            "total_tokens": input_tokens + output_tokens,
+            "input_cost_usd": round(input_cost, 6),
+            "output_cost_usd": round(output_cost, 6),
+            "cached_cost_usd": round(cached_cost, 6),
+            "total_cost_usd": round(total_cost, 6),
+            "model": self.model_name,
+            "pricing_tier": "long_context" if use_long_pricing else "standard"
+        }
+    
+    def _log_usage_metrics(self, response, operation: str = "generate") -> Optional[Dict[str, Any]]:
+        """
+        Extract and log token usage metrics from a Gemini API response.
+        
+        Args:
+            response: Gemini API response object
+            operation: Type of operation (generate, chat, etc.)
+            
+        Returns:
+            Dict with usage metrics or None if unavailable
+        """
+        try:
+            # Extract usage metadata from response
+            if hasattr(response, 'usage_metadata'):
+                usage = response.usage_metadata
+                
+                input_tokens = getattr(usage, 'prompt_token_count', 0)
+                output_tokens = getattr(usage, 'candidates_token_count', 0)
+                total_tokens = getattr(usage, 'total_token_count', 0)
+                cached_tokens = getattr(usage, 'cached_content_token_count', 0)
+                
+                # Calculate costs
+                cost_metrics = self._calculate_cost(input_tokens, output_tokens, cached_tokens)
+                
+                # Log the metrics transparently
+                logger.info(
+                    f"🤖 GEMINI API USAGE - {operation.upper()} | "
+                    f"Model: {self.model_name} | "
+                    f"Tokens: {input_tokens:,} in + {output_tokens:,} out = {total_tokens:,} total"
+                    f"{f' ({cached_tokens:,} cached)' if cached_tokens > 0 else ''} | "
+                    f"Cost: ${cost_metrics['total_cost_usd']:.6f} USD "
+                    f"(in: ${cost_metrics['input_cost_usd']:.6f}, out: ${cost_metrics['output_cost_usd']:.6f})"
+                )
+                
+                # Add timestamp and operation type
+                metrics = {
+                    **cost_metrics,
+                    "operation": operation,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                return metrics
+            else:
+                logger.warning(f"No usage_metadata in response for {operation}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to extract usage metrics: {e}", exc_info=True)
+            return None
 
     def generate_content(
         self,
@@ -117,6 +235,9 @@ class GeminiClient:
                 safety_settings=safety_settings
             )
 
+            # Log usage metrics for transparency
+            self._log_usage_metrics(response, operation="generate_content")
+
             return self._extract_text_from_response(response)
 
         except Exception as e:
@@ -142,29 +263,99 @@ class GeminiClient:
             logger.debug(f"Simple text accessor failed, trying multi-part extraction: {e}")
             
             try:
-                # Extract text from all parts
-                if hasattr(response, 'candidates') and response.candidates:
-                    texts = []
-                    for candidate in response.candidates:
-                        if hasattr(candidate, 'content') and hasattr(candidate.content, 'parts'):
-                            for part in candidate.content.parts:
-                                if hasattr(part, 'text'):
-                                    texts.append(part.text)
+                texts = []
+                
+                # Detailed debugging: Log full response structure
+                logger.info(f"=== DEBUGGING GEMINI RESPONSE ===")
+                logger.info(f"Response type: {type(response)}")
+                
+                if hasattr(response, '__dict__'):
+                    logger.info(f"Response attributes: {list(response.__dict__.keys())}")
+                    # Log the actual values (safely)
+                    for key in response.__dict__.keys():
+                        try:
+                            value = getattr(response, key)
+                            logger.info(f"  {key}: {type(value)} = {str(value)[:200]}")
+                        except Exception as attr_error:
+                            logger.info(f"  {key}: <error accessing: {attr_error}>")
+                
+                # Check prompt_feedback for safety blocks or issues
+                if hasattr(response, 'prompt_feedback'):
+                    logger.info(f"Prompt feedback: {response.prompt_feedback}")
+                    if hasattr(response.prompt_feedback, 'block_reason'):
+                        logger.warning(f"BLOCKED! Reason: {response.prompt_feedback.block_reason}")
+                    if hasattr(response.prompt_feedback, 'safety_ratings'):
+                        logger.info(f"Safety ratings: {response.prompt_feedback.safety_ratings}")
+                
+                # Check candidates
+                if hasattr(response, 'candidates'):
+                    logger.info(f"Number of candidates: {len(response.candidates) if response.candidates else 0}")
                     
-                    if texts:
-                        return ' '.join(texts)
+                    if response.candidates:
+                        for idx, candidate in enumerate(response.candidates):
+                            logger.info(f"  Candidate {idx}:")
+                            
+                            # Check finish_reason
+                            if hasattr(candidate, 'finish_reason'):
+                                logger.info(f"    Finish reason: {candidate.finish_reason}")
+                            
+                            # Check safety ratings
+                            if hasattr(candidate, 'safety_ratings'):
+                                logger.info(f"    Safety ratings: {candidate.safety_ratings}")
+                            
+                            # Try to extract content
+                            if hasattr(candidate, 'content'):
+                                logger.info(f"    Content type: {type(candidate.content)}")
+                                
+                                # Check if content has parts
+                                if hasattr(candidate.content, 'parts'):
+                                    logger.info(f"    Number of parts: {len(candidate.content.parts) if candidate.content.parts else 0}")
+                                    if candidate.content.parts:
+                                        for part_idx, part in enumerate(candidate.content.parts):
+                                            logger.info(f"      Part {part_idx}: {type(part)}")
+                                            if hasattr(part, 'text'):
+                                                logger.info(f"        Has text: {bool(part.text)}")
+                                                if part.text:
+                                                    texts.append(part.text)
+                                                    logger.info(f"        Extracted text (first 100 chars): {part.text[:100]}")
+                                            else:
+                                                logger.info(f"        No text attribute")
+                                                
+                                # Sometimes content.text works directly
+                                elif hasattr(candidate.content, 'text'):
+                                    logger.info(f"    Content has text attribute: {bool(candidate.content.text)}")
+                                    if candidate.content.text:
+                                        texts.append(candidate.content.text)
+                                        logger.info(f"    Extracted text (first 100 chars): {candidate.content.text[:100]}")
+                            else:
+                                logger.warning(f"    Candidate {idx} has no content attribute")
+                    else:
+                        logger.warning("Response has candidates attribute but it's empty/None")
+                else:
+                    logger.warning("Response has no candidates attribute")
                 
-                # If that doesn't work, try response.parts directly
-                if hasattr(response, 'parts'):
-                    texts = [part.text for part in response.parts if hasattr(part, 'text')]
-                    if texts:
-                        return ' '.join(texts)
+                logger.info(f"=== END GEMINI RESPONSE DEBUG ===")
                 
-                logger.error("Could not extract text from multi-part response")
+                if texts:
+                    logger.info(f"Successfully extracted {len(texts)} text part(s)")
+                    return ' '.join(texts)
+                
+                # Method 2: Try response.parts directly
+                if hasattr(response, 'parts') and response.parts:
+                    logger.info("Trying response.parts directly")
+                    for part in response.parts:
+                        if hasattr(part, 'text') and part.text:
+                            texts.append(part.text)
+                
+                if texts:
+                    logger.info(f"Successfully extracted {len(texts)} text part(s) from response.parts")
+                    return ' '.join(texts)
+                
+                logger.error(f"Could not extract any text from response")
                 return None
                 
             except Exception as extract_error:
-                logger.error(f"Failed to extract text from multi-part response: {extract_error}")
+                logger.error(f"Failed to extract text from multi-part response: {extract_error}", exc_info=True)
                 return None
 
     def chat(
@@ -211,6 +402,9 @@ class GeminiClient:
                     "max_output_tokens": max_tokens if max_tokens else 2048,
                 }
             )
+
+            # Log usage metrics for transparency
+            self._log_usage_metrics(response, operation="chat")
 
             return self._extract_text_from_response(response)
 
