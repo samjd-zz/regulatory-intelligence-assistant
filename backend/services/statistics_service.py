@@ -22,7 +22,6 @@ from datetime import datetime
 
 from database import SessionLocal
 from models.models import Regulation, Section, Amendment
-from models.document_models import Document
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -62,7 +61,7 @@ class StatisticsService:
         filters: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Get total count of documents/regulations.
+        Get total count of searchable documents (regulations + sections).
         
         Args:
             filters: Optional filters (jurisdiction, language, status, etc.)
@@ -73,48 +72,56 @@ class StatisticsService:
         session = self._get_session()
         
         try:
-            # Query documents table (indexed content)
-            doc_query = session.query(func.count(Document.id))
-            
-            # Query regulations table (source regulations)
+            # Count regulations from regulations table (the CORRECT table!)
             reg_query = session.query(func.count(Regulation.id))
+            
+            # Count sections from sections table (these are searchable too!)
+            section_query = session.query(func.count(Section.id))
             
             # Apply filters if provided
             if filters:
                 if 'jurisdiction' in filters:
                     jurisdiction = filters['jurisdiction']
-                    doc_query = doc_query.filter(
-                        Document.jurisdiction == jurisdiction
-                    )
                     reg_query = reg_query.filter(
+                        Regulation.jurisdiction == jurisdiction
+                    )
+                    # For sections, need to join with regulations to filter by jurisdiction
+                    section_query = section_query.join(Regulation).filter(
                         Regulation.jurisdiction == jurisdiction
                     )
                 
                 if 'language' in filters:
                     language = filters['language']
-                    # Note: Document model may not have language field
-                    # Only filter regulations by language
                     reg_query = reg_query.filter(
+                        Regulation.language == language
+                    )
+                    # For sections, join with regulations to filter by language
+                    section_query = section_query.join(Regulation).filter(
                         Regulation.language == language
                     )
                 
                 if 'status' in filters:
                     status = filters['status']
-                    # Filter documents by status
-                    doc_query = doc_query.filter(
-                        Document.status == filters['status']
-                    )
                     reg_query = reg_query.filter(
+                        Regulation.status == filters['status']
+                    )
+                    # Sections don't have status, filter by parent regulation
+                    section_query = section_query.join(Regulation).filter(
                         Regulation.status == status
                     )
             
             # Execute queries
-            doc_count = doc_query.scalar()
-            reg_count = reg_query.scalar()
+            reg_count = reg_query.scalar() or 0
+            section_count = section_query.scalar() or 0
+            
+            # Total searchable documents = regulations + sections
+            # (Each regulation and each section is indexed as a separate searchable document)
+            total_searchable = reg_count + section_count
             
             return {
-                "total_documents": doc_count or 0,
-                "total_regulations": reg_count or 0,
+                "total_searchable_documents": total_searchable,
+                "total_regulations": reg_count,
+                "total_sections": section_count,
                 "filters_applied": filters or {},
                 "timestamp": datetime.utcnow().isoformat()
             }
@@ -122,8 +129,9 @@ class StatisticsService:
         except Exception as e:
             logger.error(f"Error getting document count: {e}")
             return {
-                "total_documents": 0,
+                "total_searchable_documents": 0,
                 "total_regulations": 0,
+                "total_sections": 0,
                 "error": str(e),
                 "filters_applied": filters or {}
             }
@@ -132,7 +140,7 @@ class StatisticsService:
     
     def get_documents_by_jurisdiction(self) -> Dict[str, int]:
         """
-        Get document counts grouped by jurisdiction.
+        Get regulation counts grouped by jurisdiction.
         
         Returns:
             Dictionary mapping jurisdiction to count
@@ -140,11 +148,11 @@ class StatisticsService:
         session = self._get_session()
         
         try:
-            # Query documents grouped by jurisdiction
+            # Query regulations grouped by jurisdiction
             results = session.query(
-                Document.jurisdiction,
-                func.count(Document.id)
-            ).group_by(Document.jurisdiction).all()
+                Regulation.jurisdiction,
+                func.count(Regulation.id)
+            ).group_by(Regulation.jurisdiction).all()
             
             return {
                 jurisdiction: count
@@ -159,7 +167,7 @@ class StatisticsService:
     
     def get_documents_by_type(self) -> Dict[str, int]:
         """
-        Get document counts grouped by document type.
+        Get regulation counts by type (all are regulations in the current data).
         
         Returns:
             Dictionary mapping document type to count
@@ -167,15 +175,11 @@ class StatisticsService:
         session = self._get_session()
         
         try:
-            # Query documents grouped by type
-            results = session.query(
-                Document.document_type,
-                func.count(Document.id)
-            ).group_by(Document.document_type).all()
+            # All items in regulations table are regulations
+            total = session.query(func.count(Regulation.id)).scalar() or 0
             
             return {
-                str(doc_type): count
-                for doc_type, count in results
+                "regulation": total
             }
             
         except Exception as e:
@@ -284,9 +288,9 @@ class StatisticsService:
             
             return {
                 "summary": {
-                    "total_documents": total_stats.get("total_documents", 0),
+                    "total_searchable_documents": total_stats.get("total_searchable_documents", 0),
                     "total_regulations": total_stats.get("total_regulations", 0),
-                    "total_sections": self.get_sections_count(),
+                    "total_sections": total_stats.get("total_sections", 0),
                     "total_amendments": self.get_amendments_count(),
                 },
                 "by_jurisdiction": self.get_documents_by_jurisdiction(),
@@ -323,25 +327,31 @@ class StatisticsService:
         
         # Detect what kind of count question this is
         if "total" in question_lower or "how many" in question_lower:
-            total_docs = statistics.get("total_documents", 0)
+            total_searchable = statistics.get("total_searchable_documents", 0)
             total_regs = statistics.get("total_regulations", 0)
+            total_sections = statistics.get("total_sections", 0)
             
-            # Determine which count to use
+            # Build comprehensive answer
             answer_parts = []
             
-            if total_docs > 0:
+            if total_searchable > 0:
                 answer_parts.append(
-                    f"The database currently contains **{total_docs:,} indexed documents** "
-                    f"(searchable content chunks)"
+                    f"The knowledge base contains **{total_searchable:,} searchable documents** indexed for retrieval"
                 )
             
+            # Breakdown
+            breakdown_parts = []
             if total_regs > 0:
-                answer_parts.append(
-                    f"These documents come from **{total_regs:,} source regulations** "
-                    f"(Acts, Regulations, and legal documents)"
-                )
+                breakdown_parts.append(f"**{total_regs:,} regulations** (Acts, Regulations, and legal instruments)")
             
-            answer = ". ".join(answer_parts) + "."
+            if total_sections > 0:
+                breakdown_parts.append(f"**{total_sections:,} sections** (individual provisions within regulations)")
+            
+            if breakdown_parts:
+                answer_parts.append("This includes:")
+                answer = ". ".join(answer_parts) + ":\n\n" + "\n".join(f"- {part}" for part in breakdown_parts)
+            else:
+                answer = ". ".join(answer_parts) + "."
             
             # Add breakdown if available
             if "by_jurisdiction" in statistics:
@@ -353,30 +363,30 @@ class StatisticsService:
                         key=lambda x: x[1],
                         reverse=True
                     ):
-                        answer += f"- {jurisdiction}: {count:,} documents\n"
+                        answer += f"- {jurisdiction}: {count:,} regulations\n"
             
             if "by_language" in statistics:
                 languages = statistics["by_language"]
                 if languages:
-                    answer += "\n**By Language:**\n"
+                    answer += "\n\n**By Language:**\n"
                     for language, count in sorted(
                         languages.items(),
                         key=lambda x: x[1],
                         reverse=True
                     ):
                         lang_name = "English" if language == "en" else "French" if language == "fr" else language
-                        answer += f"- {lang_name}: {count:,} documents\n"
+                        answer += f"- {lang_name}: {count:,} regulations\n"
             
             # Add filters info if applied
             filters_applied = statistics.get("filters_applied", {})
             if filters_applied:
-                answer += f"\n*Note: These counts reflect the filters applied: {filters_applied}*"
+                answer += f"\n\n*Note: These counts reflect the filters applied: {filters_applied}*"
             
             return answer.strip()
         
         # Default response
         return (
-            f"The database contains {statistics.get('total_documents', 0):,} documents "
+            f"The knowledge base contains {statistics.get('total_searchable_documents', 0):,} searchable documents "
             f"from {statistics.get('total_regulations', 0):,} regulations."
         )
 
@@ -390,10 +400,11 @@ if __name__ == "__main__":
     service = StatisticsService()
     
     # Test 1: Total documents
-    print("\n1. Total Documents:")
+    print("\n1. Total Searchable Documents:")
     total = service.get_total_documents()
-    print(f"   Documents: {total['total_documents']:,}")
+    print(f"   Total Searchable: {total['total_searchable_documents']:,}")
     print(f"   Regulations: {total['total_regulations']:,}")
+    print(f"   Sections: {total['total_sections']:,}")
     
     # Test 2: By jurisdiction
     print("\n2. Documents by Jurisdiction:")
@@ -411,10 +422,10 @@ if __name__ == "__main__":
     for language, count in by_language.items():
         print(f"   {language}: {count:,}")
     
-    # Test 4: Database summary
+    # Test 4: Database Summary:
     print("\n4. Database Summary:")
     summary = service.get_database_summary()
-    print(f"   Total Documents: {summary['summary']['total_documents']:,}")
+    print(f"   Total Searchable Documents: {summary['summary']['total_searchable_documents']:,}")
     print(f"   Total Regulations: {summary['summary']['total_regulations']:,}")
     print(f"   Total Sections: {summary['summary']['total_sections']:,}")
     print(f"   Total Amendments: {summary['summary']['total_amendments']:,}")
