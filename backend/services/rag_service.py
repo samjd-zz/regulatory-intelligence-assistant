@@ -136,7 +136,7 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         num_context_docs: int = 5,
         use_cache: bool = True,
         temperature: float = 0.3,
-        max_tokens: int = 4096
+        max_tokens: int = 8192
     ) -> RAGAnswer:
         """
         Answer a question using RAG.

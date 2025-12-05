@@ -404,12 +404,20 @@ The RAG system uses Google's Gemini API for question answering. You'll need:
 
 **Available Models** (can be changed in `.env`):
 
-- `gemini-1.5-flash-latest` (default - fastest, good for most use cases)
-- `gemini-1.5-pro-latest` (more capable, slightly slower)
+- `gemini-1.5-flash` (recommended - stable, 8192 token output limit, good for comprehensive answers)
+- `gemini-1.5-flash-latest` (alternative - latest version, may have experimental changes)
+- `gemini-1.5-pro-latest` (more capable, slightly slower, higher cost)
 - `gemini-pro` (stable baseline model)
 - `gemini-1.0-pro` (older stable version)
 
-**Note**: The model name must match the format supported by Gemini API v1beta. Using incorrect model names (e.g., `gemini-1.5-flash` without `-latest`) will cause "404 model not found" errors.
+**⚠️ Model Recommendations**:
+
+- **Use `gemini-1.5-flash`** (without `-latest`) for stable, production-ready responses
+- **Avoid `gemini-2.5-flash`** or other experimental models - these may have token limits or API instabilities
+- The RAG service is configured with `max_tokens: 8192` to support comprehensive answers
+- If you see MAX_TOKENS errors or incomplete responses, verify you're using `gemini-1.5-flash` (not experimental models)
+
+**Note**: The model name must match the format supported by Gemini API v1beta. Using incorrect model names (e.g., `gemini-2.5-flash`) may cause "404 model not found" errors or incomplete responses.
 
 ### Installation
 
