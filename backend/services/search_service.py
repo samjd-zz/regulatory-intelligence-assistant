@@ -13,6 +13,7 @@ Created: 2025-11-22
 
 import json
 import os
+import re
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +26,17 @@ from sentence_transformers import SentenceTransformer
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Common Canadian federal act patterns for exact matching
+# These patterns extract act names from queries like "Tell me about the Employment Insurance Act"
+ACT_NAME_PATTERNS = [
+    # Match "the X Act" where X is capitalized words
+    r'(?:the\s+)?([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*)\s+Act\b',
+    # Match "the X Code" 
+    r'(?:the\s+)?([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*)\s+Code\b',
+    # Match "the X Regulations"
+    r'(?:the\s+)?([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*)\s+Regulations?\b',
+]
 
 
 class SearchService:
@@ -64,6 +76,77 @@ class SearchService:
             logger.info(f"Loading embedding model: {self.embedding_model_name}")
             self.embedder = SentenceTransformer(self.embedding_model_name)
         return self.embedder
+    
+    def _extract_act_names(self, query: str) -> List[str]:
+        """
+        Extract potential Act names from the query.
+        
+        Examples:
+            "Tell me about the Employment Insurance Act" -> ["Employment Insurance Act"]
+            "What does the Canada Pension Plan Act cover?" -> ["Canada Pension Plan Act"]
+            "Criminal Code of Canada" -> ["Criminal Code"]
+        
+        Returns:
+            List of extracted act names
+        """
+        act_names = []
+        
+        for pattern in ACT_NAME_PATTERNS:
+            # Don't use re.IGNORECASE - we want to match only properly capitalized act names
+            # This prevents matching "What does the Excise Tax Act" and instead matches just "Excise Tax Act"
+            matches = re.finditer(pattern, query)
+            for match in matches:
+                # Get the full match (including "Act", "Code", etc.)
+                act_name = match.group(0).strip()
+                # Remove optional "the " prefix if present
+                if act_name.lower().startswith('the '):
+                    act_name = act_name[4:]
+                if act_name and len(act_name) > 5:  # Filter out very short matches
+                    act_names.append(act_name)
+        
+        return list(set(act_names))  # Remove duplicates
+    
+    def _detect_query_intent(self, query: str) -> Dict[str, Any]:
+        """
+        Detect query intent to optimize search strategy.
+        
+        Returns:
+            Dict with intent information:
+                - type: "overview", "specific_question", "comparison", etc.
+                - act_names: List of detected act names
+                - wants_summary: Whether query asks for summary/overview
+                - prefers_acts: Whether to prioritize act-level documents
+        """
+        query_lower = query.lower()
+        
+        # Extract act names
+        act_names = self._extract_act_names(query)
+        
+        # Detect overview/summary requests (expanded to include coverage questions)
+        overview_keywords = ['about', 'overview', 'summary', 'summarize', 'explain', 'what is', 
+                            'tell me about', 'describe', 'introduce', 'what does', 'cover']
+        wants_summary = any(keyword in query_lower for keyword in overview_keywords)
+        
+        # Special case: "what does X cover?" is always an overview question
+        if 'cover' in query_lower and len(act_names) > 0:
+            wants_summary = True
+        
+        # Detect specific section/subsection questions
+        specific_keywords = ['how to', 'can i', 'am i eligible', 'what are the requirements',
+                           'section', 'subsection', 'paragraph', 'clause']
+        is_specific = any(keyword in query_lower for keyword in specific_keywords)
+        
+        # Determine if we should prefer act-level documents
+        # If act names are detected and NOT asking about specific sections, prefer act-level docs
+        prefers_acts = len(act_names) > 0 and not is_specific
+        
+        return {
+            'type': 'overview' if wants_summary else 'specific',
+            'act_names': act_names,
+            'wants_summary': wants_summary,
+            'is_specific': is_specific,
+            'prefers_acts': prefers_acts
+        }
 
     def create_index(self, force_recreate: bool = False) -> bool:
         """
@@ -313,7 +396,7 @@ class SearchService:
                      keyword_weight: float = 0.5,
                      vector_weight: float = 0.5) -> Dict[str, Any]:
         """
-        Perform hybrid search combining keyword and vector search.
+        Perform intelligent hybrid search with query-aware boosting.
 
         Args:
             query: Search query text
@@ -327,6 +410,23 @@ class SearchService:
             Combined and re-ranked search results
         """
         try:
+            # Detect query intent for intelligent search optimization
+            intent = self._detect_query_intent(query)
+            
+            # Log intent detection for debugging
+            if intent['act_names']:
+                logger.info(f"Detected act names in query: {intent['act_names']}")
+            logger.info(f"Query intent: {intent['type']}, prefers_acts: {intent['prefers_acts']}")
+            
+            # Adjust weights based on query type
+            # For overview queries about specific acts, favor keyword matching (titles)
+            # For complex/specific questions, favor semantic understanding
+            if intent['wants_summary'] and intent['act_names']:
+                # Override weights for overview queries - heavily favor exact title matches
+                keyword_weight = 0.7
+                vector_weight = 0.3
+                logger.info(f"Adjusted weights for overview query: keyword={keyword_weight}, vector={vector_weight}")
+            
             # Perform both searches
             keyword_results = self.keyword_search(query, filters, size=size*2, from_=from_)
             vector_results = self.vector_search(query, filters, size=size*2, from_=from_)
@@ -340,7 +440,9 @@ class SearchService:
                 combined_scores[doc_id] = {
                     'document': hit,
                     'keyword_score': hit['score'] * keyword_weight,
-                    'vector_score': 0.0
+                    'vector_score': 0.0,
+                    'title_boost': 0.0,
+                    'doc_type_boost': 0.0
                 }
 
             # Add vector scores
@@ -352,16 +454,51 @@ class SearchService:
                     combined_scores[doc_id] = {
                         'document': hit,
                         'keyword_score': 0.0,
-                        'vector_score': hit['score'] * vector_weight
+                        'vector_score': hit['score'] * vector_weight,
+                        'title_boost': 0.0,
+                        'doc_type_boost': 0.0
                     }
 
-            # Calculate combined scores
+            # Apply intelligent boosting based on query intent
             for doc_id, scores in combined_scores.items():
-                scores['combined_score'] = scores['keyword_score'] + scores['vector_score']
+                doc_source = scores['document']['source']
+                doc_title = doc_source.get('title', '').lower()
+                legislation_name = doc_source.get('legislation_name', '').lower()
+                doc_type = doc_source.get('document_type', '')
+                
+                # BOOST 1: Exact act name matching (10x boost)
+                # If query mentions "Employment Insurance Act", heavily boost docs with that exact title
+                for act_name in intent['act_names']:
+                    act_name_lower = act_name.lower()
+                    if act_name_lower in doc_title or act_name_lower in legislation_name:
+                        scores['title_boost'] = 10.0
+                        logger.debug(f"Applied title boost to: {doc_title[:50]}...")
+                        break
+                
+                # BOOST 2: Document type preference for overview queries
+                # When asking "Tell me about X Act", prefer regulation/act-level docs over sections
+                if intent['prefers_acts']:
+                    # Boost act-level documents (regulation, legislation, act overview)
+                    if doc_type in ['regulation', 'legislation', 'act'] or 'act' in doc_title:
+                        # Check if it's NOT a section (sections usually have "section X" in title)
+                        if not re.search(r'section\s+\d+', doc_title, re.IGNORECASE):
+                            scores['doc_type_boost'] = 5.0
+                            logger.debug(f"Applied doc type boost to: {doc_title[:50]}...")
+                
+                # Calculate final combined score with boosts
+                scores['combined_score'] = (
+                    scores['keyword_score'] + 
+                    scores['vector_score'] + 
+                    scores['title_boost'] + 
+                    scores['doc_type_boost']
+                )
+                
                 scores['document']['score'] = scores['combined_score']
                 scores['document']['score_breakdown'] = {
                     'keyword': scores['keyword_score'],
                     'vector': scores['vector_score'],
+                    'title_boost': scores['title_boost'],
+                    'doc_type_boost': scores['doc_type_boost'],
                     'combined': scores['combined_score']
                 }
 
@@ -378,10 +515,15 @@ class SearchService:
             return {
                 "hits": final_hits,
                 "total": len(final_hits),
-                "search_type": "hybrid",
+                "search_type": "hybrid_intelligent",
+                "intent": intent,
                 "weights": {
                     "keyword": keyword_weight,
                     "vector": vector_weight
+                },
+                "boosts_applied": {
+                    "title_boost": "10x for exact act name matches",
+                    "doc_type_boost": "5x for act-level documents on overview queries"
                 }
             }
 
