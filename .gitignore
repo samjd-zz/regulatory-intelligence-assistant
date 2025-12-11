@@ -193,7 +193,7 @@ service-account.json
 
 # Docker
 docker-compose.override.yml
-.dockerignore
+# Note: .dockerignore files should be tracked (removed blanket ignore)
 
 # Testing
 .pytest_cache/
