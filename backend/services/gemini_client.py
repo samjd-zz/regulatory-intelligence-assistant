@@ -174,7 +174,9 @@ class GeminiClient:
                 
                 return metrics
             else:
-                logger.warning(f"No usage_metadata in response for {operation}")
+                # usage_metadata is not always available in Gemini API responses
+                # This is normal for some models/API versions and doesn't affect functionality
+                logger.debug(f"ℹ️  Usage metadata not available for {operation} (this is normal for {self.model_name})")
                 return None
                 
         except Exception as e:
@@ -238,7 +240,15 @@ class GeminiClient:
             # Log usage metrics for transparency
             self._log_usage_metrics(response, operation="generate_content")
 
-            return self._extract_text_from_response(response)
+            # Extract text with detailed logging
+            extracted_text = self._extract_text_from_response(response)
+            
+            if extracted_text:
+                logger.info(f"✅ Successfully extracted {len(extracted_text)} characters from Gemini response")
+            else:
+                logger.error(f"❌ Failed to extract text from Gemini response - response may be blocked or empty")
+                
+            return extracted_text
 
         except Exception as e:
             logger.error(f"Content generation failed: {e}")
@@ -257,7 +267,10 @@ class GeminiClient:
         """
         try:
             # Try the simple accessor first
-            return response.text
+            result_text = response.text
+            if result_text and result_text.strip():
+                return result_text
+            logger.warning("response.text is empty or whitespace only")
         except (ValueError, AttributeError) as e:
             # Handle multi-part responses
             logger.debug(f"Simple text accessor failed, trying multi-part extraction: {e}")

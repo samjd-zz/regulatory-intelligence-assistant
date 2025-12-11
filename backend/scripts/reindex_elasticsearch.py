@@ -59,6 +59,7 @@ def main():
                     'authority': regulation.authority,
                     'citation': citation,
                     'legislation_name': regulation.title,
+                    'language': regulation.language or 'en',  # Add language field
                     'effective_date': regulation.effective_date.isoformat() if regulation.effective_date else None,
                     'status': regulation.status,
                     'metadata': regulation.extra_metadata or {}
@@ -85,6 +86,7 @@ def main():
                         'authority': regulation.authority,
                         'citation': citation,
                         'legislation_name': regulation.title,
+                        'language': regulation.language or 'en',  # Add language field to sections too
                         'metadata': section.extra_metadata or {}
                     }
                     
