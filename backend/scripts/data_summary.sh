@@ -18,10 +18,15 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 BOLD='\033[1m'
 
-# Container names (adjust if your setup is different)
-POSTGRES_CONTAINER="regulatory-postgres"
-NEO4J_CONTAINER="regulatory-neo4j"
-ELASTICSEARCH_CONTAINER="regulatory-elasticsearch"
+# Dynamically find container names (handles containers with ID prefixes)
+POSTGRES_CONTAINER=$(docker ps --format '{{.Names}}' | grep 'regulatory-postgres' | head -n 1)
+NEO4J_CONTAINER=$(docker ps --format '{{.Names}}' | grep 'regulatory-neo4j' | head -n 1)
+ELASTICSEARCH_CONTAINER=$(docker ps --format '{{.Names}}' | grep 'regulatory-elasticsearch' | head -n 1)
+
+# Fallback to exact names if dynamic lookup fails
+POSTGRES_CONTAINER=${POSTGRES_CONTAINER:-"regulatory-postgres"}
+NEO4J_CONTAINER=${NEO4J_CONTAINER:-"regulatory-neo4j"}
+ELASTICSEARCH_CONTAINER=${ELASTICSEARCH_CONTAINER:-"regulatory-elasticsearch"}
 
 echo ""
 echo -e "${BOLD}${CYAN}╔═══════════════════════════════════════════════════════════════╗${NC}"
