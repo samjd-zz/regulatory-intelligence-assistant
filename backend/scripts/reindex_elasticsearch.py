@@ -38,8 +38,9 @@ def main():
         
         for i, regulation in enumerate(regulations, 1):
             try:
-                # Extract citation from extra_metadata
+                # Extract citation and programs from extra_metadata
                 citation = regulation.authority
+                programs = []
                 if regulation.extra_metadata:
                     citation = (
                         regulation.extra_metadata.get('chapter') or
@@ -47,6 +48,7 @@ def main():
                         regulation.authority or
                         regulation.title
                     )
+                    programs = regulation.extra_metadata.get('programs', [])
                 
                 # Index the regulation
                 doc = {
@@ -62,6 +64,7 @@ def main():
                     'language': regulation.language or 'en',  # Add language field
                     'effective_date': regulation.effective_date.isoformat() if regulation.effective_date else None,
                     'status': regulation.status,
+                    'programs': programs,  # Add programs field
                     'metadata': regulation.extra_metadata or {}
                 }
                 
@@ -87,6 +90,7 @@ def main():
                         'citation': citation,
                         'legislation_name': regulation.title,
                         'language': regulation.language or 'en',  # Add language field to sections too
+                        'programs': programs,  # Inherit programs from regulation
                         'metadata': section.extra_metadata or {}
                     }
                     

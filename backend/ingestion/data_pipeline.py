@@ -491,6 +491,7 @@ class DataIngestionPipeline:
             'authority': regulation.authority,
             'citation': parsed_reg.chapter or regulation.authority or f"{regulation.title}",
             'legislation_name': regulation.title,
+            'language': regulation.language or 'en',  # Add language field
             'effective_date': regulation.effective_date.isoformat() if regulation.effective_date else None,
             'status': regulation.status,
             'programs': programs,  # Add programs field for filtering
