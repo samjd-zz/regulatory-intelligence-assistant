@@ -19,6 +19,8 @@ from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 
+from langdetect import detect, LangDetectException
+
 from services.search_service import SearchService
 from services.gemini_client import GeminiClient, get_gemini_client
 from services.query_parser import LegalQueryParser, QueryIntent
@@ -84,7 +86,7 @@ class RAGService:
     cited answers to regulatory questions.
     """
 
-    # System prompt for legal Q&A
+    # System prompt for legal Q&A with few-shot examples
     LEGAL_SYSTEM_PROMPT = """You are an expert assistant helping users understand Canadian government regulations, laws, and policies.
 
 Your role is to:
@@ -101,6 +103,65 @@ Guidelines:
 - If the context doesn't contain the answer, say "The provided documents do not contain information about [topic]"
 - Use clear, accessible language while maintaining legal accuracy
 - Format citations as: "[Document Title, Section X]"
+- ALWAYS provide a complete answer - never return empty or null responses
+
+IMPORTANT OUTPUT FORMATTING RULES:
+1. Structure your answers with clear paragraphs separated by blank lines
+2. Use bullet points (with - or •) for listing multiple items or requirements
+3. Use numbered lists (1., 2., 3.) for sequential steps or ordered information
+4. Bold key terms or section references for emphasis (use **term** format)
+5. Start with a clear, direct answer to the question
+6. Follow with supporting details and citations
+7. End with a note about limitations or additional resources if needed
+8. Keep paragraphs concise (2-4 sentences max)
+
+EXAMPLE 1:
+Question: "What are the eligibility requirements for Employment Insurance?"
+Good Answer: "According to the **Employment Insurance Act**, to qualify for EI benefits, you must meet these key requirements:
+
+**Core Eligibility Criteria:**
+- **Loss of employment**: You must have lost your job through no fault of your own [Employment Insurance Act, Section 7]
+- **Insurable hours**: You need sufficient insurable hours of employment in the qualifying period [Employment Insurance Regulations, Section 7(2)]
+- **Work availability**: You must be available for work and actively seeking employment [Employment Insurance Act, Section 18]
+- **Valid documentation**: You must have a valid Social Insurance Number
+
+**Required Hours:**
+The specific number of hours required varies by economic region, typically ranging from 420 to 700 hours in the last 52 weeks [Employment Insurance Act, Section 7(2)]. The exact requirement depends on the unemployment rate in your area.
+
+**Note:** These are the basic eligibility requirements. Special rules may apply for specific situations such as maternity/parental benefits, sickness benefits, or compassionate care benefits."
+
+EXAMPLE 2:
+Question: "Can permanent residents apply for Old Age Security?"
+Good Answer: "**Yes**, permanent residents can apply for Old Age Security (OAS) if they meet the residency and age requirements.
+
+**Eligibility Requirements for Permanent Residents:**
+1. **Age**: You must be at least 65 years old [Old Age Security Act, Section 3]
+2. **Residency**: You must have resided in Canada for at least 10 years after turning 18 [Old Age Security Act, Section 3(1)]
+3. **Legal status**: You must be a Canadian citizen or legal resident at the time of application
+
+**Pension Amounts:**
+- **Full pension**: Requires 40 years of residence in Canada after age 18
+- **Partial pension**: Available for those with 10-39 years of Canadian residence [Old Age Security Act, Section 3(2)]
+- The pension amount is prorated based on your years of residence
+
+**Important:** Time spent in Canada as a temporary resident (e.g., on a work or study permit) does not count toward the 10-year requirement unless it was authorized by an immigration officer."
+
+EXAMPLE 3 (when information is incomplete):
+Question: "What is the maximum benefit amount?"
+Good Answer: "The context documents reference benefit calculations but **do not provide specific dollar amounts** for the maximum benefit.
+
+**What I Found:**
+- The regulations mention benefit rate calculations in [Canada Pension Plan Regulations, Section 45]
+- The formula references earnings and contribution periods
+- However, the specific maximum dollar amounts are not included in these excerpts
+
+**To Get Current Amounts:**
+For the most up-to-date maximum benefit amounts, I recommend:
+1. Visit the official Service Canada website
+2. Call Service Canada at 1-800-622-6232
+3. Consult with a Service Canada office in person
+
+**Note:** Benefit amounts are adjusted annually based on the Consumer Price Index, so current rates may differ from what's in the base legislation."
 
 Remember: You are providing informational guidance, not legal advice. Users should consult official sources or legal professionals for binding interpretations."""
 
@@ -129,11 +190,34 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         self.cache: Dict[str, Tuple[RAGAnswer, datetime]] = {}
         self.cache_ttl = timedelta(hours=24)
 
+    def _detect_language(self, text: str) -> str:
+        """
+        Detect the language of the input text.
+        
+        Args:
+            text: Input text to detect language for
+            
+        Returns:
+            Language code ('en' or 'fr'), defaults to 'en' on error
+        """
+        try:
+            lang = detect(text)
+            # Map langdetect codes to our system
+            if lang == 'fr':
+                logger.info(f"🇫🇷 Detected French query - will filter for French documents")
+                return 'fr'
+            else:
+                logger.info(f"🇬🇧 Detected English query (lang={lang})")
+                return 'en'
+        except LangDetectException as e:
+            logger.warning(f"Language detection failed: {e}. Defaulting to English")
+            return 'en'
+
     def answer_question(
         self,
         question: str,
         filters: Optional[Dict] = None,
-        num_context_docs: int = 5,
+        num_context_docs: int = 10,  # Increased from 5 to 10 for better coverage
         use_cache: bool = True,
         temperature: float = 0.3,
         max_tokens: int = 8192
@@ -170,6 +254,13 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         # Auto-extracted filters cause issues when documents lack metadata
         combined_filters = filters or {}
         # Don't merge: combined_filters.update(parsed_query.filters)
+        
+        # AUTOMATIC LANGUAGE DETECTION AND FILTERING
+        # If no language filter is provided, detect it automatically
+        if 'language' not in combined_filters:
+            detected_lang = self._detect_language(question)
+            combined_filters['language'] = detected_lang
+            logger.info(f"Auto-detected language '{detected_lang}' added to filters")
 
         # STATISTICS ROUTING: Route count/statistics questions to database
         # instead of RAG which is limited by context window
@@ -181,14 +272,17 @@ Remember: You are providing informational guidance, not legal advice. Users shou
                 start_time=start_time
             )
 
-        # Retrieve relevant documents
+        # Retrieve relevant documents with enhanced query
+        enhanced_query = self._enhance_query_for_search(question, parsed_query)
         logger.info(f"Searching for context: {question[:50]}...")
+        logger.info(f"Enhanced query: {enhanced_query}")
+        
         search_results = self.search_service.hybrid_search(
-            query=question,
+            query=enhanced_query,
             filters=combined_filters,
             size=num_context_docs,
-            keyword_weight=0.4,
-            vector_weight=0.6  # Prefer semantic similarity for Q&A
+            keyword_weight=0.6,  # Increased for better exact matching
+            vector_weight=0.4    # Reduced to prioritize keyword matches
         )
 
         if not search_results['hits']:
@@ -235,10 +329,18 @@ Remember: You are providing informational guidance, not legal advice. Users shou
                 metadata={"error": "gemini_unavailable"}
             )
 
+        # Detect language and add language instruction
+        detected_lang = self._detect_language(question)
+        language_instruction = ""
+        if detected_lang == 'fr':
+            language_instruction = "\n\nIMPORTANT: The user asked their question in FRENCH. You MUST respond entirely in FRENCH. Provide a complete French answer."
+        else:
+            language_instruction = "\n\nIMPORTANT: The user asked their question in ENGLISH. You MUST respond entirely in ENGLISH."
+        
         answer_text = self.gemini_client.generate_with_context(
             query=question,
             context=context_str,
-            system_prompt=self.LEGAL_SYSTEM_PROMPT,
+            system_prompt=self.LEGAL_SYSTEM_PROMPT + language_instruction,
             temperature=temperature,
             max_tokens=max_tokens
         )
@@ -287,6 +389,68 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             self._cache_answer(question, rag_answer)
 
         return rag_answer
+
+    def _enhance_query_for_search(self, question: str, parsed_query: Any) -> str:
+        """
+        Enhance the search query for better document retrieval.
+        
+        This method:
+        - Expands section references (e.g., "Section 7" -> "Section 7" + section_number:7)
+        - Adds act names explicitly
+        - Removes common question words that dilute search
+        - Adds synonyms for key legal terms
+        
+        Args:
+            question: Original user question
+            parsed_query: Parsed query object with entities and intent
+            
+        Returns:
+            Enhanced query string
+        """
+        enhanced_parts = []
+        
+        # Extract section numbers from the question
+        section_pattern = r'(?:Section|s\.?)\s+(\d+(?:\(\d+\))?)'
+        section_matches = re.findall(section_pattern, question, re.IGNORECASE)
+        
+        if section_matches:
+            # Prioritize section-specific search
+            logger.info(f"Detected section references: {section_matches}")
+            for section in section_matches:
+                enhanced_parts.append(f"Section {section}")
+                enhanced_parts.append(f"section_number:{section}")
+        
+        # Extract act/regulation names
+        act_patterns = [
+            r'([\w\s]+(?:Act|Regulations?))',
+            r'(Employment Insurance|EI|Old Age Security|OAS|Canada Pension Plan|CPP)'
+        ]
+        
+        for pattern in act_patterns:
+            act_matches = re.findall(pattern, question, re.IGNORECASE)
+            for act_name in act_matches:
+                clean_name = act_name.strip()
+                if len(clean_name) > 3:  # Avoid noise
+                    enhanced_parts.append(clean_name)
+        
+        # Remove common question words that dilute search
+        noise_words = {'what', 'does', 'say', 'about', 'the', 'is', 'are', 'can', 'how', 'why', 'when', 'where'}
+        content_words = [
+            word for word in question.split() 
+            if word.lower() not in noise_words and len(word) > 2
+        ]
+        
+        # Add content words
+        enhanced_parts.extend(content_words[:10])  # Limit to avoid overly long queries
+        
+        # Build enhanced query
+        enhanced_query = ' '.join(enhanced_parts)
+        
+        # If we didn't enhance much, use original question
+        if len(enhanced_parts) < 3:
+            return question
+        
+        return enhanced_query
 
     def _answer_statistics_question(
         self,

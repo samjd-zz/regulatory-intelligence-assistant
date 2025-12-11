@@ -31,7 +31,7 @@ class QuestionRequest(BaseModel):
     """Request model for asking a question"""
     question: str = Field(..., description="Question to answer", min_length=5)
     filters: Optional[Dict[str, Any]] = Field(None, description="Search filters for context retrieval")
-    num_context_docs: int = Field(5, description="Number of context documents to use", ge=1, le=20)
+    num_context_docs: int = Field(10, description="Number of context documents to use", ge=1, le=20)
     use_cache: bool = Field(True, description="Use cached answers if available")
     temperature: float = Field(0.3, description="LLM temperature (0.0-1.0)", ge=0.0, le=1.0)
     max_tokens: int = Field(1024, description="Maximum tokens in answer", ge=100, le=4096)
@@ -41,7 +41,7 @@ class QuestionRequest(BaseModel):
             "example": {
                 "question": "Can a temporary resident apply for employment insurance?",
                 "filters": {"jurisdiction": "federal"},
-                "num_context_docs": 5,
+                "num_context_docs": 10,
                 "use_cache": True,
                 "temperature": 0.3
             }
