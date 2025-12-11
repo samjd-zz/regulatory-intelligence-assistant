@@ -105,6 +105,9 @@
       "jurisdiction": {
         "type": "keyword"
       },
+      "language": {
+        "type": "keyword"
+      },
       "program": {
         "type": "keyword"
       },
