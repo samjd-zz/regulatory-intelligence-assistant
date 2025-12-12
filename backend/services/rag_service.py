@@ -286,21 +286,27 @@ Remember: You are providing informational guidance, not legal advice. Users shou
                 start_time=start_time
             )
 
-        # Retrieve relevant documents with enhanced query
-        enhanced_query = self._enhance_query_for_search(question, parsed_query)
-        logger.info(f"Searching for context: {question[:50]}...")
-        logger.info(f"Enhanced query: {enhanced_query}")
+        # Retrieve relevant documents with MULTI-TIER SEARCH (Phase 4 Enhancement)
+        logger.info(f"🔍 Starting multi-tier search for: {question[:50]}...")
         
-        search_results = self.search_service.hybrid_search(
-            query=enhanced_query,
+        # Use the progressive 5-tier fallback system
+        context_docs, tier_metadata = self._multi_tier_search(
+            question=question,
             filters=combined_filters,
-            size=num_context_docs,
-            keyword_weight=0.6,  # Increased for better exact matching
-            vector_weight=0.4    # Reduced to prioritize keyword matches
+            num_context_docs=num_context_docs
         )
-
-        if not search_results['hits']:
-            # No context found
+        
+        # Log tier usage for monitoring
+        tier_used = tier_metadata.get('tier_used')
+        if tier_used:
+            logger.info(f"✅ Multi-tier search succeeded using Tier {tier_used}")
+            logger.info(f"   Tiers attempted: {tier_metadata.get('tiers_attempted', [])}")
+            logger.info(f"   Total search time: {tier_metadata.get('total_time_ms', 0):.1f}ms")
+        else:
+            logger.error(f"❌ Multi-tier search failed - all {len(tier_metadata.get('tiers_attempted', []))} tiers exhausted")
+        
+        if not context_docs:
+            # No context found after all 5 tiers
             return RAGAnswer(
                 question=question,
                 answer="I don't have enough information in the regulatory documents to answer this question. Please try rephrasing your question or contact a legal expert for assistance.",
@@ -309,21 +315,13 @@ Remember: You are providing informational guidance, not legal advice. Users shou
                 source_documents=[],
                 intent=intent,
                 processing_time_ms=(datetime.now() - start_time).total_seconds() * 1000,
-                metadata={"error": "no_context_found"}
+                metadata={
+                    "error": "no_context_found",
+                    "multi_tier_metadata": tier_metadata,
+                    "tiers_attempted": tier_metadata.get('tiers_attempted', []),
+                    "all_tiers_exhausted": True
+                }
             )
-
-        # Build context from search results
-        context_docs = []
-        for hit in search_results['hits']:
-            doc = hit['source']
-            context_docs.append({
-                "id": hit['id'],
-                "title": doc.get('title', 'Untitled'),
-                "content": doc.get('content', ''),
-                "citation": doc.get('citation', ''),
-                "section_number": doc.get('section_number', ''),
-                "score": hit['score']
-            })
 
         # Build context string
         context_str = self._build_context_string(context_docs)
@@ -382,7 +380,7 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             intent_confidence=parsed_query.intent_confidence
         )
 
-        # Build RAG answer
+        # Build RAG answer with multi-tier metadata
         rag_answer = RAGAnswer(
             question=question,
             answer=answer_text,
@@ -394,7 +392,10 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             metadata={
                 "num_context_docs": len(context_docs),
                 "temperature": temperature,
-                "filters_used": combined_filters
+                "filters_used": combined_filters,
+                "multi_tier_search": tier_metadata,  # Include tier usage stats
+                "tier_used": tier_metadata.get('tier_used'),
+                "search_resilience": f"Tier {tier_metadata.get('tier_used')} of 5"
             }
         )
 
