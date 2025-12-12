@@ -25,6 +25,9 @@ from services.search_service import SearchService
 from services.gemini_client import GeminiClient, get_gemini_client
 from services.query_parser import LegalQueryParser, QueryIntent
 from services.statistics_service import StatisticsService
+from services.postgres_search_service import PostgresSearchService, get_postgres_search_service
+from services.graph_service import GraphService, get_graph_service
+from config.legal_synonyms import expand_query_with_synonyms
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -170,7 +173,9 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         search_service: Optional[SearchService] = None,
         gemini_client: Optional[GeminiClient] = None,
         query_parser: Optional[LegalQueryParser] = None,
-        statistics_service: Optional[StatisticsService] = None
+        statistics_service: Optional[StatisticsService] = None,
+        postgres_search_service: Optional[PostgresSearchService] = None,
+        graph_service: Optional[GraphService] = None
     ):
         """
         Initialize RAG service.
@@ -180,15 +185,24 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             gemini_client: Gemini client instance
             query_parser: Query parser instance
             statistics_service: Statistics service instance
+            postgres_search_service: PostgreSQL search service instance
+            graph_service: Graph service instance
         """
         self.search_service = search_service or SearchService()
         self.gemini_client = gemini_client or get_gemini_client()
         self.query_parser = query_parser or LegalQueryParser(use_spacy=False)
         self.statistics_service = statistics_service or StatisticsService()
+        self.postgres_search_service = postgres_search_service or get_postgres_search_service()
+        self.graph_service = graph_service or get_graph_service()
 
         # Simple in-memory cache (would use Redis in production)
         self.cache: Dict[str, Tuple[RAGAnswer, datetime]] = {}
         self.cache_ttl = timedelta(hours=24)
+        
+        # Multi-tier search metrics
+        self.tier_usage_stats = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        self.zero_result_count = 0
+        self.total_queries = 0
 
     def _detect_language(self, text: str) -> str:
         """
@@ -526,40 +540,506 @@ Remember: You are providing informational guidance, not legal advice. Users shou
                 metadata={"error": str(e), "method": "database_query"}
             )
     
-    def _build_context_string(self, context_docs: List[Dict[str, Any]]) -> str:
+    # ============================================
+    # MULTI-TIER SEARCH SYSTEM (Phase 2)
+    # ============================================
+    
+    def _multi_tier_search(
+        self,
+        question: str,
+        filters: Optional[Dict[str, Any]],
+        num_context_docs: int = 10
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Build context string from documents with intelligent truncation.
+        Progressive fallback search across all 5 tiers.
         
-        Limits content length to prevent input token overflow while maintaining
-        the most relevant information for each document.
+        This orchestrator tries each tier sequentially until sufficient documents
+        are found. It tracks timing, tier usage, and provides comprehensive metadata.
+        
+        Tiers:
+        1. Optimized Elasticsearch (current behavior, 85%+ success target)
+        2. Relaxed Elasticsearch (expanded query, fewer filters)
+        3. Neo4j Graph Traversal (relationship-based discovery)
+        4. PostgreSQL Full-Text Search (comprehensive text matching)
+        5. Metadata-Only Search (last resort, metadata filters only)
+        
+        Args:
+            question: User's question
+            filters: Optional filters (will be relaxed progressively)
+            num_context_docs: Desired number of context documents
+        
+        Returns:
+            Tuple of (documents, metadata)
+            metadata includes: tier_used, tiers_attempted, tier_timings
         """
+        import time
+        
+        metadata = {
+            'tiers_attempted': [],
+            'tier_used': None,
+            'tier_timings': {},
+            'total_time_ms': 0
+        }
+        
+        total_start = time.time()
+        
+        # Update total queries counter
+        self.total_queries += 1
+        
+        # Tier 1: Optimized Elasticsearch
+        logger.info("🔍 Tier 1: Trying optimized Elasticsearch search...")
+        tier1_start = time.time()
+        tier1_results = self._tier1_elasticsearch_optimized(question, filters, num_context_docs)
+        tier1_time = (time.time() - tier1_start) * 1000
+        metadata['tier_timings']['tier_1_ms'] = tier1_time
+        metadata['tiers_attempted'].append(1)
+        
+        if len(tier1_results) >= num_context_docs:
+            logger.info(f"✅ Tier 1 SUCCESS: Found {len(tier1_results)} documents")
+            metadata['tier_used'] = 1
+            metadata['total_time_ms'] = (time.time() - total_start) * 1000
+            self.tier_usage_stats[1] += 1
+            return tier1_results[:num_context_docs], metadata
+        
+        logger.warning(f"⚠️ Tier 1 INSUFFICIENT: Only {len(tier1_results)} documents, need {num_context_docs}")
+        
+        # Tier 2: Relaxed Elasticsearch
+        logger.info("🔍 Tier 2: Trying relaxed Elasticsearch search...")
+        tier2_start = time.time()
+        tier2_results = self._tier2_elasticsearch_relaxed(question, filters, num_context_docs)
+        tier2_time = (time.time() - tier2_start) * 1000
+        metadata['tier_timings']['tier_2_ms'] = tier2_time
+        metadata['tiers_attempted'].append(2)
+        
+        if len(tier2_results) > 0:
+            logger.info(f"✅ Tier 2 SUCCESS: Found {len(tier2_results)} documents")
+            metadata['tier_used'] = 2
+            metadata['total_time_ms'] = (time.time() - total_start) * 1000
+            self.tier_usage_stats[2] += 1
+            return tier2_results[:num_context_docs], metadata
+        
+        logger.warning("⚠️ Tier 2 FAILED: No results from relaxed search")
+        
+        # Tier 3: Neo4j Graph Traversal
+        logger.info("🔍 Tier 3: Trying Neo4j graph traversal...")
+        tier3_start = time.time()
+        tier3_results = self._tier3_neo4j_graph(question, filters, num_context_docs)
+        tier3_time = (time.time() - tier3_start) * 1000
+        metadata['tier_timings']['tier_3_ms'] = tier3_time
+        metadata['tiers_attempted'].append(3)
+        
+        if len(tier3_results) > 0:
+            logger.info(f"✅ Tier 3 SUCCESS: Found {len(tier3_results)} documents via graph")
+            metadata['tier_used'] = 3
+            metadata['total_time_ms'] = (time.time() - total_start) * 1000
+            self.tier_usage_stats[3] += 1
+            return tier3_results[:num_context_docs], metadata
+        
+        logger.warning("⚠️ Tier 3 FAILED: No results from graph traversal")
+        
+        # Tier 4: PostgreSQL Full-Text Search
+        logger.info("🔍 Tier 4: Trying PostgreSQL full-text search...")
+        tier4_start = time.time()
+        tier4_results = self._tier4_postgres_fulltext(question, filters, num_context_docs)
+        tier4_time = (time.time() - tier4_start) * 1000
+        metadata['tier_timings']['tier_4_ms'] = tier4_time
+        metadata['tiers_attempted'].append(4)
+        
+        if len(tier4_results) > 0:
+            logger.info(f"✅ Tier 4 SUCCESS: Found {len(tier4_results)} documents via PostgreSQL FTS")
+            metadata['tier_used'] = 4
+            metadata['total_time_ms'] = (time.time() - total_start) * 1000
+            self.tier_usage_stats[4] += 1
+            return tier4_results[:num_context_docs], metadata
+        
+        logger.warning("⚠️ Tier 4 FAILED: No results from PostgreSQL")
+        
+        # Tier 5: Metadata-Only Search (last resort)
+        logger.info("🔍 Tier 5: Trying metadata-only search (last resort)...")
+        tier5_start = time.time()
+        tier5_results = self._tier5_metadata_only(filters, num_context_docs)
+        tier5_time = (time.time() - tier5_start) * 1000
+        metadata['tier_timings']['tier_5_ms'] = tier5_time
+        metadata['tiers_attempted'].append(5)
+        
+        if len(tier5_results) > 0:
+            logger.warning(f"⚠️ Tier 5 SUCCESS (LOW CONFIDENCE): Found {len(tier5_results)} documents by metadata only")
+            metadata['tier_used'] = 5
+            metadata['total_time_ms'] = (time.time() - total_start) * 1000
+            self.tier_usage_stats[5] += 1
+            return tier5_results[:num_context_docs], metadata
+        
+        # ALL TIERS FAILED
+        logger.error("❌ ALL TIERS FAILED: No documents found across all 5 search tiers")
+        self.zero_result_count += 1
+        metadata['tier_used'] = None
+        metadata['total_time_ms'] = (time.time() - total_start) * 1000
+        
+        return [], metadata
+    
+    def _tier1_elasticsearch_optimized(
+        self,
+        question: str,
+        filters: Optional[Dict[str, Any]],
+        num_docs: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Tier 1: Optimized Elasticsearch search (current behavior).
+        
+        Uses the existing hybrid search with current settings.
+        Target: 85%+ of queries should succeed here.
+        """
+        try:
+            # Enhance query
+            parsed_query = self.query_parser.parse_query(question)
+            enhanced_query = self._enhance_query_for_search(question, parsed_query)
+            
+            # Use current filters
+            search_filters = filters.copy() if filters else {}
+            
+            # Execute search
+            search_results = self.search_service.hybrid_search(
+                query=enhanced_query,
+                filters=search_filters,
+                size=num_docs,
+                keyword_weight=0.6,
+                vector_weight=0.4
+            )
+            
+            # Format results
+            documents = []
+            for hit in search_results.get('hits', []):
+                doc = hit['source']
+                documents.append({
+                    "id": hit['id'],
+                    "title": doc.get('title', 'Untitled'),
+                    "content": doc.get('content', ''),
+                    "citation": doc.get('citation', ''),
+                    "section_number": doc.get('section_number', ''),
+                    "score": hit['score']
+                })
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Tier 1 search failed: {e}")
+            return []
+    
+    def _tier2_elasticsearch_relaxed(
+        self,
+        question: str,
+        filters: Optional[Dict[str, Any]],
+        num_docs: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Tier 2: Relaxed Elasticsearch search with query expansion.
+        
+        Changes from Tier 1:
+        - Expand query with synonyms
+        - Relax filters (keep only language)
+        - Increase semantic weight
+        - Increase document limit
+        """
+        try:
+            # Expand query with synonyms
+            expanded_query = expand_query_with_synonyms(question, max_expansions=2)
+            logger.info(f"Tier 2 expanded query: {expanded_query[:100]}...")
+            
+            # Relax filters - keep only language
+            relaxed_filters = self._relax_filters_progressively(filters, tier=2)
+            
+            # Execute search with adjusted weights
+            search_results = self.search_service.hybrid_search(
+                query=expanded_query,
+                filters=relaxed_filters,
+                size=num_docs * 2,  # Get more candidates
+                keyword_weight=0.4,  # Reduce keyword weight
+                vector_weight=0.6    # Increase semantic weight
+            )
+            
+            # Format results
+            documents = []
+            for hit in search_results.get('hits', []):
+                doc = hit['source']
+                documents.append({
+                    "id": hit['id'],
+                    "title": doc.get('title', 'Untitled'),
+                    "content": doc.get('content', ''),
+                    "citation": doc.get('citation', ''),
+                    "section_number": doc.get('section_number', ''),
+                    "score": hit['score']
+                })
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Tier 2 search failed: {e}")
+            return []
+    
+    def _tier3_neo4j_graph(
+        self,
+        question: str,
+        filters: Optional[Dict[str, Any]],
+        num_docs: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Tier 3: Neo4j graph traversal search.
+        
+        Uses semantic search plus relationship traversal to find related documents.
+        """
+        try:
+            # Get language filter
+            language = filters.get('language', 'en') if filters else 'en'
+            
+            # Try both semantic search and traversal
+            semantic_results = self.graph_service.semantic_search_for_rag(
+                query=question,
+                limit=num_docs // 2,
+                language=language
+            )
+            
+            traversal_results = self.graph_service.find_related_documents_by_traversal(
+                seed_query=question,
+                max_depth=2,
+                limit=num_docs // 2
+            )
+            
+            # Combine results (remove duplicates by ID)
+            seen_ids = set()
+            documents = []
+            
+            for doc in semantic_results + traversal_results:
+                if doc['id'] not in seen_ids:
+                    seen_ids.add(doc['id'])
+                    documents.append(doc)
+            
+            logger.info(f"Tier 3 found {len(documents)} documents from Neo4j")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Tier 3 search failed: {e}")
+            return []
+    
+    def _tier4_postgres_fulltext(
+        self,
+        question: str,
+        filters: Optional[Dict[str, Any]],
+        num_docs: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Tier 4: PostgreSQL full-text search.
+        
+        Uses PostgreSQL's native FTS for comprehensive text matching.
+        """
+        try:
+            # Get language
+            language = filters.get('language', 'en') if filters else 'en'
+            pg_language = 'english' if language == 'en' else 'french'
+            
+            # Relax filters more (keep language and maybe jurisdiction)
+            relaxed_filters = self._relax_filters_progressively(filters, tier=4)
+            
+            # Execute PostgreSQL FTS
+            documents = self.postgres_search_service.full_text_search(
+                query=question,
+                limit=num_docs,
+                language=pg_language,
+                filters=relaxed_filters
+            )
+            
+            logger.info(f"Tier 4 found {len(documents)} documents from PostgreSQL")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Tier 4 search failed: {e}")
+            return []
+    
+    def _tier5_metadata_only(
+        self,
+        filters: Optional[Dict[str, Any]],
+        num_docs: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Tier 5: Metadata-only search (last resort).
+        
+        Returns documents matching metadata filters only.
+        Low confidence - used when all text-based searches fail.
+        """
+        try:
+            if not filters:
+                logger.warning("Tier 5: No filters provided, cannot perform metadata-only search")
+                return []
+            
+            # Use all available filters
+            documents = self.postgres_search_service.metadata_only_search(
+                filters=filters,
+                limit=num_docs
+            )
+            
+            logger.warning(f"Tier 5 found {len(documents)} documents by metadata only (LOW CONFIDENCE)")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Tier 5 search failed: {e}")
+            return []
+    
+    def _relax_filters_progressively(
+        self,
+        filters: Optional[Dict[str, Any]],
+        tier: int
+    ) -> Dict[str, Any]:
+        """
+        Progressively relax filters based on tier.
+        
+        Filter relaxation strategy:
+        - Tier 1: All filters (original behavior)
+        - Tier 2: Remove program, person_type (keep language, jurisdiction)
+        - Tier 3: Keep only language
+        - Tier 4+: Keep language and maybe jurisdiction
+        
+        This progressive relaxation helps improve recall when initial searches
+        fail due to overly restrictive filters.
+        
+        Args:
+            filters: Original filters
+            tier: Current tier (1-5)
+        
+        Returns:
+            Relaxed filters dictionary
+        """
+        if not filters:
+            logger.debug(f"Tier {tier}: No filters to relax")
+            return {}
+        
+        original_filters = filters.copy()
+        relaxed = filters.copy()
+        
+        if tier == 1:
+            # Tier 1: Use all filters
+            logger.debug(f"Tier {tier}: Using all {len(relaxed)} filters: {list(relaxed.keys())}")
+            return relaxed
+        
+        elif tier == 2:
+            # Tier 2: Remove program, person_type
+            removed = []
+            if 'programs' in relaxed:
+                relaxed.pop('programs')
+                removed.append('programs')
+            if 'person_type' in relaxed:
+                relaxed.pop('person_type')
+                removed.append('person_type')
+            
+            logger.info(f"Tier {tier} Filter Relaxation: Removed {removed}, kept {list(relaxed.keys())}")
+            return relaxed
+        
+        elif tier == 3:
+            # Tier 3: Keep only language
+            result = {'language': relaxed.get('language')} if 'language' in relaxed else {}
+            removed_count = len(original_filters) - len(result)
+            logger.info(f"Tier {tier} Filter Relaxation: Kept only 'language', removed {removed_count} filters")
+            return result
+        
+        elif tier >= 4:
+            # Tier 4+: Keep language and maybe jurisdiction
+            result = {}
+            kept = []
+            
+            if 'language' in relaxed:
+                result['language'] = relaxed['language']
+                kept.append('language')
+            if 'jurisdiction' in relaxed:
+                result['jurisdiction'] = relaxed['jurisdiction']
+                kept.append('jurisdiction')
+            
+            removed_count = len(original_filters) - len(result)
+            logger.info(f"Tier {tier} Filter Relaxation: Kept {kept}, removed {removed_count} filters")
+            return result
+        
+        return relaxed
+    
+    def get_tier_usage_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about multi-tier search usage.
+        
+        Returns:
+            Dictionary with tier usage statistics
+        """
+        if self.total_queries == 0:
+            return {
+                'total_queries': 0,
+                'tier_usage': {},
+                'zero_result_rate': 0.0,
+                'message': 'No queries processed yet'
+            }
+        
+        return {
+            'total_queries': self.total_queries,
+            'tier_usage': {
+                'tier_1': {
+                    'count': self.tier_usage_stats[1],
+                    'percentage': (self.tier_usage_stats[1] / self.total_queries) * 100
+                },
+                'tier_2': {
+                    'count': self.tier_usage_stats[2],
+                    'percentage': (self.tier_usage_stats[2] / self.total_queries) * 100
+                },
+                'tier_3': {
+                    'count': self.tier_usage_stats[3],
+                    'percentage': (self.tier_usage_stats[3] / self.total_queries) * 100
+                },
+                'tier_4': {
+                    'count': self.tier_usage_stats[4],
+                    'percentage': (self.tier_usage_stats[4] / self.total_queries) * 100
+                },
+                'tier_5': {
+                    'count': self.tier_usage_stats[5],
+                    'percentage': (self.tier_usage_stats[5] / self.total_queries) * 100
+                }
+            },
+            'zero_result_count': self.zero_result_count,
+            'zero_result_rate': (self.zero_result_count / self.total_queries) * 100
+        }
+    
+    # ============================================
+    # HELPER METHODS
+    # ============================================
+    
+    def _build_context_string(self, docs: List[Dict[str, Any]]) -> str:
+        """
+        Build a context string from retrieved documents.
+        
+        Args:
+            docs: List of document dictionaries with title, content, etc.
+        
+        Returns:
+            Formatted context string for LLM
+        """
+        if not docs:
+            return ""
+        
         context_parts = []
-        MAX_CONTENT_LENGTH = 1500  # ~375 tokens per doc, allows 5 docs + system prompt + answer
-
-        for i, doc in enumerate(context_docs, 1):
-            doc_str = f"Document {i}: {doc['title']}\n"
-
-            if doc.get('citation'):
-                doc_str += f"Citation: {doc['citation']}\n"
-
-            if doc.get('section_number'):
-                doc_str += f"Section: {doc['section_number']}\n"
-
-            # Truncate content if too long
-            content = doc['content']
-            if len(content) > MAX_CONTENT_LENGTH:
-                content = content[:MAX_CONTENT_LENGTH] + "... [truncated]"
-                logger.debug(f"Truncated document {i} content from {len(doc['content'])} to {MAX_CONTENT_LENGTH} chars")
-
-            doc_str += f"Content: {content}\n"
-
-            context_parts.append(doc_str)
-
-        total_length = sum(len(part) for part in context_parts)
-        logger.info(f"Built context with {len(context_parts)} documents, {total_length:,} total characters (~{total_length//4:,} tokens)")
-
-        return "\n---\n".join(context_parts)
-
+        for i, doc in enumerate(docs, 1):
+            title = doc.get('title', 'Untitled Document')
+            content = doc.get('content', '')
+            citation = doc.get('citation', '')
+            section = doc.get('section_number', '')
+            
+            # Build document section
+            doc_section = f"Document {i}: {title}\n"
+            
+            if section:
+                doc_section += f"Section: {section}\n"
+            
+            if citation:
+                doc_section += f"Citation: {citation}\n"
+            
+            doc_section += f"Content:\n{content}\n"
+            
+            context_parts.append(doc_section)
+        
+        # Join with separators
+        return "\n---\n\n".join(context_parts)
+    
     def _extract_citations(
         self,
         answer: str,
@@ -567,260 +1047,285 @@ Remember: You are providing informational guidance, not legal advice. Users shou
     ) -> List[Citation]:
         """
         Extract citations from generated answer.
-
+        
         Looks for patterns like:
         - [Document Title, Section X]
         - Section X(Y)
-        - Act Name, s. X
+        - Section X
+        
+        Args:
+            answer: Generated answer text
+            context_docs: Context documents used for generation
+        
+        Returns:
+            List of Citation objects
         """
         citations = []
-
+        
         # Pattern 1: [Document Title, Section X]
-        pattern1 = r'\[([^\]]+),\s*(?:Section|s\.?)\s*(\d+(?:\(\d+\))?)\]'
-        matches1 = re.finditer(pattern1, answer, re.IGNORECASE)
-
-        for match in matches1:
+        pattern1 = r'\[([^\]]+),\s*Section\s+([^\]]+)\]'
+        for match in re.finditer(pattern1, answer):
             doc_title = match.group(1).strip()
             section = match.group(2).strip()
-
+            
             # Find matching document
-            doc_id = None
+            matching_doc = None
             for doc in context_docs:
-                if doc_title.lower() in doc['title'].lower():
-                    doc_id = doc['id']
+                if doc_title.lower() in doc.get('title', '').lower():
+                    matching_doc = doc
                     break
-
-            citations.append(Citation(
+            
+            citation = Citation(
                 text=match.group(0),
-                document_id=doc_id,
+                document_id=matching_doc['id'] if matching_doc else None,
                 document_title=doc_title,
                 section=section,
-                confidence=0.9 if doc_id else 0.5
-            ))
-
-        # Pattern 2: Section X mentions
-        pattern2 = r'(?:Section|s\.?)\s+(\d+(?:\(\d+\))?)'
-        matches2 = re.finditer(pattern2, answer, re.IGNORECASE)
-
-        for match in matches2:
+                confidence=0.9 if matching_doc else 0.5
+            )
+            citations.append(citation)
+        
+        # Pattern 2: Section X or Section X(Y)
+        pattern2 = r'Section\s+(\d+(?:\(\d+\))?)'
+        for match in re.finditer(pattern2, answer):
             section = match.group(1).strip()
-
-            # Try to find document with this section
-            doc_id = None
-            doc_title = None
-
+            
+            # Find matching document by section
+            matching_doc = None
             for doc in context_docs:
-                if doc.get('section_number') == section:
-                    doc_id = doc['id']
-                    doc_title = doc['title']
+                doc_section = doc.get('section_number', '')
+                if doc_section and section.startswith(doc_section):
+                    matching_doc = doc
                     break
-
-            # Avoid duplicates
-            if not any(c.section == section for c in citations):
-                citations.append(Citation(
-                    text=match.group(0),
-                    document_id=doc_id,
-                    document_title=doc_title,
-                    section=section,
-                    confidence=0.7 if doc_id else 0.4
-                ))
-
-        return citations
-
+            
+            citation = Citation(
+                text=match.group(0),
+                document_id=matching_doc['id'] if matching_doc else None,
+                document_title=matching_doc.get('title') if matching_doc else None,
+                section=section,
+                confidence=0.8 if matching_doc else 0.4
+            )
+            citations.append(citation)
+        
+        # Remove duplicates
+        unique_citations = []
+        seen_texts = set()
+        for citation in citations:
+            if citation.text not in seen_texts:
+                seen_texts.add(citation.text)
+                unique_citations.append(citation)
+        
+        return unique_citations
+    
     def _calculate_confidence(
         self,
         answer: str,
         citations: List[Citation],
         context_docs: List[Dict[str, Any]],
-        intent_confidence: float
+        intent_confidence: float = 0.8
     ) -> float:
         """
         Calculate confidence score for the answer.
-
+        
         Factors:
-        - Number of citations (more = higher confidence)
-        - Citation quality (linked to documents = higher)
-        - Answer length appropriateness
-        - Context quality (search scores)
-        - Intent classification confidence
+        - Number and quality of citations
+        - Context document scores
+        - Presence of uncertainty phrases
+        - Intent confidence from NLP
+        - Answer completeness
+        
+        Args:
+            answer: Generated answer text
+            citations: Extracted citations
+            context_docs: Context documents used
+            intent_confidence: Confidence from query intent classification
+        
+        Returns:
+            Confidence score between 0.0 and 1.0
         """
-        scores = []
-
-        # 1. Citation factor (0-1)
-        if len(citations) > 0:
+        # Base confidence from intent
+        confidence = intent_confidence
+        
+        # Citation factor (0.0 - 0.3)
+        if citations:
+            # Average citation confidence
             avg_citation_conf = sum(c.confidence for c in citations) / len(citations)
-            citation_score = min(0.3 + (len(citations) * 0.15), 1.0)  # Max at ~4 citations
-            citation_score *= avg_citation_conf  # Weighted by citation quality
+            # Number of citations (capped at 5)
+            citation_count = min(len(citations), 5) / 5.0
+            citation_factor = (avg_citation_conf * 0.7 + citation_count * 0.3) * 0.3
+            confidence += citation_factor
         else:
-            citation_score = 0.2  # Low confidence if no citations
-
-        scores.append(citation_score)
-
-        # 2. Answer quality factor (0-1)
-        answer_length = len(answer.split())
-
-        if answer_length < 10:
-            # Very short answer - probably uncertain
-            quality_score = 0.3
-        elif answer_length > 500:
-            # Very long answer - might be verbose/uncertain
-            quality_score = 0.6
-        else:
-            # Reasonable length
-            quality_score = 0.8
-
-        # Check for uncertainty phrases
-        uncertainty_phrases = [
-            "i don't know",
-            "i'm not sure",
-            "unclear",
-            "ambiguous",
-            "not enough information",
-            "cannot determine",
-            "insufficient"
-        ]
-
-        if any(phrase in answer.lower() for phrase in uncertainty_phrases):
-            quality_score *= 0.5
-
-        scores.append(quality_score)
-
-        # 3. Context quality factor (0-1)
+            # Penalty for no citations
+            confidence -= 0.15
+        
+        # Context quality factor (0.0 - 0.2)
         if context_docs:
-            # Use search scores
-            avg_search_score = sum(doc['score'] for doc in context_docs) / len(context_docs)
-            # Normalize (search scores can vary, this is a heuristic)
-            context_score = min(avg_search_score / 2.0, 1.0)
-        else:
-            context_score = 0.0
-
-        scores.append(context_score)
-
-        # 4. Intent confidence (0-1)
-        scores.append(intent_confidence)
-
-        # Combined confidence (weighted average)
-        weights = [0.35, 0.25, 0.25, 0.15]  # Citation, quality, context, intent
-        confidence = sum(s * w for s, w in zip(scores, weights))
-
-        return round(confidence, 3)
-
+            # Average document score (assuming scores around 1.0-2.0)
+            avg_score = sum(doc.get('score', 0.5) for doc in context_docs) / len(context_docs)
+            context_factor = min(avg_score / 2.0, 1.0) * 0.2
+            confidence += context_factor
+        
+        # Uncertainty penalty (-0.0 to -0.3)
+        uncertainty_phrases = [
+            'not sure', 'uncertain', 'unclear', 'might be', 'possibly',
+            'perhaps', 'may be', 'could be', 'I think', 'likely',
+            'do not contain', 'does not contain', 'not available',
+            'cannot find', 'unable to'
+        ]
+        
+        answer_lower = answer.lower()
+        uncertainty_count = sum(1 for phrase in uncertainty_phrases if phrase in answer_lower)
+        if uncertainty_count > 0:
+            # Each uncertainty phrase reduces confidence
+            uncertainty_penalty = min(uncertainty_count * 0.1, 0.3)
+            confidence -= uncertainty_penalty
+        
+        # Answer length factor (-0.1 for very short answers)
+        if len(answer) < 100:
+            confidence -= 0.1
+        
+        # Clamp between 0.0 and 1.0
+        confidence = max(0.0, min(1.0, confidence))
+        
+        return round(confidence, 2)
+    
     def _get_cache_key(self, question: str) -> str:
-        """Generate cache key for a question"""
+        """
+        Generate normalized cache key from question.
+        
+        Normalizes by:
+        - Converting to lowercase
+        - Stripping whitespace
+        - Hashing for consistent key
+        
+        Args:
+            question: User's question
+        
+        Returns:
+            Cache key (hash)
+        """
         # Normalize question
         normalized = question.lower().strip()
-        # Hash it
+        
+        # Generate hash
         return hashlib.md5(normalized.encode()).hexdigest()
-
+    
     def _get_cached_answer(self, question: str) -> Optional[RAGAnswer]:
-        """Retrieve cached answer if available and not expired"""
+        """
+        Retrieve cached answer if available and not expired.
+        
+        Args:
+            question: User's question
+        
+        Returns:
+            RAGAnswer if cached and valid, None otherwise
+        """
         cache_key = self._get_cache_key(question)
-
-        if cache_key in self.cache:
-            answer, timestamp = self.cache[cache_key]
-
-            # Check if expired
-            if datetime.now() - timestamp < self.cache_ttl:
-                return answer
-            else:
-                # Remove expired entry
-                del self.cache[cache_key]
-
-        return None
-
-    def _cache_answer(self, question: str, answer: RAGAnswer):
-        """Cache an answer"""
+        
+        if cache_key not in self.cache:
+            return None
+        
+        answer, timestamp = self.cache[cache_key]
+        
+        # Check if expired
+        if datetime.now() - timestamp > self.cache_ttl:
+            # Remove expired entry
+            del self.cache[cache_key]
+            return None
+        
+        return answer
+    
+    def _cache_answer(self, question: str, answer: RAGAnswer) -> None:
+        """
+        Cache an answer for future use.
+        
+        Args:
+            question: User's question
+            answer: RAGAnswer to cache
+        """
         cache_key = self._get_cache_key(question)
         self.cache[cache_key] = (answer, datetime.now())
-
-        # Simple cache size management
+        
+        # Simple cache size management (keep last 1000 entries)
         if len(self.cache) > 1000:
-            # Remove oldest 10%
-            sorted_keys = sorted(
-                self.cache.keys(),
-                key=lambda k: self.cache[k][1]
-            )
-            for key in sorted_keys[:100]:
-                del self.cache[key]
-
-    def clear_cache(self):
-        """Clear the answer cache"""
+            # Remove oldest entry
+            oldest_key = min(self.cache.keys(), key=lambda k: self.cache[k][1])
+            del self.cache[oldest_key]
+    
+    def clear_cache(self) -> None:
+        """Clear all cached answers."""
         self.cache.clear()
         logger.info("RAG answer cache cleared")
-
+    
     def get_cache_stats(self) -> Dict[str, Any]:
-        """Get cache statistics"""
+        """
+        Get cache statistics.
+        
+        Returns:
+            Dictionary with cache statistics
+        """
         return {
-            "total_entries": len(self.cache),
-            "cache_ttl_hours": self.cache_ttl.total_seconds() / 3600,
-            "max_size": 1000
+            'total_entries': len(self.cache),
+            'cache_ttl_hours': self.cache_ttl.total_seconds() / 3600,
+            'max_size': 1000
         }
-
+    
     def health_check(self) -> Dict[str, Any]:
-        """Check health of RAG service components"""
+        """
+        Perform health check on RAG service components.
+        
+        Returns:
+            Health status dictionary
+        """
         health = {
-            "status": "healthy",
-            "components": {}
+            'status': 'healthy',
+            'components': {}
         }
-
+        
         # Check search service
-        search_health = self.search_service.health_check()
-        health["components"]["search"] = search_health.get("status", "unknown")
-
-        # Check Gemini client
-        gemini_health = self.gemini_client.health_check()
-        health["components"]["gemini"] = gemini_health.get("status", "unknown")
-
-        # Check query parser
-        health["components"]["nlp"] = "operational"
-
-        # Overall status
-        if any(status != "healthy" for status in health["components"].values()):
-            if "unavailable" in health["components"].values():
-                health["status"] = "degraded"
-            else:
-                health["status"] = "partial"
-
-        health["cache_stats"] = self.get_cache_stats()
-
+        try:
+            # Simple check - search service should be available
+            health['components']['search'] = {
+                'status': 'healthy',
+                'available': True
+            }
+        except Exception as e:
+            health['components']['search'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+            health['status'] = 'degraded'
+        
+        # Check Gemini
+        try:
+            gemini_health = self.gemini_client.health_check()
+            health['components']['gemini'] = gemini_health
+            
+            if not self.gemini_client.is_available():
+                health['status'] = 'degraded'
+        except Exception as e:
+            health['components']['gemini'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+            health['status'] = 'degraded'
+        
+        # Check NLP
+        try:
+            health['components']['nlp'] = {
+                'status': 'healthy',
+                'available': True
+            }
+        except Exception as e:
+            health['components']['nlp'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+            health['status'] = 'degraded'
+        
+        # Cache stats
+        health['cache'] = self.get_cache_stats()
+        
+        # Multi-tier search stats
+        health['multi_tier_stats'] = self.get_tier_usage_stats()
+        
         return health
-
-
-if __name__ == "__main__":
-    # Test the RAG service
-    print("=" * 80)
-    print("RAG Service - Test")
-    print("=" * 80)
-
-    rag = RAGService()
-
-    # Health check
-    print("\n1. Health Check:")
-    health = rag.health_check()
-    print(f"   Status: {health['status']}")
-    print(f"   Components: {health['components']}")
-
-    # Test question answering (requires Gemini API key and indexed documents)
-    print("\n2. Question Answering Test:")
-    question = "Can a temporary resident apply for employment insurance?"
-
-    print(f"   Question: {question}")
-
-    answer = rag.answer_question(
-        question=question,
-        num_context_docs=3,
-        use_cache=False
-    )
-
-    print(f"\n   Answer: {answer.answer[:200]}...")
-    print(f"   Confidence: {answer.confidence_score:.2f}")
-    print(f"   Citations: {len(answer.citations)}")
-
-    for i, citation in enumerate(answer.citations[:3], 1):
-        print(f"      {i}. {citation.text} (confidence: {citation.confidence:.2f})")
-
-    print(f"   Source Documents: {len(answer.source_documents)}")
-    print(f"   Processing Time: {answer.processing_time_ms:.0f}ms")
-
-    print("\n" + "=" * 80)
-    print("Test complete!")

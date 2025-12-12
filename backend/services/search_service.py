@@ -531,6 +531,86 @@ class SearchService:
             logger.error(f"Hybrid search failed: {e}")
             return {"hits": [], "total": 0, "error": str(e)}
 
+    def relaxed_search(self, query: str, filters: Optional[Dict] = None,
+                      size: int = 20, language_only: bool = True,
+                      use_synonym_expansion: bool = True) -> Dict[str, Any]:
+        """
+        Perform relaxed search with minimal filters and query expansion.
+        
+        This is Tier 2 search in the multi-tier RAG system. Used when
+        standard search fails to find enough results.
+        
+        Features:
+        - Query expansion using legal term synonyms
+        - Minimal filtering (language only by default)
+        - Higher result count (default 20)
+        - More lenient matching
+        
+        Args:
+            query: Search query text
+            filters: Filter criteria (only language filter applied by default)
+            size: Number of results to return (default: 20)
+            language_only: If True, only apply language filter (default: True)
+            use_synonym_expansion: If True, expand query with synonyms (default: True)
+        
+        Returns:
+            Search results dictionary
+        """
+        try:
+            # Import synonym expansion function
+            from backend.config.legal_synonyms import expand_query_with_synonyms
+            
+            # Expand query with synonyms if requested
+            expanded_query = query
+            if use_synonym_expansion:
+                expanded_query = expand_query_with_synonyms(query, max_expansions=3)
+                logger.info(f"Query expansion: '{query[:50]}' → '{expanded_query[:100]}'")
+            
+            # Build minimal filters
+            relaxed_filters = {}
+            
+            if language_only and filters and 'language' in filters:
+                # Only keep language filter
+                relaxed_filters['language'] = filters['language']
+                logger.info(f"Applying language-only filter: {filters['language']}")
+            elif not language_only and filters:
+                # Use provided filters
+                relaxed_filters = filters
+            
+            # Perform hybrid search with expanded query and relaxed filters
+            # Use lower keyword weight to favor semantic understanding
+            results = self.hybrid_search(
+                query=expanded_query,
+                filters=relaxed_filters,
+                size=size,
+                from_=0,
+                keyword_weight=0.4,  # Favor semantic search
+                vector_weight=0.6
+            )
+            
+            # Add metadata to indicate this was a relaxed search
+            results['search_type'] = 'relaxed_hybrid'
+            results['relaxed_search_metadata'] = {
+                'original_query': query,
+                'expanded_query': expanded_query,
+                'synonym_expansion_used': use_synonym_expansion,
+                'language_only_filter': language_only,
+                'filters_applied': relaxed_filters
+            }
+            
+            logger.info(f"Relaxed search returned {results['total']} results")
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Relaxed search failed: {e}")
+            return {
+                "hits": [],
+                "total": 0,
+                "error": str(e),
+                "search_type": "relaxed_hybrid"
+            }
+
     def _build_filters(self, filters: Optional[Dict]) -> List[Dict]:
         """Build Elasticsearch filter clauses from filter dictionary"""
         if not filters:
@@ -768,8 +848,21 @@ if __name__ == "__main__":
     for i, hit in enumerate(results['hits'][:3], 1):
         print(f"   {i}. {hit['source']['title']} (score: {hit['score']:.2f})")
 
+    # Test relaxed search
+    print("\n6. Relaxed Search Test:")
+    query = "temporary resident benefits"
+    results = search.relaxed_search(query, size=3, language_only=False)
+    print(f"   Query: '{query}'")
+    print(f"   Search Type: {results.get('search_type')}")
+    if 'relaxed_search_metadata' in results:
+        metadata = results['relaxed_search_metadata']
+        print(f"   Expanded Query: {metadata.get('expanded_query', '')[:80]}...")
+    print(f"   Results: {results['total']}")
+    for i, hit in enumerate(results['hits'][:3], 1):
+        print(f"   {i}. {hit['source']['title']} (score: {hit['score']:.2f})")
+
     # Test hybrid search
-    print("\n6. Hybrid Search Test:")
+    print("\n7. Hybrid Search Test:")
     query = "benefits for temporary residents"
     results = search.hybrid_search(query, size=3)
     print(f"   Query: '{query}'")
@@ -782,7 +875,7 @@ if __name__ == "__main__":
               f"Combined: {breakdown.get('combined', 0):.3f}")
 
     # Test with filters
-    print("\n7. Filtered Search Test:")
+    print("\n8. Filtered Search Test:")
     query = "benefits"
     filters = {'jurisdiction': 'federal', 'program': 'employment_insurance'}
     results = search.keyword_search(query, filters=filters, size=3)

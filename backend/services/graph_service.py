@@ -491,6 +491,185 @@ class GraphService:
         return self.get_graph_overview()
     
     # ============================================
+    # RAG-SPECIFIC SEARCH OPERATIONS (Tier 3)
+    # ============================================
+    
+    def semantic_search_for_rag(
+        self,
+        query: str,
+        limit: int = 20,
+        language: str = 'en'
+    ) -> List[Dict[str, Any]]:
+        """
+        Full-text search optimized for RAG context retrieval.
+        
+        This method is used as Tier 3 in the multi-tier RAG search fallback.
+        It searches across both Legislation and Section nodes using Neo4j's
+        full-text indexes.
+        
+        Args:
+            query: Search query text
+            limit: Maximum number of results
+            language: Language filter ('en' or 'fr')
+        
+        Returns:
+            List of documents formatted for RAG context
+        """
+        try:
+            # Search legislation nodes
+            legislation_query = """
+            CALL db.index.fulltext.queryNodes('legislation_fulltext', $query)
+            YIELD node, score
+            WHERE node.language = $language OR $language = 'all'
+            RETURN 
+                node.id as id,
+                node.title as title,
+                node.full_text as content,
+                node.act_number as citation,
+                '' as section_number,
+                node.jurisdiction as jurisdiction,
+                'legislation' as document_type,
+                score
+            ORDER BY score DESC
+            LIMIT $limit
+            """
+            
+            leg_results = self.client.execute_query(
+                legislation_query,
+                {"query": query, "limit": limit // 2, "language": language}
+            )
+            
+            # Search section nodes
+            section_query = """
+            CALL db.index.fulltext.queryNodes('section_fulltext', $query)
+            YIELD node, score
+            MATCH (node)-[:HAS_SECTION]-(leg:Legislation)
+            WHERE leg.language = $language OR $language = 'all'
+            RETURN 
+                node.id as id,
+                node.title as title,
+                node.content as content,
+                leg.act_number as citation,
+                node.section_number as section_number,
+                leg.jurisdiction as jurisdiction,
+                'section' as document_type,
+                score
+            ORDER BY score DESC
+            LIMIT $limit
+            """
+            
+            sec_results = self.client.execute_query(
+                section_query,
+                {"query": query, "limit": limit // 2, "language": language}
+            )
+            
+            # Combine and format results
+            documents = []
+            
+            for result in leg_results + sec_results:
+                documents.append({
+                    'id': result.get('id', ''),
+                    'title': result.get('title', ''),
+                    'content': result.get('content', '')[:1500],  # Truncate for RAG
+                    'citation': result.get('citation', ''),
+                    'section_number': result.get('section_number', ''),
+                    'jurisdiction': result.get('jurisdiction', ''),
+                    'document_type': result.get('document_type', ''),
+                    'score': float(result.get('score', 0.0))
+                })
+            
+            # Sort by score and limit
+            documents.sort(key=lambda x: x['score'], reverse=True)
+            documents = documents[:limit]
+            
+            logger.info(f"Neo4j semantic search found {len(documents)} documents")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Neo4j semantic search failed: {e}")
+            return []
+    
+    def find_related_documents_by_traversal(
+        self,
+        seed_query: str,
+        max_depth: int = 2,
+        limit: int = 20
+    ) -> List[Dict[str, Any]]:
+        """
+        Find related documents by traversing graph relationships.
+        
+        This method starts with a seed search, then traverses relationships
+        (REFERENCES, IMPLEMENTS, HAS_SECTION) to find connected documents.
+        Useful when direct text search fails but there are related documents.
+        
+        Args:
+            seed_query: Initial search query to find seed nodes
+            max_depth: Maximum traversal depth (1-3 recommended)
+            limit: Maximum number of results
+        
+        Returns:
+            List of related documents with traversal paths
+        """
+        try:
+            # First, find seed nodes using full-text search
+            seed_query_cypher = f"""
+            CALL db.index.fulltext.queryNodes('legislation_fulltext', $query)
+            YIELD node, score
+            WITH node, score
+            ORDER BY score DESC
+            LIMIT 5
+            
+            // Traverse relationships to find related nodes
+            MATCH path = (node)-[*1..{max_depth}]-(related)
+            WHERE related:Legislation OR related:Section OR related:Regulation
+            
+            RETURN DISTINCT
+                related.id as id,
+                related.title as title,
+                COALESCE(related.full_text, related.content) as content,
+                COALESCE(related.act_number, '') as citation,
+                COALESCE(related.section_number, '') as section_number,
+                COALESCE(related.jurisdiction, '') as jurisdiction,
+                labels(related)[0] as document_type,
+                length(path) as depth,
+                score as seed_score
+            ORDER BY depth ASC, seed_score DESC
+            LIMIT $limit
+            """
+            
+            results = self.client.execute_query(
+                seed_query_cypher,
+                {"query": seed_query, "limit": limit}
+            )
+            
+            # Format results
+            documents = []
+            for result in results:
+                # Calculate relevance score (closer = higher score)
+                depth = result.get('depth', max_depth)
+                seed_score = result.get('seed_score', 0.0)
+                relevance_score = seed_score * (1.0 / (depth + 1))
+                
+                documents.append({
+                    'id': result.get('id', ''),
+                    'title': result.get('title', ''),
+                    'content': (result.get('content') or '')[:1500],
+                    'citation': result.get('citation', ''),
+                    'section_number': result.get('section_number', ''),
+                    'jurisdiction': result.get('jurisdiction', ''),
+                    'document_type': result.get('document_type', '').lower(),
+                    'score': relevance_score,
+                    'traversal_depth': depth
+                })
+            
+            logger.info(f"Neo4j traversal found {len(documents)} related documents")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Neo4j relationship traversal failed: {e}")
+            return []
+    
+    # ============================================
     # BATCH OPERATIONS
     # ============================================
     
