@@ -1,0 +1,52 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="net" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#0f172a"/>
+            <stop offset="100%" style="stop-color:#1e293b"/>
+        </linearGradient>
+    </defs>
+    <circle cx="64" cy="64" r="60" fill="url(#net)"/>
+    
+    <!-- Central hub (RIA) -->
+    <circle cx="64" cy="64" r="12" fill="#4fd1c5"/>
+    <circle cx="64" cy="64" r="12" fill="white" opacity="0.2"/>
+    
+    <!-- 7 nodes for G7 countries -->
+    <circle cx="64" cy="30" r="9" fill="#3b82f6"/>
+    <circle cx="95" cy="45" r="9" fill="#3b82f6"/>
+    <circle cx="95" cy="83" r="9" fill="#3b82f6"/>
+    <circle cx="64" cy="98" r="9" fill="#3b82f6"/>
+    <circle cx="33" cy="83" r="9" fill="#3b82f6"/>
+    <circle cx="33" cy="45" r="9" fill="#3b82f6"/>
+    <circle cx="80" cy="64" r="9" fill="#3b82f6"/>
+    
+    <!-- Connection lines -->
+    <line x1="64" y1="64" x2="64" y2="39" stroke="#4fd1c5" stroke-width="2" opacity="0.6"/>
+    <line x1="64" y1="64" x2="86" y2="50" stroke="#4fd1c5" stroke-width="2" opacity="0.6"/>
+    <line x1="64" y1="64" x2="86" y2="78" stroke="#4fd1c5" stroke-width="2" opacity="0.6"/>
+    <line x1="64" y1="64" x2="64" y2="89" stroke="#4fd1c5" stroke-width="2" opacity="0.6"/>
+    <line x1="64" y1="64" x2="42" y2="78" stroke="#4fd1c5" stroke-width="2" opacity="0.6"/>
+    <line x1="64" y1="64" x2="42" y2="50" stroke="#4fd1c5" stroke-width="2" opacity="0.6"/>
+    <line x1="64" y1="64" x2="71" y2="64" stroke="#4fd1c5" stroke-width="2" opacity="0.6"/>
+    
+    <!-- Secondary connections between nodes -->
+    <line x1="64" y1="39" x2="86" y2="50" stroke="#60a5fa" stroke-width="1.5" opacity="0.3"/>
+    <line x1="86" y1="50" x2="86" y2="78" stroke="#60a5fa" stroke-width="1.5" opacity="0.3"/>
+    <line x1="42" y1="50" x2="42" y2="78" stroke="#60a5fa" stroke-width="1.5" opacity="0.3"/>
+    
+    <!-- Data flow particles -->
+    <circle cx="64" cy="47" r="2" fill="#fbbf24"/>
+    <circle cx="75" cy="54" r="2" fill="#fbbf24"/>
+    <circle cx="75" cy="74" r="2" fill="#fbbf24"/>
+    <circle cx="53" cy="74" r="2" fill="#fbbf24"/>
+    <circle cx="53" cy="54" r="2" fill="#fbbf24"/>
+    
+    <!-- Country flags (simplified) as small rectangles -->
+    <rect x="61" y="27" width="6" height="4" fill="#ef4444"/>
+    <rect x="92" y="42" width="6" height="4" fill="#3b82f6"/>
+    <rect x="92" y="80" width="6" height="4" fill="#fbbf24"/>
+    <rect x="61" y="95" width="6" height="4" fill="#10b981"/>
+    <rect x="30" y="80" width="6" height="4" fill="#8b5cf6"/>
+    <rect x="30" y="42" width="6" height="4" fill="#06b6d4"/>
+    <rect x="77" y="61" width="6" height="4" fill="#f97316"/>
+</svg>

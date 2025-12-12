@@ -1,0 +1,44 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="pillar" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#f8fafc"/>
+            <stop offset="100%" style="stop-color:#cbd5e0"/>
+        </linearGradient>
+    </defs>
+    <circle cx="64" cy="64" r="60" fill="#1e3a8a"/>
+    
+    <!-- Classical pillar -->
+    <rect x="50" y="35" width="28" height="55" fill="url(#pillar)"/>
+    <path d="M 45 35 L 50 30 L 78 30 L 83 35 Z" fill="#e2e8f0"/>
+    <path d="M 45 90 L 50 90 L 78 90 L 83 90 L 85 95 L 43 95 Z" fill="#e2e8f0"/>
+    
+    <!-- Pillar fluting -->
+    <line x1="55" y1="35" x2="55" y2="90" stroke="#94a3b8" stroke-width="1" opacity="0.4"/>
+    <line x1="60" y1="35" x2="60" y2="90" stroke="#94a3b8" stroke-width="1" opacity="0.4"/>
+    <line x1="68" y1="35" x2="68" y2="90" stroke="#94a3b8" stroke-width="1" opacity="0.4"/>
+    <line x1="73" y1="35" x2="73" y2="90" stroke="#94a3b8" stroke-width="1" opacity="0.4"/>
+    
+    <!-- G7 flag colors around pillar -->
+    <rect x="35" y="50" width="6" height="8" fill="#ef4444"/>
+    <rect x="35" y="60" width="6" height="8" fill="#3b82f6"/>
+    <rect x="35" y="70" width="6" height="8" fill="#10b981"/>
+    
+    <rect x="87" y="50" width="6" height="8" fill="#fbbf24"/>
+    <rect x="87" y="60" width="6" height="8" fill="#8b5cf6"/>
+    <rect x="87" y="70" width="6" height="8" fill="#06b6d4"/>
+    
+    <!-- Legal book at base -->
+    <rect x="52" y="95" width="24" height="18" rx="2" fill="#dc2626"/>
+    <line x1="64" y1="95" x2="64" y2="113" stroke="#7f1d1d" stroke-width="2"/>
+    
+    <!-- AI tech elements -->
+    <circle cx="64" cy="20" r="8" fill="#4fd1c5" opacity="0.3"/>
+    <circle cx="64" cy="20" r="6" fill="none" stroke="#4fd1c5" stroke-width="2"/>
+    <line x1="64" y1="20" x2="64" y2="28" stroke="#4fd1c5" stroke-width="2"/>
+    
+    <!-- Neural connections -->
+    <circle cx="48" cy="24" r="2" fill="#4fd1c5"/>
+    <circle cx="80" cy="24" r="2" fill="#4fd1c5"/>
+    <line x1="56" y1="20" x2="48" y2="24" stroke="#4fd1c5" stroke-width="1"/>
+    <line x1="72" y1="20" x2="80" y2="24" stroke="#4fd1c5" stroke-width="1"/>
+</svg>

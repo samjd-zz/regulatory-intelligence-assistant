@@ -1,0 +1,42 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="globe1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#1e40af"/>
+            <stop offset="100%" style="stop-color:#1e3a8a"/>
+        </linearGradient>
+    </defs>
+    <circle cx="64" cy="64" r="60" fill="url(#globe1)"/>
+    
+    <!-- Globe with continents -->
+    <circle cx="64" cy="64" r="45" fill="#3b82f6" opacity="0.3"/>
+    <circle cx="64" cy="64" r="45" fill="none" stroke="#60a5fa" stroke-width="2"/>
+    
+    <!-- Latitude lines -->
+    <ellipse cx="64" cy="64" rx="45" ry="15" fill="none" stroke="#60a5fa" stroke-width="1.5" opacity="0.4"/>
+    <ellipse cx="64" cy="64" rx="45" ry="30" fill="none" stroke="#60a5fa" stroke-width="1.5" opacity="0.4"/>
+    
+    <!-- Longitude lines -->
+    <ellipse cx="64" cy="64" rx="15" ry="45" fill="none" stroke="#60a5fa" stroke-width="1.5" opacity="0.4"/>
+    <ellipse cx="64" cy="64" rx="30" ry="45" fill="none" stroke="#60a5fa" stroke-width="1.5" opacity="0.4"/>
+    
+    <!-- G7 countries indicators -->
+    <circle cx="55" cy="45" r="3" fill="#fbbf24"/>
+    <circle cx="75" cy="50" r="3" fill="#fbbf24"/>
+    <circle cx="48" cy="65" r="3" fill="#fbbf24"/>
+    <circle cx="82" cy="68" r="3" fill="#fbbf24"/>
+    <circle cx="70" cy="80" r="3" fill="#fbbf24"/>
+    
+    <!-- Legal scale overlay -->
+    <line x1="64" y1="15" x2="64" y2="35" stroke="#fbbf24" stroke-width="3"/>
+    <line x1="45" y1="25" x2="83" y2="25" stroke="#fbbf24" stroke-width="2.5"/>
+    
+    <!-- Scale pans -->
+    <path d="M 45 25 L 40 30 L 50 30 Z" fill="#fbbf24"/>
+    <path d="M 83 25 L 78 30 L 88 30 Z" fill="#fbbf24"/>
+    
+    <!-- AI neural network points -->
+    <circle cx="30" cy="64" r="2" fill="#4fd1c5" opacity="0.8"/>
+    <circle cx="98" cy="64" r="2" fill="#4fd1c5" opacity="0.8"/>
+    <line x1="30" y1="64" x2="45" y2="64" stroke="#4fd1c5" stroke-width="1" opacity="0.5"/>
+    <line x1="98" y1="64" x2="83" y2="64" stroke="#4fd1c5" stroke-width="1" opacity="0.5"/>
+</svg>
