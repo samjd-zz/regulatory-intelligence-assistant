@@ -11,16 +11,39 @@ Created: 2025-11-22
 import os
 import json
 import logging
-from typing import Dict, List, Optional, Any, Union
+import time
+from typing import Dict, List, Optional, Any, Union, Tuple
 from datetime import datetime
 from pathlib import Path
+from dataclasses import dataclass
 
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from google.api_core import exceptions as google_exceptions
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GeminiError:
+    """Structured error information from Gemini API"""
+    error_type: str  # "rate_limit", "quota_exceeded", "invalid_request", "network", "unknown"
+    message: str  # User-friendly message
+    retry_after_seconds: Optional[int] = None  # Suggested retry delay
+    is_retryable: bool = False  # Whether the error can be retried
+    original_error: Optional[str] = None  # Original exception message
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization"""
+        return {
+            "error_type": self.error_type,
+            "message": self.message,
+            "retry_after_seconds": self.retry_after_seconds,
+            "is_retryable": self.is_retryable,
+            "original_error": self.original_error
+        }
 
 # Gemini API pricing (per million tokens) - Updated December 2024
 # Prices from: https://ai.google.dev/pricing
@@ -90,6 +113,159 @@ class GeminiClient:
     def is_available(self) -> bool:
         """Check if Gemini API is available"""
         return self.available
+
+    def _classify_error(self, error: Exception) -> GeminiError:
+        """
+        Classify an exception into a structured GeminiError.
+        
+        Args:
+            error: Exception from Gemini API
+            
+        Returns:
+            GeminiError with categorized information
+        """
+        error_str = str(error).lower()
+        error_type = type(error).__name__
+        
+        # Rate limit errors (429)
+        if isinstance(error, google_exceptions.ResourceExhausted) or "429" in error_str or "rate limit" in error_str:
+            # Try to extract retry-after from error message
+            retry_after = 60  # Default to 60 seconds
+            if "retry after" in error_str:
+                import re
+                match = re.search(r'retry after (\d+)', error_str)
+                if match:
+                    retry_after = int(match.group(1))
+            
+            return GeminiError(
+                error_type="rate_limit",
+                message=f"The AI service is experiencing high demand. Please wait {retry_after} seconds and try again.",
+                retry_after_seconds=retry_after,
+                is_retryable=True,
+                original_error=str(error)
+            )
+        
+        # Quota exceeded (daily/monthly limits)
+        elif isinstance(error, google_exceptions.PermissionDenied) or "quota" in error_str or "quota exceeded" in error_str:
+            return GeminiError(
+                error_type="quota_exceeded",
+                message="Your API quota has been exceeded. Please check your Gemini API usage limits and try again later.",
+                retry_after_seconds=3600,  # Suggest trying again in 1 hour
+                is_retryable=False,  # Don't auto-retry quota issues
+                original_error=str(error)
+            )
+        
+        # Invalid request (bad parameters, malformed input)
+        elif isinstance(error, google_exceptions.InvalidArgument) or "invalid" in error_str or "400" in error_str:
+            return GeminiError(
+                error_type="invalid_request",
+                message="The request to the AI service was invalid. Please try rephrasing your question.",
+                retry_after_seconds=None,
+                is_retryable=False,
+                original_error=str(error)
+            )
+        
+        # Network/connection errors
+        elif isinstance(error, (google_exceptions.ServiceUnavailable, google_exceptions.DeadlineExceeded)) or \
+             "timeout" in error_str or "connection" in error_str or "network" in error_str:
+            return GeminiError(
+                error_type="network",
+                message="Unable to connect to the AI service. Please check your internet connection and try again.",
+                retry_after_seconds=5,
+                is_retryable=True,
+                original_error=str(error)
+            )
+        
+        # Authentication errors
+        elif isinstance(error, google_exceptions.Unauthenticated) or "authentication" in error_str or "401" in error_str:
+            return GeminiError(
+                error_type="authentication",
+                message="AI service authentication failed. Please contact support.",
+                retry_after_seconds=None,
+                is_retryable=False,
+                original_error=str(error)
+            )
+        
+        # Unknown errors
+        else:
+            return GeminiError(
+                error_type="unknown",
+                message="An unexpected error occurred with the AI service. Please try again later.",
+                retry_after_seconds=30,
+                is_retryable=True,
+                original_error=str(error)
+            )
+
+    def _exponential_backoff_retry(
+        self,
+        operation_func,
+        max_retries: int = 3,
+        initial_delay: float = 1.0,
+        max_delay: float = 60.0,
+        backoff_multiplier: float = 2.0
+    ) -> Tuple[Optional[Any], Optional[GeminiError]]:
+        """
+        Execute an operation with exponential backoff retry logic.
+        
+        Args:
+            operation_func: Function to execute (should raise exceptions on failure)
+            max_retries: Maximum number of retry attempts
+            initial_delay: Initial delay in seconds before first retry
+            max_delay: Maximum delay between retries
+            backoff_multiplier: Multiplier for exponential backoff
+            
+        Returns:
+            Tuple of (result, error). If successful, error is None. If failed after all retries, result is None.
+        """
+        last_error = None
+        delay = initial_delay
+        
+        for attempt in range(max_retries + 1):  # +1 for initial attempt
+            try:
+                # Attempt the operation
+                result = operation_func()
+                
+                # Success!
+                if attempt > 0:
+                    logger.info(f"✅ Operation succeeded after {attempt} retry attempt(s)")
+                
+                return result, None
+                
+            except Exception as e:
+                # Classify the error
+                gemini_error = self._classify_error(e)
+                last_error = gemini_error
+                
+                # Log the error
+                logger.warning(
+                    f"⚠️  Gemini API error (attempt {attempt + 1}/{max_retries + 1}): "
+                    f"{gemini_error.error_type} - {gemini_error.message}"
+                )
+                
+                # Check if we should retry
+                if not gemini_error.is_retryable:
+                    logger.error(f"❌ Error is not retryable: {gemini_error.error_type}")
+                    return None, gemini_error
+                
+                # Check if we've exhausted retries
+                if attempt >= max_retries:
+                    logger.error(f"❌ Max retries ({max_retries}) exhausted")
+                    return None, gemini_error
+                
+                # Calculate delay (use error's suggested delay if available)
+                if gemini_error.retry_after_seconds:
+                    actual_delay = min(gemini_error.retry_after_seconds, max_delay)
+                else:
+                    actual_delay = min(delay, max_delay)
+                
+                logger.info(f"🔄 Retrying in {actual_delay:.1f} seconds...")
+                time.sleep(actual_delay)
+                
+                # Exponential backoff for next iteration
+                delay *= backoff_multiplier
+        
+        # Should not reach here, but just in case
+        return None, last_error
 
     def _calculate_cost(self, input_tokens: int, output_tokens: int, cached_tokens: int = 0) -> Dict[str, float]:
         """
@@ -190,10 +366,11 @@ class GeminiClient:
         max_tokens: Optional[int] = None,
         top_p: float = 0.95,
         top_k: int = 40,
-        stop_sequences: Optional[List[str]] = None
-    ) -> Optional[str]:
+        stop_sequences: Optional[List[str]] = None,
+        max_retries: int = 3
+    ) -> Tuple[Optional[str], Optional[GeminiError]]:
         """
-        Generate content using Gemini API.
+        Generate content using Gemini API with automatic retry on rate limits.
 
         Args:
             prompt: Input prompt
@@ -202,15 +379,23 @@ class GeminiClient:
             top_p: Nucleus sampling parameter
             top_k: Top-k sampling parameter
             stop_sequences: List of sequences to stop generation
+            max_retries: Maximum number of retry attempts on retryable errors
 
         Returns:
-            Generated text or None if error
+            Tuple of (generated_text, error). If successful, error is None.
+            If failed, generated_text is None and error contains details.
         """
         if not self.available:
             logger.error("Gemini API not available")
-            return None
+            error = GeminiError(
+                error_type="unavailable",
+                message="The AI service is not configured. Please contact support.",
+                is_retryable=False
+            )
+            return None, error
 
-        try:
+        # Define the operation to retry
+        def _generate_operation():
             generation_config = {
                 "temperature": temperature,
                 "top_p": top_p,
@@ -245,14 +430,18 @@ class GeminiClient:
             
             if extracted_text:
                 logger.info(f"✅ Successfully extracted {len(extracted_text)} characters from Gemini response")
+                return extracted_text
             else:
                 logger.error(f"❌ Failed to extract text from Gemini response - response may be blocked or empty")
-                
-            return extracted_text
-
-        except Exception as e:
-            logger.error(f"Content generation failed: {e}")
-            return None
+                raise ValueError("Failed to extract text from response")
+        
+        # Execute with retry logic
+        result, error = self._exponential_backoff_retry(
+            operation_func=_generate_operation,
+            max_retries=max_retries
+        )
+        
+        return result, error
 
     def _extract_text_from_response(self, response) -> Optional[str]:
         """
@@ -519,10 +708,11 @@ class GeminiClient:
         context: Union[str, List[str]],
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: Optional[int] = None
-    ) -> Optional[str]:
+        max_tokens: Optional[int] = None,
+        max_retries: int = 3
+    ) -> Tuple[Optional[str], Optional[GeminiError]]:
         """
-        Generate content with provided context.
+        Generate content with provided context and automatic retry on rate limits.
 
         Args:
             query: User query
@@ -530,12 +720,19 @@ class GeminiClient:
             system_prompt: Optional system instructions
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
+            max_retries: Maximum number of retry attempts on retryable errors
 
         Returns:
-            Generated response or None if error
+            Tuple of (generated_text, error). If successful, error is None.
+            If failed, generated_text is None and error contains details.
         """
         if not self.available:
-            return None
+            error = GeminiError(
+                error_type="unavailable",
+                message="The AI service is not configured. Please contact support.",
+                is_retryable=False
+            )
+            return None, error
 
         # Build prompt with context
         if isinstance(context, list):
@@ -557,7 +754,8 @@ class GeminiClient:
         return self.generate_content(
             prompt=prompt,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            max_retries=max_retries
         )
 
     def health_check(self) -> Dict[str, Any]:

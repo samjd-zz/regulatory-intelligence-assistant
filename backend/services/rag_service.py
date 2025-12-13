@@ -358,7 +358,8 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         else:
             language_instruction = "\n\nIMPORTANT: The user asked their question in ENGLISH. You MUST respond entirely in ENGLISH."
         
-        answer_text = self.gemini_client.generate_with_context(
+        # Generate with retry logic - returns (text, error)
+        answer_text, gemini_error = self.gemini_client.generate_with_context(
             query=question,
             context=context_str,
             system_prompt=self.LEGAL_SYSTEM_PROMPT + language_instruction,
@@ -366,16 +367,43 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             max_tokens=max_tokens
         )
 
-        if not answer_text:
+        # Handle errors from Gemini API
+        if gemini_error:
+            logger.error(f"Gemini API error: {gemini_error.error_type} - {gemini_error.message}")
+            
+            # Build comprehensive error metadata
+            error_metadata = {
+                "error": gemini_error.error_type,
+                "error_details": gemini_error.to_dict(),
+                "num_context_docs": len(context_docs),
+                "temperature": temperature,
+                "filters_used": combined_filters,
+                "multi_tier_search": tier_metadata,
+            }
+            
+            # Return user-friendly error message
             return RAGAnswer(
                 question=question,
-                answer="I encountered an error while generating the answer. Please try again or rephrase your question.",
+                answer=gemini_error.message,  # User-friendly message from error classification
                 citations=[],
                 confidence_score=0.0,
                 source_documents=context_docs,
                 intent=intent,
                 processing_time_ms=(datetime.now() - start_time).total_seconds() * 1000,
-                metadata={"error": "generation_failed"}
+                metadata=error_metadata
+            )
+        
+        # Check if we got an empty response despite no error
+        if not answer_text:
+            return RAGAnswer(
+                question=question,
+                answer="I encountered an unexpected issue while generating the answer. Please try again or rephrase your question.",
+                citations=[],
+                confidence_score=0.0,
+                source_documents=context_docs,
+                intent=intent,
+                processing_time_ms=(datetime.now() - start_time).total_seconds() * 1000,
+                metadata={"error": "empty_response", "num_context_docs": len(context_docs)}
             )
 
         # Extract citations from answer
