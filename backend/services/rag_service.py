@@ -737,7 +737,13 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         
         # Update total queries counter
         self.total_queries += 1
-        
+
+        # Parse query first
+        parsed_query = self.query_parser.parse_query(question)
+
+        # Enhance the query for better search
+        question = self._enhance_query_for_search(question, parsed_query)
+
         # Tier 1: Optimized Elasticsearch
         logger.info("🔍 Tier 1: Trying optimized Elasticsearch search...")
         tier1_start = time.time()
@@ -902,11 +908,6 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             # Use current filters
             search_filters = filters.copy() if filters else {}
             
-            # Parse query first
-            parsed_query = self.query_parser.parse_query(question)
-
-            # Enhance the query for better search
-            enhanced_query = self._enhance_query_for_search(question, parsed_query)
 
             # Execute search with ORIGINAL question to preserve intent
             # Let hybrid_search do its own intelligent processing:
@@ -915,7 +916,7 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             # - Intelligent boosting (10x title, 5x doc type)
             # - Adaptive weight adjustment
             search_results = self.search_service.hybrid_search(
-                query=enhanced_query,  # Use original question, not enhanced
+                query=question,  # Use original question, not enhanced
                 filters=search_filters,
                 size=num_docs
                 # Don't override weights - let hybrid_search decide based on intent
