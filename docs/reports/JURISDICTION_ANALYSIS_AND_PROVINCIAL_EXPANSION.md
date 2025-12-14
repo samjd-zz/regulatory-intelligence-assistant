@@ -1,7 +1,8 @@
 # Jurisdiction Analysis and Provincial Law Expansion Plan
 
 **Date**: December 13, 2025  
-**Status**: Analysis Complete - Ready for Planning
+**Status**: ✅ Phase 1.1 Complete - Jurisdiction Detection Implemented  
+**Branch**: `feature/provincial-jurisdiction-detection`
 
 ---
 
@@ -148,17 +149,39 @@ Similar databases exist for:
 
 ### Phase 1: Infrastructure Updates (Week 1)
 
-#### 1.1 Update XML Parser
+#### 1.1 Update XML Parser ✅ **COMPLETE**
 **File**: `backend/ingestion/canadian_law_xml_parser.py`
 
-**Change**:
-```python
-# BEFORE (Line 196):
-jurisdiction='federal',
+**Status**: ✅ Implemented (December 13, 2025)
 
-# AFTER:
-jurisdiction=self._detect_jurisdiction_from_metadata(root, title, chapter),
-```
+**Changes Made**:
+1. Added `_detect_jurisdiction_from_metadata()` method with comprehensive detection logic
+2. Updated `_parse_consolidation()` to use dynamic jurisdiction detection
+3. Updated `_parse_statute()` to use dynamic jurisdiction detection
+4. Removed hardcoded `jurisdiction='federal'`
+
+**Detection Logic**:
+- **Chapter Notation**: Detects jurisdiction from chapter prefixes (S.C., S.O., S.Q., etc.)
+- **Title Keywords**: Fallback detection from document title
+- **Default**: Falls back to 'federal' if no indicators found
+
+**Supported Jurisdictions**:
+- Federal: S.C., R.S.C.
+- Ontario: S.O., R.S.O.
+- Quebec: S.Q., R.S.Q., L.R.Q., L.Q.
+- British Columbia: S.B.C., R.S.B.C.
+- Alberta: S.A., R.S.A.
+- Manitoba: S.M., R.S.M.
+- Saskatchewan: S.S., R.S.S.
+- Nova Scotia: S.N.S., R.S.N.S.
+- New Brunswick: S.N.B., R.S.N.B.
+- Prince Edward Island: S.P.E.I., R.S.P.E.I.
+- Newfoundland & Labrador: S.N.L., R.S.N.L.
+
+**Testing Status**: ✅ Tested and Verified
+- All 23 existing XML parser tests passed
+- No breaking changes to existing functionality
+- Jurisdiction detection working as expected
 
 **Add Method**:
 ```python

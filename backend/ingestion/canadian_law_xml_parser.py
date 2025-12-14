@@ -172,6 +172,98 @@ class CanadianLawXMLParser:
             return element.text.strip()
         return default
     
+    def _detect_jurisdiction_from_metadata(self, root: ET.Element, title: str, chapter: str) -> str:
+        """
+        Detect jurisdiction from XML metadata, authority, or title.
+        
+        Args:
+            root: XML root element
+            title: Document title
+            chapter: Chapter/authority notation (e.g., "S.C. 1996, c. 23")
+            
+        Returns:
+            Detected jurisdiction: 'federal', 'ontario', 'quebec', etc.
+        """
+        # Check chapter notation (S.C. = federal, S.O. = Ontario, etc.)
+        if chapter:
+            chapter_upper = chapter.upper()
+            
+            # Federal
+            if chapter_upper.startswith('S.C.') or chapter_upper.startswith('R.S.C.'):
+                return 'federal'
+            
+            # Ontario
+            elif chapter_upper.startswith('S.O.') or chapter_upper.startswith('R.S.O.'):
+                return 'ontario'
+            
+            # Quebec
+            elif chapter_upper.startswith('S.Q.') or chapter_upper.startswith('R.S.Q.') or \
+                 chapter_upper.startswith('L.R.Q.') or chapter_upper.startswith('L.Q.'):
+                return 'quebec'
+            
+            # British Columbia
+            elif chapter_upper.startswith('S.B.C.') or chapter_upper.startswith('R.S.B.C.'):
+                return 'british_columbia'
+            
+            # Alberta
+            elif chapter_upper.startswith('S.A.') or chapter_upper.startswith('R.S.A.'):
+                return 'alberta'
+            
+            # Manitoba
+            elif chapter_upper.startswith('S.M.') or chapter_upper.startswith('R.S.M.'):
+                return 'manitoba'
+            
+            # Saskatchewan
+            elif chapter_upper.startswith('S.S.') or chapter_upper.startswith('R.S.S.'):
+                return 'saskatchewan'
+            
+            # Nova Scotia
+            elif chapter_upper.startswith('S.N.S.') or chapter_upper.startswith('R.S.N.S.'):
+                return 'nova_scotia'
+            
+            # New Brunswick
+            elif chapter_upper.startswith('S.N.B.') or chapter_upper.startswith('R.S.N.B.'):
+                return 'new_brunswick'
+            
+            # Prince Edward Island
+            elif chapter_upper.startswith('S.P.E.I.') or chapter_upper.startswith('R.S.P.E.I.'):
+                return 'prince_edward_island'
+            
+            # Newfoundland and Labrador
+            elif chapter_upper.startswith('S.N.L.') or chapter_upper.startswith('R.S.N.L.') or \
+                 chapter_upper.startswith('S.N.') or chapter_upper.startswith('R.S.N.'):
+                return 'newfoundland_labrador'
+        
+        # Fallback to title-based detection
+        if title:
+            title_lower = title.lower()
+            
+            # Provincial keywords
+            if 'ontario' in title_lower:
+                return 'ontario'
+            elif 'quebec' in title_lower or 'québec' in title_lower:
+                return 'quebec'
+            elif 'british columbia' in title_lower or 'b.c.' in title_lower:
+                return 'british_columbia'
+            elif 'alberta' in title_lower:
+                return 'alberta'
+            elif 'manitoba' in title_lower:
+                return 'manitoba'
+            elif 'saskatchewan' in title_lower:
+                return 'saskatchewan'
+            elif 'nova scotia' in title_lower:
+                return 'nova_scotia'
+            elif 'new brunswick' in title_lower:
+                return 'new_brunswick'
+            elif 'prince edward island' in title_lower or 'p.e.i.' in title_lower:
+                return 'prince_edward_island'
+            elif 'newfoundland' in title_lower or 'labrador' in title_lower:
+                return 'newfoundland_labrador'
+        
+        # Default to federal for Canadian laws (Justice Canada repository)
+        logger.info(f"No jurisdiction indicators found, defaulting to 'federal'")
+        return 'federal'
+    
     def _parse_consolidation(self, root: ET.Element) -> ParsedRegulation:
         """Parse Consolidation element (root)."""
         logger.info("Parsing Consolidation element")
@@ -192,7 +284,11 @@ class CanadianLawXMLParser:
         # Determine act type from chapter notation
         act_type = self._determine_act_type(chapter)
         
+        # Detect jurisdiction dynamically
+        jurisdiction = self._detect_jurisdiction_from_metadata(root, title, chapter)
+        
         logger.info(f"Parsing regulation: {title}")
+        logger.info(f"Detected jurisdiction: {jurisdiction}")
         
         # Parse body (sections)
         body = self._find(root, './/Body')
@@ -229,7 +325,7 @@ class CanadianLawXMLParser:
             act_type=act_type,
             enabled_date=enabled_date,
             consolidation_date=consolidation_date,
-            jurisdiction='federal',
+            jurisdiction=jurisdiction,  # Use detected jurisdiction
             full_text=full_text,
             sections=sections,
             amendments=amendments,
@@ -328,13 +424,17 @@ class CanadianLawXMLParser:
                 if clean_key in ['pit-date', 'lastAmendedDate', 'current-date', 'inforce-start-date']:
                     metadata[clean_key] = value
         
+        # Detect jurisdiction dynamically
+        jurisdiction = self._detect_jurisdiction_from_metadata(root, title, chapter)
+        logger.info(f"Detected jurisdiction: {jurisdiction}")
+        
         regulation = ParsedRegulation(
             title=title,
             chapter=chapter,
             act_type=act_type,
             enabled_date=None,  # Use inforce-start-date from metadata
             consolidation_date=metadata.get('current-date'),
-            jurisdiction='federal',
+            jurisdiction=jurisdiction,  # Use detected jurisdiction
             full_text=full_text,
             sections=sections,
             amendments=amendments,

@@ -33,6 +33,15 @@ except ImportError:
     DOCX_AVAILABLE = False
     logging.warning("python-docx not available. DOCX parsing will be disabled.")
 
+# DOC parsing (legacy Word format)
+import subprocess
+import shutil
+
+# Check if antiword is available on the system
+DOC_AVAILABLE = shutil.which('antiword') is not None
+if not DOC_AVAILABLE:
+    logging.warning("antiword not available. Legacy .doc parsing will be disabled. Install: apt-get install antiword")
+
 # XML parsing
 import xml.etree.ElementTree as ET
 
@@ -51,7 +60,7 @@ class DocumentParser:
     Service for parsing and processing regulatory documents.
     """
     
-    SUPPORTED_FORMATS = ['pdf', 'html', 'htm', 'xml', 'txt', 'docx']
+    SUPPORTED_FORMATS = ['pdf', 'html', 'htm', 'xml', 'txt', 'doc', 'docx']
     
     def __init__(self, db: Session):
         """
@@ -175,6 +184,8 @@ class DocumentParser:
             return self._extract_html_text(content)
         elif file_format == 'xml':
             return self._extract_xml_text(content)
+        elif file_format == 'doc':
+            return self._extract_doc_text(content)
         elif file_format == 'docx':
             return self._extract_docx_text(content)
         else:  # txt or unknown
@@ -264,6 +275,57 @@ class DocumentParser:
         except Exception as e:
             logger.error(f"Error extracting XML text: {e}")
             raise ValueError(f"Failed to parse XML: {e}")
+    
+    def _extract_doc_text(self, content: bytes) -> str:
+        """Extract text from legacy DOC content (OLE/CFB format) using antiword."""
+        if not DOC_AVAILABLE:
+            logger.error("antiword not installed. Cannot parse legacy .doc files.")
+            raise ValueError("DOC parsing not available. Install antiword: apt-get install antiword")
+        
+        try:
+            import tempfile
+            import os
+            import subprocess
+            
+            # antiword requires a file path, so write to temp file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.doc') as tmp_file:
+                tmp_file.write(content)
+                tmp_path = tmp_file.name
+            
+            try:
+                # Extract text using antiword command-line tool
+                result = subprocess.run(
+                    ['antiword', tmp_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                if result.returncode != 0:
+                    logger.error(f"antiword failed with return code {result.returncode}: {result.stderr}")
+                    raise ValueError(f"antiword failed: {result.stderr}")
+                
+                text = result.stdout
+                
+                if not text.strip():
+                    logger.error("No text could be extracted from DOC.")
+                    raise ValueError("DOC contains no extractable text.")
+                
+                logger.info(f"Successfully extracted {len(text)} characters from DOC")
+                return text.strip()
+            finally:
+                # Clean up temp file
+                try:
+                    os.unlink(tmp_path)
+                except:
+                    pass
+            
+        except subprocess.TimeoutExpired:
+            logger.error("antiword command timed out")
+            raise ValueError("DOC parsing timed out after 30 seconds")
+        except Exception as e:
+            logger.error(f"Error parsing DOC: {str(e)}")
+            raise ValueError(f"Failed to parse DOC: {str(e)}")
     
     def _extract_docx_text(self, content: bytes) -> str:
         """Extract text from DOCX content."""
