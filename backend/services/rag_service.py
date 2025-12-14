@@ -741,13 +741,8 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         # Tier 1: Optimized Elasticsearch
         logger.info("🔍 Tier 1: Trying optimized Elasticsearch search...")
         tier1_start = time.time()
-        # Parse query first
-        parsed_query = self.query_parser.parse_query(question)
 
-        # Enhance the query for better search
-        enhanced_query = self._enhance_query_for_search(question, parsed_query)
-
-        tier1_results = self._tier1_elasticsearch_optimized(enhanced_query, filters, num_context_docs)
+        tier1_results = self._tier1_elasticsearch_optimized(question, filters, num_context_docs)
         tier1_time = (time.time() - tier1_start) * 1000
         metadata['tier_timings']['tier_1_ms'] = tier1_time
         metadata['tiers_attempted'].append(1)
@@ -907,6 +902,12 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             # Use current filters
             search_filters = filters.copy() if filters else {}
             
+            # Parse query first
+            parsed_query = self.query_parser.parse_query(question)
+
+            # Enhance the query for better search
+            enhanced_query = self._enhance_query_for_search(question, parsed_query)
+
             # Execute search with ORIGINAL question to preserve intent
             # Let hybrid_search do its own intelligent processing:
             # - Query intent detection
@@ -914,7 +915,7 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             # - Intelligent boosting (10x title, 5x doc type)
             # - Adaptive weight adjustment
             search_results = self.search_service.hybrid_search(
-                query=question,  # Use original question, not enhanced
+                query=enhanced_query,  # Use original question, not enhanced
                 filters=search_filters,
                 size=num_docs
                 # Don't override weights - let hybrid_search decide based on intent

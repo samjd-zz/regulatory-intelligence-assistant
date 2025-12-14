@@ -498,8 +498,11 @@ class GraphService:
         """
         Sanitize query text for Lucene full-text search.
         
-        Lucene has special characters that must be escaped to avoid syntax errors:
-        + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
+        This method:
+        1. Removes common stop words
+        2. Handles slash-separated terms (GST/HST -> GST OR HST)
+        3. Escapes remaining special characters
+        4. Uses OR for broader matching
         
         Args:
             query: Raw query text
@@ -507,23 +510,46 @@ class GraphService:
         Returns:
             Sanitized query safe for Lucene
         """
-        # Characters that need escaping in Lucene queries
-        special_chars = ['+', '-', '&&', '||', '!', '(', ')', '{', '}', 
-                        '[', ']', '^', '"', '~', '*', '?', ':', '\\', '/']
+        # Common stop words to filter out
+        stop_words = {
+            'how', 'is', 'are', 'the', 'a', 'an', 'what', 'when', 'where', 
+            'who', 'which', 'this', 'that', 'these', 'those', 'be', 'been',
+            'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+            'should', 'could', 'may', 'might', 'must', 'can'
+        }
         
-        sanitized = query
+        # Split query into words
+        words = query.split()
+        expanded_words = []
         
-        # Escape each special character
-        for char in special_chars:
-            sanitized = sanitized.replace(char, f'\\{char}')
+        for word in words:
+            word_lower = word.lower().strip()
+            
+            # Skip stop words
+            if word_lower in stop_words:
+                continue
+            
+            # Handle slash-separated terms (e.g., "GST/HST" -> ["GST", "HST"])
+            if '/' in word:
+                variants = word.split('/')
+                variants_clean = [v.strip() for v in variants if v.strip()]
+                expanded_words.extend(variants_clean)
+            else:
+                # Remove punctuation but keep the word
+                clean_word = ''.join(c for c in word if c.isalnum() or c in ('-', '_'))
+                if clean_word and clean_word.lower() not in stop_words:
+                    expanded_words.append(clean_word)
         
-        # Also handle whitespace - convert to AND operators for better matching
-        # Split on whitespace and join with AND
-        terms = sanitized.split()
-        if len(terms) > 1:
-            sanitized = ' AND '.join(terms)
+        # If no meaningful terms extracted, use original query
+        if not expanded_words:
+            logger.warning(f"No meaningful terms extracted from query: '{query}', using original")
+            return query
         
-        logger.debug(f"Sanitized query: '{query}' -> '{sanitized}'")
+        # Join with OR for broader matching (instead of AND)
+        # This allows partial matches instead of requiring all terms
+        sanitized = ' OR '.join(expanded_words)
+        
+        logger.info(f"Sanitized Lucene query: '{query}' -> '{sanitized}'")
         return sanitized
     
     def semantic_search_for_rag(
@@ -537,7 +563,7 @@ class GraphService:
         
         This method is used as Tier 3 in the multi-tier RAG search fallback.
         It searches across both Legislation and Section nodes using Neo4j's
-        full-text indexes.
+        full-text indexes, with a fallback to simple CONTAINS matching.
         
         Args:
             query: Search query text
@@ -548,80 +574,249 @@ class GraphService:
             List of documents formatted for RAG context
         """
         try:
-            # Sanitize query to prevent Lucene syntax errors
-            sanitized_query = self._sanitize_lucene_query(query)
+            # Try full-text search first
+            results = self._fulltext_search(query, limit, language)
             
-            # Search legislation nodes
-            legislation_query = """
-            CALL db.index.fulltext.queryNodes('legislation_fulltext', $query)
-            YIELD node, score
-            WHERE node.language = $language OR $language = 'all'
-            RETURN 
-                node.id as id,
-                node.title as title,
-                node.full_text as content,
-                node.act_number as citation,
-                '' as section_number,
-                node.jurisdiction as jurisdiction,
-                'legislation' as document_type,
-                score
-            ORDER BY score DESC
-            LIMIT $limit
-            """
+            # If full-text search returns no results, try fallback CONTAINS search
+            if not results:
+                logger.warning(f"Full-text search returned 0 results, trying fallback CONTAINS search")
+                results = self._fallback_contains_search(query, limit, language)
             
-            leg_results = self.client.execute_query(
-                legislation_query,
-                {"query": sanitized_query, "limit": limit // 2, "language": language}
+            return results
+            
+        except Exception as e:
+            logger.error(f"Neo4j semantic search failed: {e}")
+            # Try fallback search even on error
+            try:
+                return self._fallback_contains_search(query, limit, language)
+            except Exception as fallback_error:
+                logger.error(f"Fallback search also failed: {fallback_error}")
+                return []
+    
+    def _fulltext_search(
+        self,
+        query: str,
+        limit: int,
+        language: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Perform full-text search using Neo4j indexes.
+        
+        Args:
+            query: Search query text
+            limit: Maximum number of results
+            language: Language filter
+            
+        Returns:
+            List of matching documents
+        """
+        # Sanitize query to prevent Lucene syntax errors
+        sanitized_query = self._sanitize_lucene_query(query)
+        
+        # Search legislation nodes
+        legislation_query = """
+        CALL db.index.fulltext.queryNodes('legislation_fulltext', $query)
+        YIELD node, score
+        WHERE node.language = $language OR $language = 'all'
+        RETURN 
+            node.id as id,
+            node.title as title,
+            node.full_text as content,
+            node.act_number as citation,
+            '' as section_number,
+            node.jurisdiction as jurisdiction,
+            'legislation' as document_type,
+            score
+        ORDER BY score DESC
+        LIMIT $limit
+        """
+        
+        leg_results = self.client.execute_query(
+            legislation_query,
+            {"query": sanitized_query, "limit": limit // 2, "language": language}
+        )
+        
+        # Search section nodes
+        section_query = """
+        CALL db.index.fulltext.queryNodes('section_fulltext', $query)
+        YIELD node, score
+        MATCH (node)-[:HAS_SECTION]-(leg:Legislation)
+        WHERE leg.language = $language OR $language = 'all'
+        RETURN 
+            node.id as id,
+            node.title as title,
+            node.content as content,
+            leg.act_number as citation,
+            node.section_number as section_number,
+            leg.jurisdiction as jurisdiction,
+            'section' as document_type,
+            score
+        ORDER BY score DESC
+        LIMIT $limit
+        """
+        
+        sec_results = self.client.execute_query(
+            section_query,
+            {"query": sanitized_query, "limit": limit // 2, "language": language}
+        )
+        
+        # Combine and format results
+        documents = []
+        
+        for result in leg_results + sec_results:
+            documents.append({
+                'id': result.get('id', ''),
+                'title': result.get('title', ''),
+                'content': result.get('content', '')[:1500],  # Truncate for RAG
+                'citation': result.get('citation', ''),
+                'section_number': result.get('section_number', ''),
+                'jurisdiction': result.get('jurisdiction', ''),
+                'document_type': result.get('document_type', ''),
+                'score': float(result.get('score', 0.0))
+            })
+        
+        # Sort by score and limit
+        documents.sort(key=lambda x: x['score'], reverse=True)
+        documents = documents[:limit]
+        
+        logger.info(f"Neo4j full-text search found {len(documents)} documents")
+        return documents
+    
+    def _fallback_contains_search(
+        self,
+        query: str,
+        limit: int,
+        language: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Fallback search using simple CONTAINS matching.
+        
+        This is used when full-text search fails or returns no results.
+        It's less sophisticated but more reliable.
+        
+        Args:
+            query: Search query text
+            limit: Maximum number of results
+            language: Language filter
+            
+        Returns:
+            List of matching documents
+        """
+        # Extract meaningful search terms
+        stop_words = {
+            'how', 'is', 'are', 'the', 'a', 'an', 'what', 'when', 'where', 
+            'who', 'which', 'this', 'that', 'be', 'do', 'does'
+        }
+        
+        words = query.split()
+        search_terms = []
+        
+        for word in words:
+            word_lower = word.lower().strip()
+            
+            # Skip stop words
+            if word_lower in stop_words:
+                continue
+            
+            # Handle slash-separated terms
+            if '/' in word:
+                variants = word.split('/')
+                search_terms.extend(v.strip() for v in variants if v.strip())
+            else:
+                clean_word = ''.join(c for c in word if c.isalnum() or c in ('-', '_'))
+                if clean_word and clean_word.lower() not in stop_words:
+                    search_terms.append(clean_word)
+        
+        if not search_terms:
+            logger.warning(f"No search terms extracted from query: '{query}'")
+            return []
+        
+        logger.info(f"Fallback CONTAINS search with terms: {search_terms}")
+        
+        # Build CONTAINS query for each term
+        # Use UNWIND to search for any of the terms
+        fallback_query = """
+        WITH $search_terms AS terms
+        UNWIND terms AS term
+
+        // Search legislation
+        MATCH (l:Legislation)
+        WHERE (l.language = $language OR $language = 'all')
+        AND (toLower(l.title) CONTAINS toLower(term) 
+            OR toLower(coalesce(l.full_text, '')) CONTAINS toLower(term))
+        WITH term, collect(DISTINCT {
+        id: l.id,
+        title: l.title,
+        content: l.full_text,
+        citation: l.act_number,
+        section_number: '',
+        jurisdiction: l.jurisdiction,
+        document_type: 'legislation',
+        score: CASE 
+            WHEN toLower(l.title) CONTAINS toLower(term) THEN 2.0
+            ELSE 1.0
+        END
+        }) AS leg_results
+
+        // Search sections
+        OPTIONAL MATCH (s:Section)-[:HAS_SECTION]-(parent:Legislation)
+        WHERE (parent.language = $language OR $language = 'all')
+        AND (toLower(s.title) CONTAINS toLower(term)
+            OR toLower(coalesce(s.content, '')) CONTAINS toLower(term))
+        WITH term, leg_results,
+            collect(DISTINCT {
+            id: s.id,
+            title: s.title,
+            content: s.content,
+            citation: parent.act_number,
+            section_number: s.section_number,
+            jurisdiction: parent.jurisdiction,
+            document_type: 'section',
+            score: CASE 
+                WHEN toLower(s.title) CONTAINS toLower(term) THEN 2.0
+                ELSE 1.0
+            END
+            }) AS sec_results
+        WITH term, leg_results + sec_results AS all_results
+
+        UNWIND all_results AS result
+        WITH result
+        WHERE result.id IS NOT NULL
+        RETURN result
+        ORDER BY result.score DESC
+        LIMIT $limit
+        """
+        
+        try:
+            results = self.client.execute_query(
+                fallback_query,
+                {
+                    "search_terms": search_terms,
+                    "limit": limit,
+                    "language": language
+                }
             )
             
-            # Search section nodes
-            section_query = """
-            CALL db.index.fulltext.queryNodes('section_fulltext', $query)
-            YIELD node, score
-            MATCH (node)-[:HAS_SECTION]-(leg:Legislation)
-            WHERE leg.language = $language OR $language = 'all'
-            RETURN 
-                node.id as id,
-                node.title as title,
-                node.content as content,
-                leg.act_number as citation,
-                node.section_number as section_number,
-                leg.jurisdiction as jurisdiction,
-                'section' as document_type,
-                score
-            ORDER BY score DESC
-            LIMIT $limit
-            """
-            
-            sec_results = self.client.execute_query(
-                section_query,
-                {"query": sanitized_query, "limit": limit // 2, "language": language}
-            )
-            
-            # Combine and format results
+            # Format results
             documents = []
-            
-            for result in leg_results + sec_results:
+            for row in results:
+                result = row['result']
                 documents.append({
                     'id': result.get('id', ''),
                     'title': result.get('title', ''),
-                    'content': result.get('content', '')[:1500],  # Truncate for RAG
+                    'content': (result.get('content') or '')[:1500],
                     'citation': result.get('citation', ''),
                     'section_number': result.get('section_number', ''),
                     'jurisdiction': result.get('jurisdiction', ''),
                     'document_type': result.get('document_type', ''),
-                    'score': float(result.get('score', 0.0))
+                    'score': float(result.get('score', 1.0))
                 })
             
-            # Sort by score and limit
-            documents.sort(key=lambda x: x['score'], reverse=True)
-            documents = documents[:limit]
-            
-            logger.info(f"Neo4j semantic search found {len(documents)} documents")
+            logger.info(f"Fallback CONTAINS search found {len(documents)} documents")
             return documents
             
         except Exception as e:
-            logger.error(f"Neo4j semantic search failed: {e}")
+            logger.error(f"Fallback CONTAINS search failed: {e}")
             return []
     
     def find_related_documents_by_traversal(

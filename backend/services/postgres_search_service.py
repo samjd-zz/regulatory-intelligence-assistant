@@ -44,6 +44,66 @@ class PostgresSearchService:
             db: Database session (creates new if None)
         """
         self.db = db
+        
+        # Common English stop words that PostgreSQL FTS typically ignores
+        self.stop_words = {
+            'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
+            'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
+            'to', 'was', 'will', 'with', 'what', 'when', 'where', 'who', 'how'
+        }
+    
+    def _build_ts_query(self, query_text: str) -> str:
+        """
+        Build a proper PostgreSQL ts_query from user input.
+        
+        This method:
+        1. Removes common English stop words
+        2. Handles special characters like slashes (GST/HST -> (GST | HST))
+        3. Cleans punctuation
+        4. Joins terms with AND operator
+        
+        Args:
+            query_text: Raw user query
+            
+        Returns:
+            Formatted ts_query string
+            
+        Examples:
+            "How is GST/HST calculated?" -> "(GST | HST) & calculated"
+            "What is EI eligibility" -> "EI & eligibility"
+        """
+        words = query_text.split()
+        query_terms = []
+        
+        for word in words:
+            word_lower = word.lower().strip()
+            
+            # Skip stop words
+            if word_lower in self.stop_words:
+                continue
+            
+            # Handle slashes (e.g., "GST/HST" becomes "(GST | HST)")
+            if '/' in word:
+                variants = word.split('/')
+                variants_clean = [v.strip() for v in variants if v.strip()]
+                if len(variants_clean) > 1:
+                    # Create OR group for variants
+                    query_terms.append(f"({' | '.join(variants_clean)})".replace('?', '').replace('!', ''))
+                elif variants_clean:
+                    clean = variants_clean[0].replace('?', '').replace('!', '').strip()
+                    if clean:
+                        query_terms.append(clean)
+            else:
+                # Clean special characters but preserve alphanumeric
+                clean_word = ''.join(c for c in word if c.isalnum() or c in ('-', '_'))
+                if clean_word and clean_word.lower() not in self.stop_words:
+                    query_terms.append(clean_word)
+        
+        # Join with AND operator, fallback to original if no terms extracted
+        result = " & ".join(query_terms) if query_terms else query_text
+        
+        logger.info(f"Built ts_query: '{query_text}' -> '{result}'")
+        return result
     
     def _get_db(self) -> Session:
         """Get database session"""
@@ -76,10 +136,8 @@ class PostgresSearchService:
         try:
             db = self._get_db()
             
-            # Convert query to tsquery format
-            # Simple approach: split on whitespace and combine with & (AND)
-            query_terms = query.strip().split()
-            ts_query = ' & '.join(query_terms)
+            # Build PostgreSQL ts_query with proper formatting
+            ts_query = self._build_ts_query(query)
             
             # Determine which config to use
             ts_config = 'english' if language == 'english' else 'french'
