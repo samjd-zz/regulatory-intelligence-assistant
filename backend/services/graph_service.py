@@ -494,6 +494,38 @@ class GraphService:
     # RAG-SPECIFIC SEARCH OPERATIONS (Tier 3)
     # ============================================
     
+    def _sanitize_lucene_query(self, query: str) -> str:
+        """
+        Sanitize query text for Lucene full-text search.
+        
+        Lucene has special characters that must be escaped to avoid syntax errors:
+        + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
+        
+        Args:
+            query: Raw query text
+            
+        Returns:
+            Sanitized query safe for Lucene
+        """
+        # Characters that need escaping in Lucene queries
+        special_chars = ['+', '-', '&&', '||', '!', '(', ')', '{', '}', 
+                        '[', ']', '^', '"', '~', '*', '?', ':', '\\', '/']
+        
+        sanitized = query
+        
+        # Escape each special character
+        for char in special_chars:
+            sanitized = sanitized.replace(char, f'\\{char}')
+        
+        # Also handle whitespace - convert to AND operators for better matching
+        # Split on whitespace and join with AND
+        terms = sanitized.split()
+        if len(terms) > 1:
+            sanitized = ' AND '.join(terms)
+        
+        logger.debug(f"Sanitized query: '{query}' -> '{sanitized}'")
+        return sanitized
+    
     def semantic_search_for_rag(
         self,
         query: str,
@@ -516,6 +548,9 @@ class GraphService:
             List of documents formatted for RAG context
         """
         try:
+            # Sanitize query to prevent Lucene syntax errors
+            sanitized_query = self._sanitize_lucene_query(query)
+            
             # Search legislation nodes
             legislation_query = """
             CALL db.index.fulltext.queryNodes('legislation_fulltext', $query)
@@ -536,7 +571,7 @@ class GraphService:
             
             leg_results = self.client.execute_query(
                 legislation_query,
-                {"query": query, "limit": limit // 2, "language": language}
+                {"query": sanitized_query, "limit": limit // 2, "language": language}
             )
             
             # Search section nodes
@@ -560,7 +595,7 @@ class GraphService:
             
             sec_results = self.client.execute_query(
                 section_query,
-                {"query": query, "limit": limit // 2, "language": language}
+                {"query": sanitized_query, "limit": limit // 2, "language": language}
             )
             
             # Combine and format results
@@ -611,6 +646,9 @@ class GraphService:
             List of related documents with traversal paths
         """
         try:
+            # Sanitize query to prevent Lucene syntax errors
+            sanitized_query = self._sanitize_lucene_query(seed_query)
+            
             # First, find seed nodes using full-text search
             seed_query_cypher = f"""
             CALL db.index.fulltext.queryNodes('legislation_fulltext', $query)
@@ -639,7 +677,7 @@ class GraphService:
             
             results = self.client.execute_query(
                 seed_query_cypher,
-                {"query": seed_query, "limit": limit}
+                {"query": sanitized_query, "limit": limit}
             )
             
             # Format results

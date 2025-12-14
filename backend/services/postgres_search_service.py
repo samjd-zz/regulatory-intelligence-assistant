@@ -109,45 +109,46 @@ class PostgresSearchService:
             
             # Search across both regulations and sections
             # Note: This assumes ts_vector columns exist (will be added in migration)
-            sql = text(f"""
+            # Build SQL without f-string to avoid bind parameter conflicts
+            sql_template = """
                 WITH regulation_matches AS (
                     SELECT 
                         r.id,
                         r.title,
                         r.full_text as content,
-                        r.citation,
+                        r.title as citation,
                         '' as section_number,
                         r.jurisdiction,
-                        r.programs,
+                        ARRAY[]::text[] as programs,
                         r.language,
                         'regulation' as doc_type,
                         ts_rank(
-                            to_tsvector(:{ts_config}, coalesce(r.title, '') || ' ' || coalesce(r.full_text, '')),
-                            to_tsquery(:{ts_config}, :ts_query)
+                            to_tsvector(:ts_config, coalesce(r.title, '') || ' ' || coalesce(r.full_text, '')),
+                            to_tsquery(:ts_config, :ts_query)
                         ) as rank
                     FROM regulations r
-                    WHERE to_tsvector(:{ts_config}, coalesce(r.title, '') || ' ' || coalesce(r.full_text, '')) @@ to_tsquery(:{ts_config}, :ts_query)
-                    {filter_sql}
+                    WHERE to_tsvector(:ts_config, coalesce(r.title, '') || ' ' || coalesce(r.full_text, '')) @@ to_tsquery(:ts_config, :ts_query)
+                    {filter_clause}
                 ),
                 section_matches AS (
                     SELECT 
                         s.id,
                         s.title,
                         s.content,
-                        r.citation,
+                        r.title as citation,
                         s.section_number,
                         r.jurisdiction,
-                        r.programs,
+                        ARRAY[]::text[] as programs,
                         r.language,
                         'section' as doc_type,
                         ts_rank(
-                            to_tsvector(:{ts_config}, coalesce(s.title, '') || ' ' || coalesce(s.content, '')),
-                            to_tsquery(:{ts_config}, :ts_query)
+                            to_tsvector(:ts_config, coalesce(s.title, '') || ' ' || coalesce(s.content, '')),
+                            to_tsquery(:ts_config, :ts_query)
                         ) as rank
                     FROM sections s
                     JOIN regulations r ON s.regulation_id = r.id
-                    WHERE to_tsvector(:{ts_config}, coalesce(s.title, '') || ' ' || coalesce(s.content, '')) @@ to_tsquery(:{ts_config}, :ts_query)
-                    {filter_sql}
+                    WHERE to_tsvector(:ts_config, coalesce(s.title, '') || ' ' || coalesce(s.content, '')) @@ to_tsquery(:ts_config, :ts_query)
+                    {filter_clause}
                 )
                 SELECT * FROM (
                     SELECT * FROM regulation_matches
@@ -156,7 +157,10 @@ class PostgresSearchService:
                 ) combined
                 ORDER BY rank DESC
                 LIMIT :limit
-            """)
+            """
+            
+            # Insert filter SQL using string formatting (only for WHERE clause, not bind params)
+            sql = text(sql_template.format(filter_clause=filter_sql))
             
             # Execute query
             params = {
@@ -242,21 +246,23 @@ class PostgresSearchService:
             where_clause = " AND ".join(conditions)
             
             # Query for regulations matching metadata
-            sql = text(f"""
+            sql_template = """
                 SELECT 
                     r.id,
                     r.title,
                     r.full_text as content,
-                    r.citation,
+                    r.title as citation,
                     r.jurisdiction,
-                    r.programs,
+                    ARRAY[]::text[] as programs,
                     r.language,
                     'regulation' as doc_type
                 FROM regulations r
-                WHERE {where_clause}
+                WHERE {where_condition}
                 ORDER BY r.created_at DESC
                 LIMIT :limit
-            """)
+            """
+            
+            sql = text(sql_template.format(where_condition=where_clause))
             
             result = db.execute(sql, params)
             rows = result.fetchall()

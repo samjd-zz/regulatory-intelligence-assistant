@@ -582,6 +582,120 @@ Remember: You are providing informational guidance, not legal advice. Users shou
     # MULTI-TIER SEARCH SYSTEM (Phase 2)
     # ============================================
     
+    def _assess_result_quality(
+        self,
+        results: List[Dict[str, Any]],
+        question: str,
+        tier: int,
+        min_score_threshold: float = 13.0,
+        avg_score_threshold: float = 15.0,
+        min_acceptable_results: int = 5
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Assess the quality of search results to determine if they're acceptable.
+        
+        This prevents accepting poor-quality results even when we have the
+        requested number of documents. Quality criteria:
+        
+        1. Minimum score threshold: Worst document must be above this
+        2. Average score threshold: Average quality must be above this  
+        3. Minimum acceptable results: At least this many results needed
+        4. Keyword coverage: Check if key terms from query appear in results
+        
+        Args:
+            results: List of search result documents with scores
+            question: Original user question
+            tier: Which tier produced these results (for adaptive thresholds)
+            min_score_threshold: Minimum acceptable score for worst document
+            avg_score_threshold: Minimum acceptable average score
+            min_acceptable_results: Minimum number of results needed
+            
+        Returns:
+            Tuple of (is_acceptable: bool, quality_metrics: dict)
+        """
+        if not results:
+            return False, {
+                "reason": "no_results",
+                "num_results": 0,
+                "acceptable": False
+            }
+        
+        # Extract scores
+        scores = [doc.get('score', 0.0) for doc in results]
+        
+        # Adjust thresholds based on tier (lower tiers have relaxed standards)
+        if tier >= 2:
+            min_score_threshold *= 0.7  # 30% more lenient
+            avg_score_threshold *= 0.7
+        if tier >= 3:
+            min_score_threshold *= 0.6  # 40% more lenient from original
+            avg_score_threshold *= 0.6
+        if tier >= 4:
+            min_score_threshold *= 0.5  # 50% more lenient from original
+            avg_score_threshold *= 0.5
+        
+        # Calculate quality metrics
+        quality_metrics = {
+            "num_results": len(results),
+            "min_score": min(scores) if scores else 0.0,
+            "max_score": max(scores) if scores else 0.0,
+            "avg_score": sum(scores) / len(scores) if scores else 0.0,
+            "tier": tier,
+            "adjusted_min_threshold": min_score_threshold,
+            "adjusted_avg_threshold": avg_score_threshold
+        }
+        
+        # Check 1: Minimum number of results
+        if len(results) < min_acceptable_results:
+            quality_metrics["reason"] = f"insufficient_results: {len(results)} < {min_acceptable_results}"
+            quality_metrics["acceptable"] = False
+            logger.warning(f"❌ Quality check FAILED: {quality_metrics['reason']}")
+            return False, quality_metrics
+        
+        # Check 2: Minimum score (worst document quality)
+        if quality_metrics["min_score"] < min_score_threshold:
+            quality_metrics["reason"] = f"min_score_too_low: {quality_metrics['min_score']:.2f} < {min_score_threshold:.2f}"
+            quality_metrics["acceptable"] = False
+            logger.warning(f"❌ Quality check FAILED: {quality_metrics['reason']}")
+            return False, quality_metrics
+        
+        # Check 3: Average score (overall quality)
+        if quality_metrics["avg_score"] < avg_score_threshold:
+            quality_metrics["reason"] = f"avg_score_too_low: {quality_metrics['avg_score']:.2f} < {avg_score_threshold:.2f}"
+            quality_metrics["acceptable"] = False
+            logger.warning(f"❌ Quality check FAILED: {quality_metrics['reason']}")
+            return False, quality_metrics
+        
+        # Check 4: Keyword coverage (are key terms from question in results?)
+        # Include words > 2 chars to capture important acronyms (GST, HST, EI, OAS, CPP)
+        question_keywords = set(word.lower() for word in question.split() if len(word) > 2)
+        if question_keywords:
+            # Check if at least 30% of top 5 results contain query keywords
+            top_results = results[:5]
+            keyword_matches = 0
+            
+            for doc in top_results:
+                content = (doc.get('content', '') + ' ' + doc.get('title', '')).lower()
+                if any(keyword in content for keyword in question_keywords):
+                    keyword_matches += 1
+            
+            keyword_coverage = keyword_matches / len(top_results) if top_results else 0.0
+            quality_metrics["keyword_coverage"] = keyword_coverage
+            
+            if keyword_coverage < 0.3:  # Less than 30% have keywords
+                quality_metrics["reason"] = f"low_keyword_coverage: {keyword_coverage:.1%} < 30%"
+                quality_metrics["acceptable"] = False
+                logger.warning(f"❌ Quality check FAILED: {quality_metrics['reason']}")
+                return False, quality_metrics
+        
+        # All checks passed!
+        quality_metrics["reason"] = "quality_checks_passed"
+        quality_metrics["acceptable"] = True
+        logger.info(f"✅ Quality check PASSED: min={quality_metrics['min_score']:.2f}, "
+                   f"avg={quality_metrics['avg_score']:.2f}, "
+                   f"count={quality_metrics['num_results']}")
+        return True, quality_metrics
+    
     def _multi_tier_search(
         self,
         question: str,
@@ -627,19 +741,36 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         # Tier 1: Optimized Elasticsearch
         logger.info("🔍 Tier 1: Trying optimized Elasticsearch search...")
         tier1_start = time.time()
-        tier1_results = self._tier1_elasticsearch_optimized(question, filters, num_context_docs)
+        # Parse query first
+        parsed_query = self.query_parser.parse_query(question)
+
+        # Enhance the query for better search
+        enhanced_query = self._enhance_query_for_search(question, parsed_query)
+
+        tier1_results = self._tier1_elasticsearch_optimized(enhanced_query, filters, num_context_docs)
         tier1_time = (time.time() - tier1_start) * 1000
         metadata['tier_timings']['tier_1_ms'] = tier1_time
         metadata['tiers_attempted'].append(1)
         
+        # Quality check for Tier 1
         if len(tier1_results) >= num_context_docs:
-            logger.info(f"✅ Tier 1 SUCCESS: Found {len(tier1_results)} documents")
-            metadata['tier_used'] = 1
-            metadata['total_time_ms'] = (time.time() - total_start) * 1000
-            self.tier_usage_stats[1] += 1
-            return tier1_results[:num_context_docs], metadata
-        
-        logger.warning(f"⚠️ Tier 1 INSUFFICIENT: Only {len(tier1_results)} documents, need {num_context_docs}")
+            is_quality_ok, quality_metrics = self._assess_result_quality(
+                results=tier1_results,
+                question=question,
+                tier=1
+            )
+            metadata['tier_1_quality'] = quality_metrics
+            
+            if is_quality_ok:
+                logger.info(f"✅ Tier 1 SUCCESS: Found {len(tier1_results)} high-quality documents")
+                metadata['tier_used'] = 1
+                metadata['total_time_ms'] = (time.time() - total_start) * 1000
+                self.tier_usage_stats[1] += 1
+                return tier1_results[:num_context_docs], metadata
+            else:
+                logger.warning(f"⚠️ Tier 1 QUALITY CHECK FAILED: {quality_metrics.get('reason')} - continuing to Tier 2")
+        else:
+            logger.warning(f"⚠️ Tier 1 INSUFFICIENT: Only {len(tier1_results)} documents, need {num_context_docs}")
         
         # Tier 2: Relaxed Elasticsearch
         logger.info("🔍 Tier 2: Trying relaxed Elasticsearch search...")
@@ -649,14 +780,25 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         metadata['tier_timings']['tier_2_ms'] = tier2_time
         metadata['tiers_attempted'].append(2)
         
+        # Quality check for Tier 2
         if len(tier2_results) > 0:
-            logger.info(f"✅ Tier 2 SUCCESS: Found {len(tier2_results)} documents")
-            metadata['tier_used'] = 2
-            metadata['total_time_ms'] = (time.time() - total_start) * 1000
-            self.tier_usage_stats[2] += 1
-            return tier2_results[:num_context_docs], metadata
-        
-        logger.warning("⚠️ Tier 2 FAILED: No results from relaxed search")
+            is_quality_ok, quality_metrics = self._assess_result_quality(
+                results=tier2_results,
+                question=question,
+                tier=2
+            )
+            metadata['tier_2_quality'] = quality_metrics
+            
+            if is_quality_ok:
+                logger.info(f"✅ Tier 2 SUCCESS: Found {len(tier2_results)} quality documents")
+                metadata['tier_used'] = 2
+                metadata['total_time_ms'] = (time.time() - total_start) * 1000
+                self.tier_usage_stats[2] += 1
+                return tier2_results[:num_context_docs], metadata
+            else:
+                logger.warning(f"⚠️ Tier 2 QUALITY CHECK FAILED: {quality_metrics.get('reason')} - continuing to Tier 3")
+        else:
+            logger.warning("⚠️ Tier 2 FAILED: No results from relaxed search")
         
         # Tier 3: Neo4j Graph Traversal
         logger.info("🔍 Tier 3: Trying Neo4j graph traversal...")
@@ -666,14 +808,25 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         metadata['tier_timings']['tier_3_ms'] = tier3_time
         metadata['tiers_attempted'].append(3)
         
+        # Quality check for Tier 3
         if len(tier3_results) > 0:
-            logger.info(f"✅ Tier 3 SUCCESS: Found {len(tier3_results)} documents via graph")
-            metadata['tier_used'] = 3
-            metadata['total_time_ms'] = (time.time() - total_start) * 1000
-            self.tier_usage_stats[3] += 1
-            return tier3_results[:num_context_docs], metadata
-        
-        logger.warning("⚠️ Tier 3 FAILED: No results from graph traversal")
+            is_quality_ok, quality_metrics = self._assess_result_quality(
+                results=tier3_results,
+                question=question,
+                tier=3
+            )
+            metadata['tier_3_quality'] = quality_metrics
+            
+            if is_quality_ok:
+                logger.info(f"✅ Tier 3 SUCCESS: Found {len(tier3_results)} quality documents via graph")
+                metadata['tier_used'] = 3
+                metadata['total_time_ms'] = (time.time() - total_start) * 1000
+                self.tier_usage_stats[3] += 1
+                return tier3_results[:num_context_docs], metadata
+            else:
+                logger.warning(f"⚠️ Tier 3 QUALITY CHECK FAILED: {quality_metrics.get('reason')} - continuing to Tier 4")
+        else:
+            logger.warning("⚠️ Tier 3 FAILED: No results from graph traversal")
         
         # Tier 4: PostgreSQL Full-Text Search
         logger.info("🔍 Tier 4: Trying PostgreSQL full-text search...")
@@ -683,14 +836,25 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         metadata['tier_timings']['tier_4_ms'] = tier4_time
         metadata['tiers_attempted'].append(4)
         
+        # Quality check for Tier 4
         if len(tier4_results) > 0:
-            logger.info(f"✅ Tier 4 SUCCESS: Found {len(tier4_results)} documents via PostgreSQL FTS")
-            metadata['tier_used'] = 4
-            metadata['total_time_ms'] = (time.time() - total_start) * 1000
-            self.tier_usage_stats[4] += 1
-            return tier4_results[:num_context_docs], metadata
-        
-        logger.warning("⚠️ Tier 4 FAILED: No results from PostgreSQL")
+            is_quality_ok, quality_metrics = self._assess_result_quality(
+                results=tier4_results,
+                question=question,
+                tier=4
+            )
+            metadata['tier_4_quality'] = quality_metrics
+            
+            if is_quality_ok:
+                logger.info(f"✅ Tier 4 SUCCESS: Found {len(tier4_results)} quality documents via PostgreSQL FTS")
+                metadata['tier_used'] = 4
+                metadata['total_time_ms'] = (time.time() - total_start) * 1000
+                self.tier_usage_stats[4] += 1
+                return tier4_results[:num_context_docs], metadata
+            else:
+                logger.warning(f"⚠️ Tier 4 QUALITY CHECK FAILED: {quality_metrics.get('reason')} - continuing to Tier 5")
+        else:
+            logger.warning("⚠️ Tier 4 FAILED: No results from PostgreSQL")
         
         # Tier 5: Metadata-Only Search (last resort)
         logger.info("🔍 Tier 5: Trying metadata-only search (last resort)...")
@@ -700,9 +864,16 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         metadata['tier_timings']['tier_5_ms'] = tier5_time
         metadata['tiers_attempted'].append(5)
         
+        # Tier 5 accepts any results (last resort - no quality check)
         if len(tier5_results) > 0:
             logger.warning(f"⚠️ Tier 5 SUCCESS (LOW CONFIDENCE): Found {len(tier5_results)} documents by metadata only")
             metadata['tier_used'] = 5
+            metadata['tier_5_quality'] = {
+                "reason": "tier_5_last_resort",
+                "num_results": len(tier5_results),
+                "acceptable": True,
+                "note": "Quality check skipped for last-resort tier"
+            }
             metadata['total_time_ms'] = (time.time() - total_start) * 1000
             self.tier_usage_stats[5] += 1
             return tier5_results[:num_context_docs], metadata
@@ -722,26 +893,31 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         num_docs: int
     ) -> List[Dict[str, Any]]:
         """
-        Tier 1: Optimized Elasticsearch search (current behavior).
+        Tier 1: Optimized Elasticsearch search with full hybrid intelligence.
         
-        Uses the existing hybrid search with current settings.
+        Uses the original question (not enhanced) to leverage hybrid_search's:
+        - Query intent detection (overview vs specific)
+        - Act name extraction and 10x title boosting
+        - Document type boosting (5x for act-level docs)
+        - Adaptive keyword/vector weight adjustment
+        
         Target: 85%+ of queries should succeed here.
         """
         try:
-            # Enhance query
-            parsed_query = self.query_parser.parse_query(question)
-            enhanced_query = self._enhance_query_for_search(question, parsed_query)
-            
             # Use current filters
             search_filters = filters.copy() if filters else {}
             
-            # Execute search
+            # Execute search with ORIGINAL question to preserve intent
+            # Let hybrid_search do its own intelligent processing:
+            # - Query intent detection
+            # - Act name extraction
+            # - Intelligent boosting (10x title, 5x doc type)
+            # - Adaptive weight adjustment
             search_results = self.search_service.hybrid_search(
-                query=enhanced_query,
+                query=question,  # Use original question, not enhanced
                 filters=search_filters,
-                size=num_docs,
-                keyword_weight=0.6,
-                vector_weight=0.4
+                size=num_docs
+                # Don't override weights - let hybrid_search decide based on intent
             )
             
             # Format results
