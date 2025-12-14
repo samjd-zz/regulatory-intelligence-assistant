@@ -587,8 +587,8 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         results: List[Dict[str, Any]],
         question: str,
         tier: int,
-        min_score_threshold: float = 13.0,
-        avg_score_threshold: float = 15.0,
+        min_score_threshold: float = 10.0,
+        avg_score_threshold: float = 13.0,
         min_acceptable_results: int = 5
     ) -> Tuple[bool, Dict[str, Any]]:
         """
