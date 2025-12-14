@@ -738,11 +738,8 @@ Remember: You are providing informational guidance, not legal advice. Users shou
         # Update total queries counter
         self.total_queries += 1
 
-        # Parse query first
-        parsed_query = self.query_parser.parse_query(question)
-
         # Enhance the query for better search
-        question = self._enhance_query_for_search(question, parsed_query)
+        question = self._enhance_query_for_search(question, self.query_parser.parse_query(question))
 
         # Tier 1: Optimized Elasticsearch
         logger.info("🔍 Tier 1: Trying optimized Elasticsearch search...")
