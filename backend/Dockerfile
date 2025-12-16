@@ -27,4 +27,6 @@ COPY . .
 # Expose FastAPI port only
 EXPOSE 8000
 
-CMD ["./scripts/entrypoint_backend.sh"]
+COPY scripts/entrypoint_backend.sh /entrypoint_backend.sh
+
+CMD ["/entrypoint_backend.sh"]

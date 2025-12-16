@@ -140,7 +140,7 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-      - ./scripts/entrypoint_ollama.sh:/entrypoint_ollama.sh:ro
+      - ./backend/scripts/entrypoint_ollama.sh:/entrypoint_ollama.sh:ro
     environment:
       - OLLAMA_KEEP_ALIVE=24h
       - OLLAMA_HOST=0.0.0.0:11434
