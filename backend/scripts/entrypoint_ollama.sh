@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-MODEL="llama3.2:3b"
+MODEL="${OLLAMA_MODEL:-llama3.2:3b}"
 
 # Start Ollama in background
 ollama serve &
@@ -11,7 +11,7 @@ until curl -s http://localhost:11434/api/tags >/dev/null 2>&1; do
   sleep 1
 done
 
-# Pull model (idempotent)
+# Pull model
 ollama pull "$MODEL" || true
 
 # Keep server running
