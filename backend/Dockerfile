@@ -27,9 +27,4 @@ COPY . .
 # Expose FastAPI port only
 EXPOSE 8000
 
-# Copy start script
-COPY scripts/start_services.sh /start_services.sh
-RUN chmod +x /start_services.sh
-
-# Default command
-CMD ["/start_services.sh"]
+CMD ["./scripts/entrypoint_backend.sh"]
