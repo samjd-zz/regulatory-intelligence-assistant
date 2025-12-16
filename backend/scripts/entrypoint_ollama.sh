@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-MODEL="${OLLAMA_MODEL:-llama3.2:3b}"
+MODEL="llama3.2:3b"
 
 # Start Ollama in background
 ollama serve &
