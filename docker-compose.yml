@@ -35,6 +35,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_started
     restart: unless-stopped
 
   # PostgreSQL Database
@@ -127,6 +129,10 @@ services:
       retries: 5
 
   # Ollama
+  # Model Selection:
+  # - llama3.2:3b (Default) - 3B parameters, fast, good for testing
+  # - llama3.2:7b - 7B parameters, better quality, slower
+  # - mistral:7b - Alternative 7B model
   ollama:
     image: ollama/ollama:latest
     container_name: regulatory-ollama
