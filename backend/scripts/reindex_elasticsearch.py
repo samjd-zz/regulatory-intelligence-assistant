@@ -82,7 +82,7 @@ def main():
                         'section_id': str(section.id),
                         'regulation_id': str(regulation.id),
                         'section_number': section.section_number,
-                        'title': section.title or '',
+                        'title': section.title or regulation.title,
                         'content': section.content,
                         'document_type': 'section',
                         'jurisdiction': regulation.jurisdiction,

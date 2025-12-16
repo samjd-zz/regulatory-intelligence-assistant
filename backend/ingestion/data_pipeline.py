@@ -99,6 +99,37 @@ class DataIngestionPipeline:
         if not xml_path.exists():
             raise ValueError(f"Directory not found: {xml_dir}")
         
+        # FORCE MODE CLEANUP: Clear Neo4j and Elasticsearch before re-ingestion
+        if force:
+            logger.warning("=" * 80)
+            logger.warning("FORCE MODE: Clearing Neo4j and Elasticsearch data before re-ingestion")
+            logger.warning("=" * 80)
+            
+            # Clear Neo4j knowledge graph
+            try:
+                logger.info("Clearing Neo4j knowledge graph...")
+                clear_result = self.graph_service.clear_all_data()
+                if clear_result.get('status') == 'success':
+                    logger.info("✓ Neo4j data cleared successfully")
+                else:
+                    logger.error(f"✗ Neo4j clear failed: {clear_result.get('message')}")
+            except Exception as e:
+                logger.error(f"✗ Failed to clear Neo4j data: {e}")
+            
+            # Recreate Elasticsearch index (deletes and recreates)
+            try:
+                logger.info("Recreating Elasticsearch index...")
+                if self.search_service.create_index(force_recreate=True):
+                    logger.info("✓ Elasticsearch index recreated successfully")
+                else:
+                    logger.error("✗ Elasticsearch index recreation failed")
+            except Exception as e:
+                logger.error(f"✗ Failed to recreate Elasticsearch index: {e}")
+            
+            logger.warning("=" * 80)
+            logger.warning("Cleanup complete. Starting fresh ingestion...")
+            logger.warning("=" * 80)
+        
         # Find all XML files recursively (to handle en/ and fr/ subdirectories)
         xml_files = list(xml_path.rglob("*.xml"))
         logger.info(f"Found {len(xml_files)} XML files in {xml_dir} (including subdirectories)")
@@ -207,6 +238,9 @@ class DataIngestionPipeline:
         # Check if already exists (by content hash and title)
         content_hash = self._calculate_content_hash(parsed_reg.full_text)
         
+        # Track if this is a duplicate by title+jurisdiction (for graph/ES deduplication)
+        is_title_duplicate = False
+        
         if not force:
             # Check for duplicates using multiple criteria for robustness
             existing = self.db.query(Regulation).filter(
@@ -225,36 +259,69 @@ class DataIngestionPipeline:
                 self.stats['skipped'] += 1
                 return {'status': 'skipped', 'regulation_id': str(existing.id)}
         else:
-            # Force mode: delete existing regulation if found
-            existing = self.db.query(Regulation).filter(
+            # Force mode: Check for duplicates by BOTH content_hash AND title+jurisdiction
+            # This ensures Neo4j/ES respect PostgreSQL's deduplication strategy
+            
+            # First check by content_hash
+            existing_by_hash = self.db.query(Regulation).filter(
                 Regulation.content_hash == content_hash
             ).first()
             
-            if existing:
-                logger.info(f"Force mode: Deleting existing regulation: {parsed_reg.title}")
-                self.db.delete(existing)
+            # Then check by title+jurisdiction (PostgreSQL's deduplication strategy)
+            existing_by_title = None
+            if parsed_reg.title:
+                existing_by_title = self.db.query(Regulation).filter(
+                    Regulation.title == parsed_reg.title,
+                    Regulation.jurisdiction == parsed_reg.jurisdiction
+                ).first()
+            
+            # Delete existing regulation if found by hash
+            if existing_by_hash:
+                logger.info(f"Force mode: Deleting existing regulation by hash: {parsed_reg.title}")
+                self.db.delete(existing_by_hash)
                 self.db.flush()
+            
+            # Mark as duplicate if another regulation with same title+jurisdiction exists
+            # (but different content_hash). This prevents Neo4j/ES from indexing duplicates.
+            if existing_by_title and existing_by_title.content_hash != content_hash:
+                is_title_duplicate = True
+                logger.info(
+                    f"Detected title+jurisdiction duplicate (different content_hash): "
+                    f"{parsed_reg.title} (existing_id={existing_by_title.id})"
+                )
         
         # Stage 2: Store in PostgreSQL
         regulation = await self._store_in_postgres(parsed_reg, content_hash, language)
         self.stats['regulations_created'] += 1
         
-        # Stage 3: Build knowledge graph
-        try:
-            graph_result = await self._build_knowledge_graph(regulation, parsed_reg)
-            self.stats['graph_nodes_created'] += graph_result.get('nodes_created', 0)
-            self.stats['graph_relationships_created'] += graph_result.get('relationships_created', 0)
-        except Exception as e:
-            logger.error(f"Knowledge graph creation failed: {e}")
-            # Continue even if graph fails
+        # Stage 3: Build knowledge graph (skip if title+jurisdiction duplicate)
+        if not is_title_duplicate:
+            try:
+                graph_result = await self._build_knowledge_graph(regulation, parsed_reg)
+                self.stats['graph_nodes_created'] += graph_result.get('nodes_created', 0)
+                self.stats['graph_relationships_created'] += graph_result.get('relationships_created', 0)
+            except Exception as e:
+                logger.error(f"Knowledge graph creation failed: {e}")
+                # Continue even if graph fails
+        else:
+            logger.info(
+                f"Skipping graph creation for title+jurisdiction duplicate: "
+                f"{parsed_reg.title} (regulation_id={regulation.id})"
+            )
         
-        # Stage 4: Index in Elasticsearch
-        try:
-            await self._index_in_elasticsearch(regulation, parsed_reg)
-            self.stats['elasticsearch_indexed'] += 1
-        except Exception as e:
-            logger.error(f"Elasticsearch indexing failed: {e}")
-            # Continue even if ES fails
+        # Stage 4: Index in Elasticsearch (skip if title+jurisdiction duplicate)
+        if not is_title_duplicate:
+            try:
+                await self._index_in_elasticsearch(regulation, parsed_reg)
+                self.stats['elasticsearch_indexed'] += 1
+            except Exception as e:
+                logger.error(f"Elasticsearch indexing failed: {e}")
+                # Continue even if ES fails
+        else:
+            logger.info(
+                f"Skipping ES indexing for title+jurisdiction duplicate: "
+                f"{parsed_reg.title} (regulation_id={regulation.id})"
+            )
         
         # Stage 5: Upload to Gemini (optional, for RAG)
         # This will be handled separately as Gemini has API rate limits
@@ -303,18 +370,12 @@ class DataIngestionPipeline:
             content=parsed_reg.full_text[:2000]  # Use first 2000 chars for detection
         )
         
-        # Detect jurisdiction (use program detector as fallback/validation)
-        detected_jurisdiction = self.program_detector.detect_jurisdiction(
-            title=parsed_reg.title,
-            content=parsed_reg.full_text[:1000],
-            authority=parsed_reg.chapter or ""
-        )
         
-        # Use detected jurisdiction if parsed jurisdiction is missing or generic
+        # Use federal jurisdiction if parsed jurisdiction is missing or generic
         final_jurisdiction = parsed_reg.jurisdiction
         if not final_jurisdiction or final_jurisdiction == 'unknown':
-            final_jurisdiction = detected_jurisdiction
-            logger.info(f"Using detected jurisdiction: {detected_jurisdiction}")
+            final_jurisdiction = "federal"
+            logger.info(f"Using default jurisdiction: federal")
         
         # Log detected programs
         if detected_programs:
@@ -323,7 +384,6 @@ class DataIngestionPipeline:
         # Merge detected programs and jurisdiction into metadata
         metadata = parsed_reg.metadata.copy() if parsed_reg.metadata else {}
         metadata['programs'] = detected_programs
-        metadata['detected_jurisdiction'] = detected_jurisdiction
         
         # Create regulation record
         regulation = Regulation(

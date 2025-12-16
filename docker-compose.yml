@@ -17,6 +17,7 @@ services:
       NEO4J_PASSWORD: password123
       ELASTICSEARCH_URL: http://elasticsearch:9200
       REDIS_URL: redis://redis:6379
+      OLLAMA_BASE_URL: http://ollama:11434
       CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://frontend:5173
       APP_ENV: development
       DEBUG: "True"
@@ -125,6 +126,19 @@ services:
       timeout: 5s
       retries: 5
 
+  # Ollama
+  ollama:
+    image: ollama/ollama:latest
+    container_name: regulatory-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0:11434
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   neo4j_data:
@@ -132,3 +146,5 @@ volumes:
   neo4j_import:
   elasticsearch_data:
   redis_data:
+  ollama_data:
+    driver: local

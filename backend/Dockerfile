@@ -2,6 +2,8 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
@@ -16,14 +18,18 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Download spacy model
+# Download spaCy model (ignore failure if offline)
 RUN python -m spacy download en_core_web_sm || true
 
 # Copy application code
 COPY . .
 
-# Expose port
+# Expose FastAPI port only
 EXPOSE 8000
 
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Copy start script
+COPY scripts/start_services.sh /start_services.sh
+RUN chmod +x /start_services.sh
+
+# Default command
+CMD ["/start_services.sh"]

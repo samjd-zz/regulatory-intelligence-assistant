@@ -484,11 +484,93 @@ class GraphService:
     def get_graph_stats(self) -> Dict[str, Any]:
         """
         Get graph statistics (alias for get_graph_overview).
-        
+
         Returns:
             Graph statistics with node and relationship counts
         """
         return self.get_graph_overview()
+    
+    def clear_all_data(self) -> Dict[str, Any]:
+        """
+        Clear all nodes and relationships from the knowledge graph.
+        
+        WARNING: This is a destructive operation that deletes ALL data.
+        Use with caution, typically only during force re-ingestion.
+        
+        Uses batched deletion to prevent heap errors with large datasets.
+        
+        Returns:
+            Dictionary with deletion statistics
+        """
+        logger.warning("Clearing all data from Neo4j knowledge graph using batched deletion")
+        
+        try:
+            # Delete all nodes and relationships in batches to prevent heap errors
+            # APOC version (if available)
+            try:
+                batch_query = """
+                CALL apoc.periodic.iterate(
+                    "MATCH (n) RETURN n",
+                    "DETACH DELETE n",
+                    {batchSize: 10000}
+                )
+                YIELD batches, total
+                RETURN batches, total
+                """
+                result = self.client.execute_query(batch_query)
+                
+                if result:
+                    batches = result[0].get('batches', 0)
+                    total = result[0].get('total', 0)
+                    logger.info(f"Deleted {total} nodes in {batches} batches using APOC")
+                    
+                    return {
+                        'status': 'success',
+                        'message': f'Deleted {total} nodes in {batches} batches',
+                        'batches': batches,
+                        'total_deleted': total
+                    }
+                    
+            except Exception as apoc_error:
+                # APOC not available or failed, use native Neo4j 5.x batching
+                logger.warning(f"APOC batch delete failed ({apoc_error}), using native batching")
+                
+                # Neo4j 5.x native batching with CALL {} IN TRANSACTIONS
+                native_batch_query = """
+                CALL {
+                    MATCH (n)
+                    WITH n LIMIT 10000
+                    DETACH DELETE n
+                    RETURN count(n) as deleted
+                } IN TRANSACTIONS OF 10000 ROWS
+                RETURN sum(deleted) as total
+                """
+                
+                result = self.client.execute_query(native_batch_query)
+                
+                if result:
+                    total = result[0].get('total', 0)
+                    logger.info(f"Deleted {total} nodes using native batching")
+                    
+                    return {
+                        'status': 'success',
+                        'message': f'Deleted {total} nodes using native batching',
+                        'total_deleted': total
+                    }
+            
+            logger.info("Successfully cleared all Neo4j data")
+            
+            return {
+                'status': 'success',
+                'message': 'All nodes and relationships deleted'
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to clear Neo4j data: {e}")
+            return {
+                'status': 'error',
+                'message': str(e)
+            }
     
     # ============================================
     # RAG-SPECIFIC SEARCH OPERATIONS (Tier 3)
