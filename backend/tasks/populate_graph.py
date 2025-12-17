@@ -52,15 +52,19 @@ def setup_neo4j_constraints(neo4j: Neo4jClient):
         "CREATE INDEX program_name IF NOT EXISTS FOR (p:Program) ON (p.name)",
     ]
     
-    # Full-text indexes
+    # Full-text indexes  
     fulltext_indexes = [
         """
         CREATE FULLTEXT INDEX legislation_fulltext IF NOT EXISTS
-        FOR (l:Legislation) ON EACH [l.title, l.full_text]
+        FOR (l:Legislation) ON EACH [l.title, l.full_text, l.act_number]
+        """,
+        """
+        CREATE FULLTEXT INDEX regulation_fulltext IF NOT EXISTS
+        FOR (r:Regulation) ON EACH [r.title, r.full_text]
         """,
         """
         CREATE FULLTEXT INDEX section_fulltext IF NOT EXISTS
-        FOR (s:Section) ON EACH [s.title, s.content]
+        FOR (s:Section) ON EACH [s.title, s.content, s.section_number]
         """
     ]
     

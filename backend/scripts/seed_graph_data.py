@@ -507,11 +507,16 @@ def main():
     print("="*60 + "\n")
     
     try:
+        # Get graph service and ensure fulltext indexes
+        service = get_graph_service()
+        print("🔍 Ensuring fulltext indexes are created...")
+        service._ensure_fulltext_indexes()
+        print("✅ Fulltext indexes ensured")
+        
         # Create comprehensive data
         created = create_comprehensive_regulatory_data()
         
         # Get overview
-        service = get_graph_service()
         overview = service.get_graph_overview()
         
         print("\n" + "="*60)

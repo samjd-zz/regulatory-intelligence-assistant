@@ -92,7 +92,7 @@ FOR (s:Section) ON EACH [s.title, s.content];
 
 // Full-text search on Regulation
 CREATE FULLTEXT INDEX regulation_fulltext IF NOT EXISTS
-FOR (r:Regulation) ON EACH [r.title, l.full_text];
+FOR (r:Regulation) ON EACH [r.title, r.full_text];
 
 // ============================================
 // NODE TYPE DEFINITIONS (Documentation)

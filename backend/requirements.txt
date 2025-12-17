@@ -5,6 +5,10 @@ pydantic==2.5.3
 pydantic-settings==2.1.0
 python-multipart==0.0.6
 
+# HTTP Clients
+requests==2.31.0
+httpx==0.26.0
+
 # Database - PostgreSQL
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
@@ -34,7 +38,7 @@ sentence-transformers==2.3.1
 # NLP - Legal Text Processing
 spacy==3.7.2
 transformers==4.36.2
-torch==2.1.2
+torch==2.2.0
 nltk==3.8.1
 scikit-learn==1.4.0
 langdetect==1.0.9
@@ -43,7 +47,6 @@ langdetect==1.0.9
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-dotenv==1.0.0
-httpx==0.26.0
 
 # Development
 pytest==7.4.4

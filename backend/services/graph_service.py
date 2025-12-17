@@ -23,6 +23,7 @@ class GraphService:
             client: Neo4j client (uses global if None)
         """
         self.client = client or get_neo4j_client()
+        self._indexes_checked = False
     
     # ============================================
     # LEGISLATION OPERATIONS
@@ -444,18 +445,39 @@ class GraphService:
         Returns:
             Matching legislation
         """
-        query = """
-        CALL db.index.fulltext.queryNodes('legislation_fulltext', $search_text)
-        YIELD node, score
-        RETURN node, score
-        ORDER BY score DESC
-        LIMIT $limit
-        """
-        results = self.client.execute_query(
-            query,
-            {"search_text": search_text, "limit": limit}
-        )
-        return results
+        try:
+            query = """
+            CALL db.index.fulltext.queryNodes('legislation_fulltext', $search_text)
+            YIELD node, score
+            RETURN node, score
+            ORDER BY score DESC
+            LIMIT $limit
+            """
+            results = self.client.execute_query(
+                query,
+                {"search_text": search_text, "limit": limit}
+            )
+            return results
+        except Exception as e:
+            if "legislation_fulltext" in str(e):
+                logger.warning(f"Fulltext index missing, attempting to create: {e}")
+                if self._ensure_fulltext_indexes():
+                    # Retry the query after creating indexes
+                    try:
+                        results = self.client.execute_query(
+                            query,
+                            {"search_text": search_text, "limit": limit}
+                        )
+                        return results
+                    except Exception as retry_error:
+                        logger.error(f"Fulltext search failed after index creation: {retry_error}")
+                        return []
+                else:
+                    logger.error(f"Failed to create fulltext indexes")
+                    return []
+            else:
+                logger.error(f"Fulltext search failed: {e}")
+                return []
     
     def get_graph_overview(self) -> Dict[str, Any]:
         """
@@ -572,6 +594,53 @@ class GraphService:
                 'message': str(e)
             }
     
+    def _ensure_fulltext_indexes(self) -> bool:
+        """
+        Ensure that required fulltext indexes exist in Neo4j.
+        
+        Creates the following indexes if they don't exist:
+        - legislation_fulltext: For searching Legislation nodes
+        - section_fulltext: For searching Section nodes
+        - regulation_fulltext: For searching Regulation nodes
+        
+        Returns:
+            True if indexes exist or were created successfully, False otherwise
+        """
+        try:
+            # Create fulltext indexes using the same syntax as init_graph.cypher
+            fulltext_indexes = [
+                """
+                CREATE FULLTEXT INDEX legislation_fulltext IF NOT EXISTS
+                FOR (l:Legislation) ON EACH [l.title, l.full_text, l.act_number]
+                """,
+                """
+                CREATE FULLTEXT INDEX regulation_fulltext IF NOT EXISTS
+                FOR (r:Regulation) ON EACH [r.title, r.full_text]
+                """,
+                """
+                CREATE FULLTEXT INDEX section_fulltext IF NOT EXISTS
+                FOR (s:Section) ON EACH [s.title, s.content, s.section_number]
+                """
+            ]
+            
+            for index_query in fulltext_indexes:
+                try:
+                    clean_query = ' '.join(line.strip() for line in index_query.split('\n') if line.strip())
+                    self.client.execute_query(clean_query)
+                    logger.debug(f"Ensured fulltext index: {clean_query[:50]}...")
+                except Exception as e:
+                    if "already exists" in str(e) or "Equivalent" in str(e):
+                        logger.debug(f"Fulltext index already exists: {e}")
+                    else:
+                        logger.warning(f"Could not create fulltext index: {e}")
+            
+            logger.info("✅ All fulltext indexes are ensured")
+            return True
+                
+        except Exception as e:
+            logger.error(f"Failed to ensure fulltext indexes: {e}")
+            return False
+    
     # ============================================
     # RAG-SPECIFIC SEARCH OPERATIONS (Tier 3)
     # ============================================
@@ -655,6 +724,11 @@ class GraphService:
         Returns:
             List of documents formatted for RAG context
         """
+        # Ensure fulltext indexes exist before searching
+        if not self._indexes_checked:
+            self._ensure_fulltext_indexes()
+            self._indexes_checked = True
+        
         try:
             # Try full-text search first
             results = self._fulltext_search(query, limit, language)
@@ -695,52 +769,81 @@ class GraphService:
         # Sanitize query to prevent Lucene syntax errors
         sanitized_query = self._sanitize_lucene_query(query)
         
-        # Search legislation nodes
-        legislation_query = """
-        CALL db.index.fulltext.queryNodes('legislation_fulltext', $query)
-        YIELD node, score
-        WHERE node.language = $language OR $language = 'all'
-        RETURN 
-            node.id as id,
-            node.title as title,
-            node.full_text as content,
-            node.act_number as citation,
-            '' as section_number,
-            node.jurisdiction as jurisdiction,
-            'legislation' as document_type,
-            score
-        ORDER BY score DESC
-        LIMIT $limit
-        """
+        try:
+            # Search legislation nodes
+            legislation_query = """
+            CALL db.index.fulltext.queryNodes('legislation_fulltext', $query)
+            YIELD node, score
+            WHERE node.language = $language OR $language = 'all'
+            RETURN 
+                node.id as id,
+                node.title as title,
+                node.full_text as content,
+                node.act_number as citation,
+                '' as section_number,
+                node.jurisdiction as jurisdiction,
+                'legislation' as document_type,
+                score
+            ORDER BY score DESC
+            LIMIT $limit
+            """
+            
+            leg_results = self.client.execute_query(
+                legislation_query,
+                {"query": sanitized_query, "limit": limit // 2, "language": language}
+            )
+        except Exception as e:
+            if "legislation_fulltext" in str(e):
+                logger.error(f"Neo4j semantic search failed: {e}")
+                logger.info("Attempting to create missing fulltext indexes...")
+                if self._ensure_fulltext_indexes():
+                    try:
+                        leg_results = self.client.execute_query(
+                            legislation_query,
+                            {"query": sanitized_query, "limit": limit // 2, "language": language}
+                        )
+                    except Exception as retry_error:
+                        logger.error(f"Fulltext search failed after index creation: {retry_error}")
+                        leg_results = []
+                else:
+                    logger.error(f"Failed to create fulltext indexes")
+                    leg_results = []
+            else:
+                logger.error(f"Neo4j semantic search failed: {e}")
+                leg_results = []
         
-        leg_results = self.client.execute_query(
-            legislation_query,
-            {"query": sanitized_query, "limit": limit // 2, "language": language}
-        )
-        
-        # Search section nodes
-        section_query = """
-        CALL db.index.fulltext.queryNodes('section_fulltext', $query)
-        YIELD node, score
-        MATCH (node)-[:HAS_SECTION]-(leg:Legislation)
-        WHERE leg.language = $language OR $language = 'all'
-        RETURN 
-            node.id as id,
-            node.title as title,
-            node.content as content,
-            leg.act_number as citation,
-            node.section_number as section_number,
-            leg.jurisdiction as jurisdiction,
-            'section' as document_type,
-            score
-        ORDER BY score DESC
-        LIMIT $limit
-        """
-        
-        sec_results = self.client.execute_query(
-            section_query,
-            {"query": sanitized_query, "limit": limit // 2, "language": language}
-        )
+        try:
+            # Search section nodes
+            section_query = """
+            CALL db.index.fulltext.queryNodes('section_fulltext', $query)
+            YIELD node, score
+            MATCH (node)-[:HAS_SECTION]-(leg:Legislation)
+            WHERE leg.language = $language OR $language = 'all'
+            RETURN 
+                node.id as id,
+                node.title as title,
+                node.content as content,
+                leg.act_number as citation,
+                node.section_number as section_number,
+                leg.jurisdiction as jurisdiction,
+                'section' as document_type,
+                score
+            ORDER BY score DESC
+            LIMIT $limit
+            """
+            
+            sec_results = self.client.execute_query(
+                section_query,
+                {"query": sanitized_query, "limit": limit // 2, "language": language}
+            )
+        except Exception as e:
+            if "section_fulltext" in str(e):
+                logger.error(f"Neo4j section search failed: {e}")
+                logger.info("Section fulltext index missing, using fallback search")
+                sec_results = []
+            else:
+                logger.error(f"Neo4j section search failed: {e}")
+                sec_results = []
         
         # Combine and format results
         documents = []
@@ -774,7 +877,7 @@ class GraphService:
         Fallback search using simple CONTAINS matching.
         
         This is used when full-text search fails or returns no results.
-        It's less sophisticated but more reliable.
+        It is less sophisticated but more reliable.
         
         Args:
             query: Search query text

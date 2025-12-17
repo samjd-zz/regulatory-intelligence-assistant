@@ -12,10 +12,13 @@ import os
 import json
 import logging
 import time
-from typing import Dict, List, Optional, Any, Union, Tuple
+from typing import Dict, List, Optional, Any, Union, Tuple, TYPE_CHECKING
 from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass
+
+if TYPE_CHECKING:
+    from services.ollama_client import OllamaClient
 
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
@@ -798,14 +801,23 @@ class GeminiClient:
 _gemini_client: Optional[GeminiClient] = None
 
 
-def get_gemini_client() -> GeminiClient:
-    """Get or create singleton Gemini client"""
-    global _gemini_client
-
-    if _gemini_client is None:
-        _gemini_client = GeminiClient()
-
-    return _gemini_client
+def get_gemini_client() -> Union['GeminiClient', 'OllamaClient']:
+    """
+    Get LLM client based on LLM_PROVIDER environment variable.
+    
+    For backward compatibility, this function now delegates to the LLM factory.
+    Returns Gemini client if LLM_PROVIDER is 'gemini' or not set.
+    Returns Ollama client if LLM_PROVIDER is 'ollama'.
+    """
+    try:
+        from services.llm_client_factory import get_llm_client
+        return get_llm_client()
+    except ImportError:
+        # Fallback to direct Gemini client if factory not available
+        global _gemini_client
+        if _gemini_client is None:
+            _gemini_client = GeminiClient()
+        return _gemini_client
 
 
 if __name__ == "__main__":

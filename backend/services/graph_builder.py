@@ -41,6 +41,50 @@ class GraphBuilder:
             "relationships_created": 0,
             "errors": []
         }
+        
+        # Ensure fulltext indexes exist for graph search functionality
+        self._ensure_fulltext_indexes()
+    
+    def _ensure_fulltext_indexes(self):
+        """
+        Ensure that required fulltext indexes exist in Neo4j.
+        
+        This is called during GraphBuilder initialization to ensure that
+        fulltext search capabilities are available whenever we build graphs.
+        """
+        try:
+            # Create fulltext indexes using the same syntax as init_graph.cypher
+            fulltext_indexes = [
+                """
+                CREATE FULLTEXT INDEX legislation_fulltext IF NOT EXISTS
+                FOR (l:Legislation) ON EACH [l.title, l.full_text, l.act_number]
+                """,
+                """
+                CREATE FULLTEXT INDEX regulation_fulltext IF NOT EXISTS
+                FOR (r:Regulation) ON EACH [r.title, r.full_text]
+                """,
+                """
+                CREATE FULLTEXT INDEX section_fulltext IF NOT EXISTS
+                FOR (s:Section) ON EACH [s.title, s.content, s.section_number]
+                """
+            ]
+            
+            for index_query in fulltext_indexes:
+                try:
+                    clean_query = ' '.join(line.strip() for line in index_query.split('\n') if line.strip())
+                    self.neo4j.execute_query(clean_query)
+                    logger.debug(f"Ensured fulltext index: {clean_query[:50]}...")
+                except Exception as e:
+                    if "already exists" in str(e) or "Equivalent" in str(e):
+                        logger.debug(f"Fulltext index already exists")
+                    else:
+                        logger.warning(f"Could not create fulltext index: {e}")
+            
+            logger.info("✅ All fulltext indexes are ensured for graph building")
+            
+        except Exception as e:
+            # Log warning but don't fail the graph building process
+            logger.warning(f"Could not ensure fulltext indexes: {e}")
     
     def build_document_graph(self, document_id: uuid.UUID) -> Dict[str, Any]:
         """

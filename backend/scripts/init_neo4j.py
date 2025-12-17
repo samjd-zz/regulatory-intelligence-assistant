@@ -36,12 +36,24 @@ def init_schema():
     statements = [s.strip() for s in cypher_script.split(';') if s.strip() and not s.strip().startswith('//')]
     
     for statement in statements:
-        if statement and not statement.startswith('CALL db.'):  # Skip verification queries
-            try:
-                client.execute_write(statement)
-                logger.info(f"Executed: {statement[:50]}...")
-            except Exception as e:
-                logger.warning(f"Statement may have failed (might already exist): {e}")
+        # Skip empty statements and comments
+        if not statement or statement.startswith('//'):
+            continue
+            
+        # Skip verification queries (but allow fulltext index creation)
+        if statement.startswith('CALL db.') and 'CREATE FULLTEXT' not in statement:
+            continue
+            
+        try:
+            # Clean up the statement (remove comments and extra whitespace)
+            clean_statement = ' '.join(line.strip() for line in statement.split('\n') 
+                                     if line.strip() and not line.strip().startswith('//'))
+            if clean_statement:
+                client.execute_write(clean_statement)
+                logger.info(f"Executed: {clean_statement[:50]}...")
+        except Exception as e:
+            logger.warning(f"Statement may have failed (might already exist): {e}")
+            logger.debug(f"Failed statement: {statement[:100]}...")
     
     logger.info("✓ Schema initialization complete")
 
@@ -263,8 +275,7 @@ def main():
         # Step 1: Initialize schema
         init_schema()
         
-        # Step 2: Create sample data
-        create_sample_data()
+        # Sample data creation removed - using real regulatory dataset instead
         
         print("\n" + "="*60)
         print("✓ Neo4j initialization completed successfully!")

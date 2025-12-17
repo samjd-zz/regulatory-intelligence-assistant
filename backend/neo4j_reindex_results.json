@@ -1,0 +1,43 @@
+{
+  "start_time": "2025-12-17T06:07:26.564371",
+  "configuration": {
+    "batch_size": 50,
+    "max_retries": 3,
+    "dry_run": false,
+    "resume": false
+  },
+  "dataset_stats": {
+    "total_regulations": 1827,
+    "total_sections": 277027,
+    "total_documents": 278854,
+    "estimated_batches": 37
+  },
+  "clear_result": {
+    "status": "success",
+    "message": "Deleted 6671 nodes in 1 batches",
+    "batches": 1,
+    "total_deleted": 6671
+  },
+  "populate_result": {
+    "total_processed": 1827,
+    "total_successful": 1827,
+    "total_failed": 0,
+    "total_nodes_created": 278854,
+    "total_relationships_created": 277027,
+    "batches_completed": 37,
+    "errors": [],
+    "start_time": 1765951646.960795,
+    "total_time_hours": 0.5197571223311954,
+    "final_graph_stats": {
+      "nodes": {
+        "Section": 277027,
+        "Regulation": 1827
+      },
+      "relationships": {
+        "HAS_SECTION": 277027
+      }
+    }
+  },
+  "end_time": "2025-12-17T06:38:38.191949",
+  "status": "completed"
+}

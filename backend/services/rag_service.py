@@ -11,18 +11,25 @@ Author: Developer 2 (AI/ML Engineer)
 Created: 2025-11-22
 """
 
+import os
 import re
 import json
 import hashlib
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+import os
+from pathlib import Path
+from typing import Dict, List, Optional, Any, Tuple, Union, TYPE_CHECKING
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 
 from langdetect import detect, LangDetectException
 
+if TYPE_CHECKING:
+    from services.gemini_client import GeminiClient
+    from services.ollama_client import OllamaClient
+
 from services.search_service import SearchService
-from services.gemini_client import GeminiClient, get_gemini_client
+from services.llm_client_factory import get_gemini_client
 from services.query_parser import LegalQueryParser, QueryIntent
 from services.statistics_service import StatisticsService
 from services.postgres_search_service import PostgresSearchService, get_postgres_search_service
@@ -88,117 +95,11 @@ class RAGService:
     Combines document retrieval with LLM generation to provide accurate,
     cited answers to regulatory questions.
     """
-    # CANADIAN_LEGAL_RAG_AGENT_STRICT_RAG_ENFORCEMENT_GEMINI
-    LEGAL_SYSTEM_PROMPT = """
-## ROLE & SCOPE (NON-NEGOTIABLE)
-You are an **expert legal information assistant** for **Canadian federal, provincial, and territorial statutes, regulations, and official government policies**.
-You provide **informational guidance only**.
-You **do not provide legal advice**.
-The **retrieved context documents are the complete and exclusive source of truth**.
-If information is **not explicitly stated** in the provided documents, it **does not exist for the purposes of your answer**.
----
-## HARD RAG ENFORCEMENT RULES 🔒
-These rules override all other instructions.
-1. **SOURCE LOCK**
-   * You must answer **ONLY** using the provided context documents.
-   * You must **not** rely on training data, general legal knowledge, assumptions, or common practice.
-   * If a fact is not in the context, you must treat it as unknown.
-2. **NO INFERENCE / NO GAP-FILLING**
-   * Do **not** infer intent, policy rationale, or unstated requirements.
-   * Do **not** approximate thresholds, timelines, or definitions.
-   * Do **not** “connect dots” unless the document explicitly does so.
-3. **FAIL-CLOSED BEHAVIOR**
-   * If the answer is incomplete or missing:
-     > **“The provided documents do not contain information about [specific topic].”**
-   * Partial answers must clearly state what is missing.
-4. **CLAIM–CITATION PAIRING**
-   * **Every legal claim must include a citation**.
-   * Any sentence containing a requirement, eligibility rule, prohibition, exception, or entitlement **must be cited**.
-   * If a citation cannot be provided, the sentence must be removed.
-5. **CONFLICT & AMBIGUITY MANDATE**
-   * If documents conflict, overlap, or are unclear:
-     * Identify the conflict
-     * Cite each source
-     * State that the issue cannot be resolved from the provided context
-6. **JURISDICTION LOCK**
-   * Do not assume federal, provincial, or territorial jurisdiction.
-   * Jurisdiction must be **explicitly stated in the documents**.
-   * If unclear, say so.
----
-## REASONING PROCESS (INTERNAL ONLY)
-Use this reasoning structure **silently**.
-**Do NOT reveal internal reasoning or chain-of-thought.**
-1. Identify the precise legal question and jurisdiction
-2. Locate relevant sections in the context
-3. Extract explicit requirements and conditions
-4. Synthesize only what is directly supported
-5. Assess completeness and confidence
----
-## OUTPUT STRUCTURE (MANDATORY)
-Your response **must always** follow this structure:
-### 1. Direct Answer
-A concise answer based strictly on the documents.
----
-### 2. Legal Basis & Explanation
-Plain-language explanation supported by citations.
----
-### 3. Key Requirements / Conditions (if applicable)
-Use bullet points or numbered lists.
-* Each bullet **must include a citation**
----
-### 4. Ambiguities, Exceptions, or Conflicts (if any)
-Clearly explain limitations or unresolved issues.
----
-### 5. Confidence Level
-One of:
-* **High** – Explicitly and fully addressed
-* **Medium** – Partially addressed or conditional
-* **Low** – Incomplete or indirect coverage
-Explain why in one sentence.
----
-### 6. Limitations & Next Steps
-State what the documents do **not** cover and where authoritative clarification would normally be found.
----
-## CITATION FORMAT (STRICT)
-Use **only** this format:
-**[Document Title, Section X / Subsection Y / Clause Z]**
-* Do not combine citations
-* Do not reference external sources
-* Do not paraphrase citations
----
-## LANGUAGE & STYLE RULES
-* Use clear, neutral, professional language
-* Avoid legal jargon unless required by the text
-* Keep paragraphs to **2–4 sentences max**
-* Use **bold** for key legal terms and section references
-* Use bullet points for lists
-* Do not include speculation or commentary
----
-## PROHIBITED BEHAVIOR 🚫
-You must NOT:
-* Provide legal advice or recommendations
-* Assume facts not in evidence
-* Rely on “common law knowledge”
-* Reconcile conflicts without textual authority
-* Answer hypotheticals beyond the text
-* Reveal reasoning steps or chain-of-thought
----
-## REQUIRED DISCLAIMER (WHEN APPLICABLE)
-> *This information is provided for general informational purposes only and does not constitute legal advice. For binding interpretations or advice specific to your situation, consult official government guidance or a qualified legal professional.*
----
-## FINAL QUALITY STANDARD
-Your answers must be:
-* Evidence-locked
-* Citation-complete
-* Conservative in scope
-* Regulator-defensible
-* Safe to audit line-by-line
-If the documents do not clearly support an answer, **say so and stop**.
-    """ 
+
     def __init__(
         self,
         search_service: Optional[SearchService] = None,
-        gemini_client: Optional[GeminiClient] = None,
+        llm_client: Optional[Union['GeminiClient', 'OllamaClient']] = None,
         query_parser: Optional[LegalQueryParser] = None,
         statistics_service: Optional[StatisticsService] = None,
         postgres_search_service: Optional[PostgresSearchService] = None,
@@ -209,14 +110,19 @@ If the documents do not clearly support an answer, **say so and stop**.
 
         Args:
             search_service: Search service instance
-            gemini_client: Gemini client instance
+            llm_client: LLM client instance (Gemini or Ollama, auto-detected based on LLM_PROVIDER)
             query_parser: Query parser instance
             statistics_service: Statistics service instance
             postgres_search_service: PostgreSQL search service instance
             graph_service: Graph service instance
         """
+        # Load system prompt based on LLM provider
+        self.LEGAL_SYSTEM_PROMPT = self._load_system_prompt()
+        
         self.search_service = search_service or SearchService()
-        self.gemini_client = gemini_client or get_gemini_client()
+        # Note: Keep 'gemini_client' attribute name for backward compatibility
+        # This actually contains the LLM client (Gemini or Ollama) based on LLM_PROVIDER env var
+        self.gemini_client = llm_client or get_gemini_client()
         self.query_parser = query_parser or LegalQueryParser(use_spacy=False)
         self.statistics_service = statistics_service or StatisticsService()
         self.postgres_search_service = postgres_search_service or get_postgres_search_service()
@@ -230,6 +136,45 @@ If the documents do not clearly support an answer, **say so and stop**.
         self.tier_usage_stats = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
         self.zero_result_count = 0
         self.total_queries = 0
+
+    def _load_system_prompt(self) -> str:
+        """Load the appropriate system prompt based on LLM provider."""
+        try:
+            # Get the directory containing this file, then go to backend root and into prompts
+            current_file = Path(__file__)
+            backend_root = current_file.parent.parent
+            prompts_dir = backend_root / "prompts"
+            provider = os.getenv("LLM_PROVIDER", "gemini")
+
+            if provider == "gemini":
+                prompt_file = prompts_dir / 'CANADIAN_LEGAL_RAG_AGENT_STRICT_RAG_ENFORCEMENT_GEMINI.md'
+            elif provider == "ollama":
+                prompt_file = prompts_dir / 'CANADIAN_LEGAL_RAG_AGENT_LLAMA_3.2_3B_STRICT_MODE.md'
+            else:
+                # Fallback to gemini prompt
+                prompt_file = prompts_dir / 'CANADIAN_LEGAL_RAG_AGENT_STRICT_RAG_ENFORCEMENT_GEMINI.md'
+            
+            if prompt_file.exists():
+                with open(prompt_file, 'r', encoding='utf-8') as f:
+                    prompt_content = f.read()
+                logger.info(f"✅ Loaded {provider} system prompt from {prompt_file.name}")
+                return prompt_content
+            else:
+                logger.error(f"❌ Prompt file not found: {prompt_file}")
+                return self._get_fallback_prompt()
+                
+        except Exception as e:
+            logger.error(f"❌ Error loading system prompt: {e}")
+            return self._get_fallback_prompt()
+    
+    def _get_fallback_prompt(self) -> str:
+        """Return a basic fallback prompt if file loading fails."""
+        return """You are a Canadian legal assistant specializing in federal regulations.
+        
+Your job is to provide accurate, well-cited answers based on the provided legal documents.
+Always cite your sources using [Document Title, Section X] format.
+If you cannot find relevant information in the provided documents, clearly state this.
+Be precise and cite specific sections when possible."""
 
     def _detect_language(self, text: str) -> str:
         """
@@ -605,8 +550,8 @@ If the documents do not clearly support an answer, **say so and stop**.
         results: List[Dict[str, Any]],
         question: str,
         tier: int,
-        min_score_threshold: float = 10.0,
-        avg_score_threshold: float = 13.0,
+        min_score_threshold: float = 3.0,
+        avg_score_threshold: float = 5.0,
         min_acceptable_results: int = 5
     ) -> Tuple[bool, Dict[str, Any]]:
         """
@@ -643,14 +588,14 @@ If the documents do not clearly support an answer, **say so and stop**.
         
         # Adjust thresholds based on tier (lower tiers have relaxed standards)
         if tier >= 2:
-            min_score_threshold *= 0.7  # 30% more lenient
-            avg_score_threshold *= 0.7
+            min_score_threshold *= 0.8  # 20% more lenient
+            avg_score_threshold *= 0.8
         if tier >= 3:
-            min_score_threshold *= 0.6  # 40% more lenient from original
-            avg_score_threshold *= 0.6
+            min_score_threshold *= 0.7  # 30% more lenient from original  
+            avg_score_threshold *= 0.7
         if tier >= 4:
-            min_score_threshold *= 0.5  # 50% more lenient from original
-            avg_score_threshold *= 0.5
+            min_score_threshold *= 0.3  # Much more lenient for PostgreSQL scores
+            avg_score_threshold *= 0.3
         
         # Calculate quality metrics
         quality_metrics = {
