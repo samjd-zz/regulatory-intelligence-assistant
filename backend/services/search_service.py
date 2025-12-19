@@ -280,7 +280,7 @@ class SearchService:
             return 0, doc_count
 
     def keyword_search(self, query: str, filters: Optional[Dict] = None,
-                      size: int = 10, from_: int = 0) -> Dict[str, Any]:
+                      size: int = 10, from_: int = 0, boost_sections: bool = False) -> Dict[str, Any]:
         """
         Perform keyword-based search using BM25.
 
@@ -289,39 +289,52 @@ class SearchService:
             filters: Filter criteria (jurisdiction, program, etc.)
             size: Number of results to return
             from_: Offset for pagination
+            boost_sections: If True, boost section documents over full acts
 
         Returns:
             Search results dictionary
         """
         try:
-            # Build query
-            must_clauses = [
-                {
-                    "multi_match": {
-                        "query": query,
-                        "fields": [
-                            "title^3",  # Boost title matches
-                            "content",
-                            "summary^2",
-                            "legislation_name^2"
-                        ],
-                        "type": "best_fields",
-                        "fuzziness": "AUTO"
-                    }
-                }
-            ]
-
-            # Add filters
+            # Build filter clauses
             filter_clauses = self._build_filters(filters)
+            
+            # For specific queries (not act overviews), ONLY search sections
+            if boost_sections:
+                logger.info("🎯 Filtering to ONLY sections for specific query (excluding full acts)")
+                filter_clauses.append({"term": {"document_type": "section"}})
+            
+            # Build multi_match query - use best_fields for more flexible matching
+            multi_match_query = {
+                "query": query,
+                "fields": [
+                    "title^1.5",  # Moderate title boost
+                    "content^2",   # Boost content heavily for specific queries
+                    "summary^1.5",
+                    "legislation_name^1.5"
+                ],
+                "type": "best_fields",
+                "operator": "or"
+            }
+            
+            # Only use fuzziness when NOT filtering to sections (fuzziness too strict for multi-term queries)
+            if not boost_sections:
+                multi_match_query["fuzziness"] = "AUTO"
+            else:
+                logger.info("🔍 Disabled fuzziness for section-only search")
+            
+            # Build base query
+            base_query = {
+                "bool": {
+                    "must": [{"multi_match": multi_match_query}],
+                    "filter": filter_clauses
+                }
+            }
+            
+            search_query = base_query
 
             # Construct query
             search_body = {
-                "query": {
-                    "bool": {
-                        "must": must_clauses,
-                        "filter": filter_clauses
-                    }
-                },
+                "query": search_query,
                 "size": size,
                 "from": from_,
                 "highlight": {
@@ -336,6 +349,9 @@ class SearchService:
                 }
             }
 
+            # Log the actual query for debugging
+            logger.debug(f"🔍 Keyword query: {json.dumps(search_body, indent=2)}")
+
             # Execute search
             response = self.es.search(index=self.INDEX_NAME, body=search_body)
 
@@ -346,7 +362,7 @@ class SearchService:
             return {"hits": [], "total": 0, "error": str(e)}
 
     def vector_search(self, query: str, filters: Optional[Dict] = None,
-                     size: int = 10, from_: int = 0) -> Dict[str, Any]:
+                     size: int = 10, from_: int = 0, boost_sections: bool = False) -> Dict[str, Any]:
         """
         Perform vector-based semantic search using embeddings.
 
@@ -355,6 +371,7 @@ class SearchService:
             filters: Filter criteria
             size: Number of results to return
             from_: Offset for pagination
+            boost_sections: If True, filter to ONLY sections (exclude full acts)
 
         Returns:
             Search results dictionary
@@ -366,6 +383,11 @@ class SearchService:
 
             # Add filters
             filter_clauses = self._build_filters(filters)
+            
+            # Filter to sections only if requested
+            if boost_sections:
+                logger.info("🎯 Vector search: Filtering to ONLY sections (excluding full acts)")
+                filter_clauses.append({"term": {"document_type": "section"}})
 
             # Construct kNN query for indexed dense vectors
             search_body = {
@@ -378,9 +400,16 @@ class SearchService:
                 "size": size
             }
 
-            # Add filters if present
+            # Add filters if present - kNN requires bool query wrapper
             if filter_clauses:
-                search_body["knn"]["filter"] = filter_clauses
+                search_body["knn"]["filter"] = {
+                    "bool": {
+                        "must": filter_clauses
+                    }
+                }
+
+            # Log the actual query for debugging
+            logger.debug(f"🔍 Vector query: {json.dumps(search_body, indent=2)}")
 
             # Execute search
             response = self.es.search(index=self.INDEX_NAME, body=search_body)
@@ -427,9 +456,23 @@ class SearchService:
                 vector_weight = 0.3
                 logger.info(f"Adjusted weights for overview query: keyword={keyword_weight}, vector={vector_weight}")
             
-            # Perform both searches
-            keyword_results = self.keyword_search(query, filters, size=size*2, from_=from_)
-            vector_results = self.vector_search(query, filters, size=size*2, from_=from_)
+            # Perform both searches with section boost for specific queries
+            boost_sections = not intent['prefers_acts']
+            keyword_results = self.keyword_search(query, filters, size=size*2, from_=from_, boost_sections=boost_sections)
+            vector_results = self.vector_search(query, filters, size=size*2, from_=from_, boost_sections=boost_sections)
+
+            # Log what document types we got from Elasticsearch
+            keyword_doc_types = {}
+            for hit in keyword_results.get('hits', []):
+                doc_type = hit.get('source', {}).get('document_type', 'unknown')
+                keyword_doc_types[doc_type] = keyword_doc_types.get(doc_type, 0) + 1
+            logger.info(f"🔍 Keyword search returned: {keyword_doc_types}")
+            
+            vector_doc_types = {}
+            for hit in vector_results.get('hits', []):
+                doc_type = hit.get('source', {}).get('document_type', 'unknown')
+                vector_doc_types[doc_type] = vector_doc_types.get(doc_type, 0) + 1
+            logger.info(f"🔍 Vector search returned: {vector_doc_types}")
 
             # Combine and re-rank results
             combined_scores = {}
@@ -475,7 +518,7 @@ class SearchService:
                         logger.debug(f"Applied title boost to: {doc_title[:50]}...")
                         break
                 
-                # BOOST 2: Document type preference for overview queries
+                # BOOST 2: Document type preference based on query intent
                 # When asking "Tell me about X Act", prefer regulation/act-level docs over sections
                 if intent['prefers_acts']:
                     # Boost act-level documents (regulation, legislation, act overview)
@@ -483,7 +526,16 @@ class SearchService:
                         # Check if it's NOT a section (sections usually have "section X" in title)
                         if not re.search(r'section\s+\d+', doc_title, re.IGNORECASE):
                             scores['doc_type_boost'] = 5.0
-                            logger.debug(f"Applied doc type boost to: {doc_title[:50]}...")
+                            logger.debug(f"Applied act-level doc boost to: {doc_title[:50]}...")
+                else:
+                    # For specific queries (not overview), prefer sections over full acts
+                    if doc_type == 'section':
+                        scores['doc_type_boost'] = 8.0
+                        logger.debug(f"Applied section boost to: {doc_title[:50]}...")
+                    elif doc_type in ['regulation', 'legislation', 'act']:
+                        # Penalize full acts on specific queries
+                        scores['doc_type_boost'] = -3.0
+                        logger.debug(f"Applied act penalty to: {doc_title[:50]}...")
                 
                 # Calculate final combined score with boosts
                 scores['combined_score'] = (

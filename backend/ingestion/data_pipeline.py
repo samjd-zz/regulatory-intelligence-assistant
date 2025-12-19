@@ -591,6 +591,7 @@ class DataIngestionPipeline:
                 'citation': section_citation,
                 'legislation_name': regulation.title,
                 'regulation_title': regulation.title,
+                'language': regulation.language or 'en',  # Inherit language from regulation
                 'programs': programs,  # Inherit programs from regulation
                 'metadata': section.extra_metadata or {}
             }
@@ -665,6 +666,7 @@ class DataIngestionPipeline:
                     'authority': regulation.authority,
                     'citation': citation,
                     'legislation_name': regulation.title,
+                    'language': regulation.language or 'en',  # Add language field
                     'effective_date': regulation.effective_date.isoformat() if regulation.effective_date else None,
                     'status': regulation.status,
                     'programs': programs,  # Add programs field
@@ -695,6 +697,7 @@ class DataIngestionPipeline:
                         'citation': citation,
                         'legislation_name': regulation.title,
                         'regulation_title': regulation.title,
+                        'language': regulation.language or 'en',  # Inherit language from regulation
                         'programs': programs,  # Inherit programs from regulation
                         'metadata': section.extra_metadata or {}
                     }

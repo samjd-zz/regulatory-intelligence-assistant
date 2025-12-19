@@ -321,11 +321,18 @@ Be precise and cite specific sections when possible."""
         else:
             language_instruction = "\n\nIMPORTANT: The user asked their question in ENGLISH. You MUST respond entirely in ENGLISH."
         
+        # Add fallback search mode instruction if using tier 2+
+        tier_used = tier_metadata.get('tier_used', 1)
+        fallback_instruction = ""
+        if tier_used and tier_used > 1:
+            fallback_instruction = f"\n\n🔄 FALLBACK_SEARCH_MODE ACTIVATED (Tier {tier_used}/5): The retrieval system used fallback strategies to find documents. Provide the best available information from these documents, but clearly indicate at the start of your response that the search used fallback methods and the results may not be exact matches. Follow the FALLBACK_SEARCH_MODE format in your instructions."
+            logger.info(f"🔄 Added FALLBACK_SEARCH_MODE instruction for Tier {tier_used}")
+        
         # Generate with retry logic - returns (text, error)
         answer_text, gemini_error = self.gemini_client.generate_with_context(
             query=question,
             context=context_str,
-            system_prompt=self.LEGAL_SYSTEM_PROMPT + language_instruction,
+            system_prompt=self.LEGAL_SYSTEM_PROMPT + language_instruction + fallback_instruction,
             temperature=temperature,
             max_tokens=max_tokens
         )
@@ -550,8 +557,8 @@ Be precise and cite specific sections when possible."""
         results: List[Dict[str, Any]],
         question: str,
         tier: int,
-        min_score_threshold: float = 3.0,
-        avg_score_threshold: float = 5.0,
+        min_score_threshold: float = 15.0,
+        avg_score_threshold: float = 20.0,
         min_acceptable_results: int = 5
     ) -> Tuple[bool, Dict[str, Any]]:
         """
@@ -654,9 +661,9 @@ Be precise and cite specific sections when possible."""
         # All checks passed!
         quality_metrics["reason"] = "quality_checks_passed"
         quality_metrics["acceptable"] = True
-        logger.info(f"✅ Quality check PASSED: min={quality_metrics['min_score']:.2f}, "
-                   f"avg={quality_metrics['avg_score']:.2f}, "
-                   f"count={quality_metrics['num_results']}")
+        logger.debug(f"✅ Quality check PASSED: min={quality_metrics['min_score']:.2f}, "
+                    f"avg={quality_metrics['avg_score']:.2f}, "
+                    f"count={quality_metrics['num_results']}")
         return True, quality_metrics
     
     def _multi_tier_search(
@@ -733,13 +740,19 @@ Be precise and cite specific sections when possible."""
         else:
             logger.warning(f"⚠️ Tier 1 INSUFFICIENT: Only {len(tier1_results)} documents, need {num_context_docs}")
         
-        # Tier 2: Relaxed Elasticsearch
+        # Tier 2: Relaxed Elasticsearch 
         logger.info("🔍 Tier 2: Trying relaxed Elasticsearch search...")
         tier2_start = time.time()
         tier2_results = self._tier2_elasticsearch_relaxed(question, filters, num_context_docs)
         tier2_time = (time.time() - tier2_start) * 1000
         metadata['tier_timings']['tier_2_ms'] = tier2_time
         metadata['tiers_attempted'].append(2)
+        
+        # Log what Elasticsearch returned BEFORE reranking
+        if tier2_results:
+            logger.info(f"📊 Tier 2 RAW results from search (top 10):")
+            for i, doc in enumerate(tier2_results[:10], 1):
+                logger.info(f"  {i}. {doc.get('title', 'Unknown')} ({doc.get('document_type', 'unknown')})")
         
         # Quality check for Tier 2
         if len(tier2_results) > 0:
@@ -943,8 +956,12 @@ Be precise and cite specific sections when possible."""
                     "content": doc.get('content', ''),
                     "citation": doc.get('citation', ''),
                     "section_number": doc.get('section_number', ''),
+                    "document_type": doc.get('document_type', 'unknown'),
+                    "regulation_title": doc.get('regulation_title', ''),
                     "score": hit['score']
                 })
+            
+            logger.debug(f"📦 Tier 2 found {len(documents)} documents from Elasticsearch")
             
             return documents
             
@@ -1194,11 +1211,19 @@ Be precise and cite specific sections when possible."""
             return ""
         
         context_parts = []
+        doc_titles = []
+        
         for i, doc in enumerate(docs, 1):
             title = doc.get('title', 'Untitled Document')
             content = doc.get('content', '')
             citation = doc.get('citation', '')
             section = doc.get('section_number', '')
+            reg_title = doc.get('regulation_title', '')
+            
+            # Track titles for logging
+            doc_type = doc.get('document_type', 'unknown')
+            score = doc.get('score', 'N/A')
+            doc_titles.append(f"{i}. {title} ({doc_type}, {reg_title or 'unknown'}) [score: {score}]")
             
             # Build document section
             doc_section = f"Document {i}: {title}\n"
@@ -1212,6 +1237,9 @@ Be precise and cite specific sections when possible."""
             doc_section += f"Content:\n{content}\n"
             
             context_parts.append(doc_section)
+        
+        # Log document count only
+        logger.info(f"📄 Using {len(docs)} context documents for answer generation")
         
         # Join with separators
         return "\n---\n\n".join(context_parts)
