@@ -803,31 +803,53 @@ class GraphBuilder:
                 )
                 self.stats["relationships_created"] += 1
             
-            # Create citation relationships
+            # Create citation relationships for ALL citations involving this regulation's sections
+            # This includes both internal citations and cross-regulation citations
             from models.models import Citation
+            
+            # Get all section IDs for this regulation
+            section_ids = [str(section.id) for section in sections]
+            
+            # Query citations where source OR target is in this regulation
             citations = self.db.query(Citation).join(
                 Section, Citation.section_id == Section.id
             ).filter(Section.regulation_id == regulation.id).all()
             
-            for citation in citations:
-                query = """
-                MATCH (source:Section {id: $source_id})
-                MATCH (target:Section {id: $target_id})
-                MERGE (source)-[r:REFERENCES]->(target)
-                SET r.citation_text = $citation_text
-                SET r.created_at = datetime()
-                RETURN r
-                """
-                
-                self.neo4j.execute_write(
-                    query,
-                    {
-                        "source_id": str(citation.section_id),
-                        "target_id": str(citation.cited_section_id),
-                        "citation_text": citation.citation_text or ""
-                    }
-                )
-                self.stats["relationships_created"] += 1
+            # Also get citations that TARGET this regulation's sections (from other regulations)
+            target_citations = self.db.query(Citation).filter(
+                Citation.cited_section_id.in_([section.id for section in sections])
+            ).all()
+            
+            # Combine and deduplicate
+            all_citations = {citation.id: citation for citation in citations}
+            for citation in target_citations:
+                all_citations[citation.id] = citation
+            
+            logger.info(f"Creating {len(all_citations)} citation relationships (includes cross-regulation references)")
+            
+            for citation in all_citations.values():
+                try:
+                    query = """
+                    MATCH (source:Section {id: $source_id})
+                    MATCH (target:Section {id: $target_id})
+                    MERGE (source)-[r:REFERENCES]->(target)
+                    SET r.citation_text = $citation_text
+                    SET r.created_at = datetime()
+                    RETURN r
+                    """
+                    
+                    self.neo4j.execute_write(
+                        query,
+                        {
+                            "source_id": str(citation.section_id),
+                            "target_id": str(citation.cited_section_id),
+                            "citation_text": citation.citation_text or ""
+                        }
+                    )
+                    self.stats["relationships_created"] += 1
+                except Exception as e:
+                    logger.warning(f"Failed to create citation relationship: {e}")
+                    # Continue processing other citations even if one fails
             
             logger.info(f"Graph built successfully for {regulation.title}")
             logger.info(f"Created {self.stats['nodes_created']} nodes, {self.stats['relationships_created']} relationships")
