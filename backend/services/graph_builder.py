@@ -803,6 +803,46 @@ class GraphBuilder:
                 )
                 self.stats["relationships_created"] += 1
             
+            # Create PART_OF relationships for section hierarchy
+            logger.info(f"Creating section hierarchy (PART_OF relationships)...")
+            hierarchy_count = 0
+            
+            for section in sections:
+                # Check if section has a parent
+                parent_number = section.extra_metadata.get('parent_number') if section.extra_metadata else None
+                
+                if parent_number:
+                    # Find parent section by section_number within same regulation
+                    parent_section = self.db.query(Section).filter(
+                        Section.regulation_id == regulation.id,
+                        Section.section_number == parent_number
+                    ).first()
+                    
+                    if parent_section:
+                        try:
+                            hierarchy_query = """
+                            MATCH (child:Section {id: $child_id})
+                            MATCH (parent:Section {id: $parent_id})
+                            MERGE (child)-[r:PART_OF]->(parent)
+                            SET r.created_at = datetime()
+                            RETURN r
+                            """
+                            
+                            self.neo4j.execute_write(
+                                hierarchy_query,
+                                {
+                                    "child_id": str(section.id),
+                                    "parent_id": str(parent_section.id)
+                                }
+                            )
+                            self.stats["relationships_created"] += 1
+                            hierarchy_count += 1
+                        except Exception as e:
+                            logger.warning(f"Failed to create PART_OF relationship for section {section.section_number}: {e}")
+            
+            if hierarchy_count > 0:
+                logger.info(f"Created {hierarchy_count} PART_OF relationships for section hierarchy")
+            
             # Create citation relationships for ALL citations involving this regulation's sections
             # This includes both internal citations and cross-regulation citations
             from models.models import Citation
