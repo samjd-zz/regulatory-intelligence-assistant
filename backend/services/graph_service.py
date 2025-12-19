@@ -2,12 +2,21 @@
 Graph service for managing the regulatory knowledge graph in Neo4j.
 Provides high-level operations for creating and querying regulatory entities.
 """
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, date
 import uuid
 import logging
+import re
 
 from utils.neo4j_client import get_neo4j_client, Neo4jClient
+
+try:
+    from config.legal_synonyms import expand_query_with_synonyms
+    SYNONYMS_AVAILABLE = True
+except ImportError:
+    SYNONYMS_AVAILABLE = False
+    def expand_query_with_synonyms(query: str) -> str:
+        return query
 
 logger = logging.getLogger(__name__)
 
@@ -481,10 +490,10 @@ class GraphService:
     
     def get_graph_overview(self) -> Dict[str, Any]:
         """
-        Get overview statistics of the knowledge graph.
+        Get overview statistics of the knowledge graph including indexes.
         
         Returns:
-            Graph statistics
+            Graph statistics with node counts, relationship counts, and index info
         """
         query = """
         MATCH (n)
@@ -498,9 +507,48 @@ class GraphService:
         """
         rel_counts = self.client.execute_query(query)
         
+        # Get index information
+        indexes_query = "SHOW INDEXES"
+        try:
+            index_results = self.client.execute_query(indexes_query)
+            fulltext_indexes = []
+            range_indexes = []
+            
+            for idx in index_results:
+                idx_type = idx.get('type', '')
+                idx_name = idx.get('name', '')
+                idx_state = idx.get('state', '')
+                read_count = idx.get('readCount', 0)
+                
+                if idx_type == 'FULLTEXT':
+                    fulltext_indexes.append({
+                        'name': idx_name,
+                        'state': idx_state,
+                        'read_count': read_count,
+                        'labels': idx.get('labelsOrTypes', []),
+                        'properties': idx.get('properties', [])
+                    })
+                elif idx_type == 'RANGE':
+                    range_indexes.append({
+                        'name': idx_name,
+                        'labels': idx.get('labelsOrTypes', []),
+                        'properties': idx.get('properties', [])
+                    })
+            
+            indexes_info = {
+                'fulltext_count': len(fulltext_indexes),
+                'range_count': len(range_indexes),
+                'fulltext_indexes': fulltext_indexes[:5],  # Limit for readability
+                'query_expansion': SYNONYMS_AVAILABLE
+            }
+        except Exception as e:
+            logger.warning(f"Could not retrieve index information: {e}")
+            indexes_info = {'error': str(e)}
+        
         return {
             "nodes": {item['label']: item['count'] for item in node_counts},
-            "relationships": {item['type']: item['count'] for item in rel_counts}
+            "relationships": {item['type']: item['count'] for item in rel_counts},
+            "indexes": indexes_info
         }
     
     def get_graph_stats(self) -> Dict[str, Any]:
@@ -645,15 +693,71 @@ class GraphService:
     # RAG-SPECIFIC SEARCH OPERATIONS (Tier 3)
     # ============================================
     
+    def _extract_snippet(self, text: str, query_terms: List[str], max_length: int = 500) -> Tuple[str, bool]:
+        """
+        Extract a relevant snippet from text containing query terms.
+        
+        Args:
+            text: Full text to extract from
+            query_terms: List of query terms to highlight
+            max_length: Maximum snippet length
+            
+        Returns:
+            Tuple of (snippet with highlights, found_match)
+        """
+        if not text:
+            return '', False
+        
+        text_lower = text.lower()
+        
+        # Find first occurrence of any query term
+        best_pos = -1
+        matched_term = None
+        
+        for term in query_terms:
+            term_lower = term.lower()
+            pos = text_lower.find(term_lower)
+            if pos != -1 and (best_pos == -1 or pos < best_pos):
+                best_pos = pos
+                matched_term = term
+        
+        if best_pos == -1:
+            # No match found, return beginning
+            snippet = text[:max_length]
+            if len(text) > max_length:
+                snippet += '...'
+            return snippet, False
+        
+        # Extract context around the match
+        start = max(0, best_pos - max_length // 2)
+        end = min(len(text), start + max_length)
+        
+        snippet = text[start:end]
+        
+        # Add ellipsis
+        if start > 0:
+            snippet = '...' + snippet
+        if end < len(text):
+            snippet += '...'
+        
+        # Highlight all query terms
+        for term in query_terms:
+            # Use regex for case-insensitive replacement
+            pattern = re.compile(re.escape(term), re.IGNORECASE)
+            snippet = pattern.sub(lambda m: f'<mark>{m.group(0)}</mark>', snippet)
+        
+        return snippet, True
+    
     def _sanitize_lucene_query(self, query: str) -> str:
         """
         Sanitize query text for Lucene full-text search.
         
         This method:
-        1. Removes common stop words
-        2. Handles slash-separated terms (GST/HST -> GST OR HST)
-        3. Escapes remaining special characters
-        4. Uses OR for broader matching
+        1. Expands query with legal synonyms (if available)
+        2. Removes common stop words
+        3. Handles slash-separated terms (GST/HST -> GST OR HST)
+        4. Escapes remaining special characters
+        5. Uses OR for broader matching
         
         Args:
             query: Raw query text
@@ -661,6 +765,13 @@ class GraphService:
         Returns:
             Sanitized query safe for Lucene
         """
+        # Apply legal synonym expansion if available
+        if SYNONYMS_AVAILABLE:
+            expanded_query = expand_query_with_synonyms(query)
+            if expanded_query != query:
+                logger.info(f"Expanded query with synonyms: '{query}' -> '{expanded_query}'")
+                query = expanded_query
+        
         # Common stop words to filter out
         stop_words = {
             'how', 'is', 'are', 'the', 'a', 'an', 'what', 'when', 'where', 
@@ -769,8 +880,11 @@ class GraphService:
         # Sanitize query to prevent Lucene syntax errors
         sanitized_query = self._sanitize_lucene_query(query)
         
+        leg_results = []
+        reg_results = []
+        
+        # Try searching Legislation nodes (if any exist)
         try:
-            # Search legislation nodes
             legislation_query = """
             CALL db.index.fulltext.queryNodes('legislation_fulltext', $query)
             YIELD node, score
@@ -790,42 +904,71 @@ class GraphService:
             
             leg_results = self.client.execute_query(
                 legislation_query,
-                {"query": sanitized_query, "limit": limit // 2, "language": language}
+                {"query": sanitized_query, "limit": limit // 3, "language": language}
             )
         except Exception as e:
-            if "legislation_fulltext" in str(e):
-                logger.error(f"Neo4j semantic search failed: {e}")
+            logger.debug(f"Legislation search returned no results or index missing: {e}")
+            leg_results = []
+        
+        # Search Regulation nodes (primary data source)
+        try:
+            regulation_query = """
+            CALL db.index.fulltext.queryNodes('regulation_fulltext', $query)
+            YIELD node, score
+            WHERE node.language = $language OR $language = 'all'
+            RETURN 
+                node.id as id,
+                node.title as title,
+                node.full_text as content,
+                coalesce(node.act_number, '') as citation,
+                '' as section_number,
+                coalesce(node.jurisdiction, '') as jurisdiction,
+                'regulation' as document_type,
+                score
+            ORDER BY score DESC
+            LIMIT $limit
+            """
+            
+            reg_results = self.client.execute_query(
+                regulation_query,
+                {"query": sanitized_query, "limit": limit // 3, "language": language}
+            )
+        except Exception as e:
+            if "regulation_fulltext" in str(e):
+                logger.error(f"Neo4j regulation search failed: {e}")
                 logger.info("Attempting to create missing fulltext indexes...")
                 if self._ensure_fulltext_indexes():
                     try:
-                        leg_results = self.client.execute_query(
-                            legislation_query,
-                            {"query": sanitized_query, "limit": limit // 2, "language": language}
+                        reg_results = self.client.execute_query(
+                            regulation_query,
+                            {"query": sanitized_query, "limit": limit // 3, "language": language}
                         )
                     except Exception as retry_error:
-                        logger.error(f"Fulltext search failed after index creation: {retry_error}")
-                        leg_results = []
+                        logger.error(f"Regulation search failed after index creation: {retry_error}")
+                        reg_results = []
                 else:
                     logger.error(f"Failed to create fulltext indexes")
-                    leg_results = []
+                    reg_results = []
             else:
-                logger.error(f"Neo4j semantic search failed: {e}")
-                leg_results = []
+                logger.error(f"Neo4j regulation search failed: {e}")
+                reg_results = []
         
+        # Search section nodes
+        sec_results = []
         try:
-            # Search section nodes
             section_query = """
             CALL db.index.fulltext.queryNodes('section_fulltext', $query)
             YIELD node, score
-            MATCH (node)-[:HAS_SECTION]-(leg:Legislation)
-            WHERE leg.language = $language OR $language = 'all'
+            MATCH (node)-[:HAS_SECTION|PART_OF]-(parent)
+            WHERE (parent:Regulation OR parent:Legislation)
+            AND (parent.language = $language OR $language = 'all')
             RETURN 
                 node.id as id,
                 node.title as title,
                 node.content as content,
-                leg.act_number as citation,
+                coalesce(parent.act_number, '') as citation,
                 node.section_number as section_number,
-                leg.jurisdiction as jurisdiction,
+                coalesce(parent.jurisdiction, '') as jurisdiction,
                 'section' as document_type,
                 score
             ORDER BY score DESC
@@ -834,7 +977,7 @@ class GraphService:
             
             sec_results = self.client.execute_query(
                 section_query,
-                {"query": sanitized_query, "limit": limit // 2, "language": language}
+                {"query": sanitized_query, "limit": limit // 3, "language": language}
             )
         except Exception as e:
             if "section_fulltext" in str(e):
@@ -845,26 +988,40 @@ class GraphService:
                 logger.error(f"Neo4j section search failed: {e}")
                 sec_results = []
         
-        # Combine and format results
+        # Combine and format results with snippets
         documents = []
         
-        for result in leg_results + sec_results:
+        # Extract query terms for snippet highlighting
+        query_terms = [w.strip() for w in sanitized_query.split(' OR ') if w.strip()]
+        
+        for result in leg_results + reg_results + sec_results:
+            content = result.get('content', '')
+            
+            # Generate snippet with highlights
+            snippet, has_match = self._extract_snippet(content, query_terms, max_length=1500)
+            
+            # Boost score if snippet contains highlighted match
+            base_score = float(result.get('score', 0.0))
+            adjusted_score = base_score * 1.2 if has_match else base_score
+            
             documents.append({
                 'id': result.get('id', ''),
                 'title': result.get('title', ''),
-                'content': result.get('content', '')[:1500],  # Truncate for RAG
+                'content': snippet,
+                'full_content': content[:3000],  # Keep more context for RAG
                 'citation': result.get('citation', ''),
                 'section_number': result.get('section_number', ''),
                 'jurisdiction': result.get('jurisdiction', ''),
                 'document_type': result.get('document_type', ''),
-                'score': float(result.get('score', 0.0))
+                'score': adjusted_score,
+                'has_highlight': has_match
             })
         
-        # Sort by score and limit
+        # Sort by adjusted score and limit
         documents.sort(key=lambda x: x['score'], reverse=True)
         documents = documents[:limit]
         
-        logger.info(f"Neo4j full-text search found {len(documents)} documents")
+        logger.info(f"Neo4j full-text search found {len(documents)} documents (avg score: {sum(d['score'] for d in documents) / len(documents) if documents else 0:.4f})")
         return documents
     
     def _fallback_contains_search(
@@ -1002,6 +1159,140 @@ class GraphService:
             
         except Exception as e:
             logger.error(f"Fallback CONTAINS search failed: {e}")
+            return []
+    
+    def similarity_search(
+        self,
+        query: str,
+        limit: int = 20,
+        language: str = 'en',
+        min_similarity: float = 0.3
+    ) -> List[Dict[str, Any]]:
+        """
+        Fuzzy similarity search using Levenshtein distance approximation.
+        
+        This is useful for typo-tolerant search when full-text search fails.
+        Uses case-insensitive CONTAINS matching with scoring based on
+        match position and frequency.
+        
+        Args:
+            query: Search query text
+            limit: Maximum number of results
+            language: Language filter ('en' or 'fr')
+            min_similarity: Minimum similarity threshold (0.0-1.0)
+        
+        Returns:
+            List of similar documents with similarity scores
+        """
+        # Extract search terms
+        query_lower = query.lower()
+        terms = [t.strip() for t in query_lower.split() if len(t.strip()) > 2]
+        
+        if not terms:
+            logger.warning(f"No valid search terms for similarity search: '{query}'")
+            return []
+        
+        logger.info(f"Similarity search for terms: {terms}")
+        
+        # Build similarity query
+        # Score based on: title match (high), content match (medium), term frequency
+        similarity_query = """
+        WITH $terms AS search_terms, $min_sim AS min_similarity, $language AS lang
+        
+        // Search in Regulations (primary data source)
+        MATCH (r:Regulation)
+        WHERE r.language = lang OR lang = 'all'
+        WITH r, search_terms, min_similarity,
+            size([term IN search_terms WHERE toLower(r.title) CONTAINS term]) AS title_count,
+            size([term IN search_terms WHERE toLower(coalesce(r.full_text, '')) CONTAINS term]) AS content_count,
+            size(search_terms) AS total_terms
+        WHERE (title_count + content_count) > 0
+        WITH r,
+            (toFloat(title_count) * 3.0 + toFloat(content_count)) / toFloat(total_terms) AS similarity,
+            title_count, content_count
+        WHERE similarity >= min_similarity
+        
+        RETURN
+            r.id as id,
+            r.title as title,
+            r.full_text as content,
+            coalesce(r.act_number, '') as citation,
+            '' as section_number,
+            coalesce(r.jurisdiction, '') as jurisdiction,
+            'regulation' as document_type,
+            similarity as score,
+            title_count as title_matches,
+            content_count as content_matches
+        
+        UNION ALL
+        
+        // Search in Sections
+        MATCH (s:Section)-[:HAS_SECTION|PART_OF]-(parent)
+        WHERE (parent:Regulation OR parent:Legislation)
+        AND (parent.language = $language OR $language = 'all')
+        WITH s, parent, $terms AS search_terms, $min_sim AS min_similarity,
+            size([term IN $terms WHERE toLower(coalesce(s.title, '')) CONTAINS term]) AS title_count,
+            size([term IN $terms WHERE toLower(coalesce(s.content, '')) CONTAINS term]) AS content_count,
+            size($terms) AS total_terms
+        WHERE (title_count + content_count) > 0
+        WITH s, parent,
+            (toFloat(title_count) * 3.0 + toFloat(content_count)) / toFloat(total_terms) AS similarity,
+            title_count, content_count
+        WHERE similarity >= min_similarity
+        
+        RETURN
+            s.id as id,
+            coalesce(s.title, s.section_number) as title,
+            s.content as content,
+            coalesce(parent.act_number, '') as citation,
+            s.section_number as section_number,
+            coalesce(parent.jurisdiction, '') as jurisdiction,
+            'section' as document_type,
+            similarity as score,
+            title_count as title_matches,
+            content_count as content_matches
+        
+        ORDER BY score DESC
+        LIMIT $limit
+        """
+        
+        try:
+            results = self.client.execute_query(
+                similarity_query,
+                {
+                    'terms': terms,
+                    'limit': limit,
+                    'language': language,
+                    'min_sim': min_similarity
+                }
+            )
+            
+            # Format results with snippets
+            documents = []
+            for result in results:
+                content = result.get('content', '')
+                snippet, has_match = self._extract_snippet(content, terms, max_length=1500)
+                
+                documents.append({
+                    'id': result.get('id', ''),
+                    'title': result.get('title', ''),
+                    'content': snippet,
+                    'full_content': content[:3000],
+                    'citation': result.get('citation', ''),
+                    'section_number': result.get('section_number', ''),
+                    'jurisdiction': result.get('jurisdiction', ''),
+                    'document_type': result.get('document_type', ''),
+                    'score': float(result.get('score', 0.0)),
+                    'similarity_type': 'fuzzy',
+                    'title_matches': result.get('title_matches', 0),
+                    'content_matches': result.get('content_matches', 0)
+                })
+            
+            logger.info(f"Similarity search found {len(documents)} documents (min_similarity={min_similarity})")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Neo4j similarity search failed: {e}")
             return []
     
     def find_related_documents_by_traversal(
