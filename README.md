@@ -58,7 +58,7 @@ docker compose exec backend python seed_data.py
 
 ## 📊 System Status
 
-**Current Version**: v1.2.0 (Multi-Tier RAG Search Enhancements)
+**Current Version**: v1.3.7 (Multi-Tier RAG Search Enhancements)
 
 ### Data Loaded
 - **PostgreSQL**: 1,827 regulations + 277,031 sections (278,858 total)
@@ -152,7 +152,7 @@ curl -X POST http://localhost:8000/api/compliance/check \
 
 **Full API documentation**: http://localhost:8000/docs
 
-## 🚀 Recent Enhancements (v1.2.0)
+## 🚀 Recent Enhancements (v1.3.7)
 
 ### PostgreSQL Search Service
 - ✅ Pre-generated search_vector columns (5-10x faster)
