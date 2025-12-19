@@ -42,8 +42,17 @@ npm install
 #### Backend Development
 
 ```bash
-# Run backend locally (with hot reload)
+# Backend runs in Docker with hot reload enabled
+# View logs
+docker compose logs -f backend
+
+# Restart after changes (if needed)
+docker compose restart backend
+
+# Run backend locally (outside Docker - optional)
 cd backend
+python -m venv venv
+source venv/bin/activate
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # Run tests

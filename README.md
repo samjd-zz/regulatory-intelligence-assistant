@@ -215,16 +215,18 @@ cd frontend && npm run test:e2e
 ## 🛠️ Development
 
 ```bash
-# Backend hot reload
-cd backend
-uvicorn main:app --reload
+# View backend logs (already running with hot reload in Docker)
+docker compose logs -f backend
 
-# Frontend dev server
+# Restart backend after code changes
+docker compose restart backend
+
+# Frontend dev server (if not using Docker)
 cd frontend
 npm run dev
 
-# View logs
-docker compose logs -f backend
+# Or use Docker for frontend
+docker compose up -d frontend
 ```
 
 See [Development Guide](./docs/DEVELOPMENT.md) for full setup.
