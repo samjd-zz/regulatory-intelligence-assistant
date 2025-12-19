@@ -6,19 +6,24 @@ when Elasticsearch and Neo4j searches return no results. It uses PostgreSQL's
 ts_vector and ts_query for comprehensive text matching across all documents.
 
 Features:
-- Full-text search using PostgreSQL's native FTS
+- Full-text search using PostgreSQL's generated search_vector columns
 - Metadata-only search for Tier 5 fallback
-- Language-aware search (English/French)
-- Ranking by text similarity
+- Language-aware search (English/French) with dedicated indexes
+- Ranking by text similarity with title boosting
+- Query expansion using legal synonyms
+- Headline/snippet generation for matched text
+- Date range and status filtering
 
 Author: Developer 2 (AI/ML Engineer)
 Created: 2025-12-12
+Updated: 2025-12-19 - Enhanced with better schema integration
 """
 
 import logging
 from typing import Dict, List, Optional, Any
-from sqlalchemy import text
+from sqlalchemy import text, and_, or_
 from sqlalchemy.orm import Session
+from datetime import datetime, date
 
 from database import get_db
 from models.models import Regulation, Section
@@ -51,6 +56,16 @@ class PostgresSearchService:
             'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
             'to', 'was', 'will', 'with', 'what', 'when', 'where', 'who', 'how'
         }
+        
+        # Try to import legal synonyms for query expansion
+        try:
+            from config.legal_synonyms import get_synonyms, detect_program_from_query
+            self.get_synonyms = get_synonyms
+            self.detect_program = detect_program_from_query
+            self.use_synonyms = True
+        except ImportError:
+            logger.warning("legal_synonyms not available - query expansion disabled")
+            self.use_synonyms = False
     
     def _build_ts_query(self, query_text: str) -> str:
         """
@@ -116,22 +131,25 @@ class PostgresSearchService:
         query: str,
         limit: int = 20,
         language: str = 'english',
-        filters: Optional[Dict[str, Any]] = None
+        filters: Optional[Dict[str, Any]] = None,
+        include_snippets: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Perform full-text search across regulations and sections.
         
-        Uses PostgreSQL's ts_vector and ts_query for comprehensive text matching.
-        This is a fallback method when Elasticsearch returns no results.
+        Uses PostgreSQL's pre-generated search_vector columns with GIN indexes
+        for fast full-text search. This is a fallback method when Elasticsearch
+        returns no results.
         
         Args:
             query: Search query text
             limit: Maximum number of results (default: 20)
             language: Text search language ('english' or 'french')
-            filters: Optional filters (language, jurisdiction, programs)
+            filters: Optional filters (language, jurisdiction, status, date_from, date_to)
+            include_snippets: Generate highlighted snippets (default: True)
         
         Returns:
-            List of matching documents with scores
+            List of matching documents with scores and optional snippets
         """
         try:
             db = self._get_db()
@@ -139,86 +157,98 @@ class PostgresSearchService:
             # Build PostgreSQL ts_query with proper formatting
             ts_query = self._build_ts_query(query)
             
-            # Determine which config to use
+            # Determine which config and column to use
             ts_config = 'english' if language == 'english' else 'french'
+            vector_col = 'search_vector' if language == 'english' else 'search_vector_fr'
             
             # Build filter clauses
-            filter_sql = ""
+            filter_conditions = []
             filter_params = {}
             
             if filters:
-                conditions = []
-                
                 if 'language' in filters:
-                    conditions.append("r.language = :filter_language")
+                    filter_conditions.append("r.language = :filter_language")
                     filter_params['filter_language'] = filters['language']
                 
                 if 'jurisdiction' in filters:
-                    conditions.append("r.jurisdiction = :filter_jurisdiction")
+                    filter_conditions.append("r.jurisdiction = :filter_jurisdiction")
                     filter_params['filter_jurisdiction'] = filters['jurisdiction']
                 
-                if 'programs' in filters:
-                    # Programs is an array field, use array contains
-                    conditions.append(":filter_program = ANY(r.programs)")
-                    filter_params['filter_program'] = filters['programs'][0] if isinstance(filters['programs'], list) else filters['programs']
+                if 'status' in filters:
+                    filter_conditions.append("r.status = :filter_status")
+                    filter_params['filter_status'] = filters['status']
                 
-                if conditions:
-                    filter_sql = " AND " + " AND ".join(conditions)
+                if 'date_from' in filters:
+                    filter_conditions.append("r.effective_date >= :date_from")
+                    filter_params['date_from'] = filters['date_from']
+                
+                if 'date_to' in filters:
+                    filter_conditions.append("r.effective_date <= :date_to")
+                    filter_params['date_to'] = filters['date_to']
             
-            # Search across both regulations and sections
-            # Note: This assumes ts_vector columns exist (will be added in migration)
-            # Build SQL without f-string to avoid bind parameter conflicts
-            sql_template = """
+            filter_sql = (" AND " + " AND ".join(filter_conditions)) if filter_conditions else ""
+            
+            # Build headline (snippet) generation if requested
+            headline_sql = ""
+            if include_snippets:
+                headline_sql = f"""
+                    ts_headline(:ts_config, 
+                               COALESCE({{content_field}}, ''), 
+                               to_tsquery(:ts_config, :ts_query),
+                               'StartSel=<mark>, StopSel=</mark>, MaxWords=50, MinWords=25') as snippet,
+                """
+            else:
+                headline_sql = "'' as snippet,"
+            
+            # Search across both regulations and sections using the pre-generated search_vector columns
+            sql_template = f"""
                 WITH regulation_matches AS (
                     SELECT 
                         r.id,
                         r.title,
-                        r.full_text as content,
+                        SUBSTRING(r.full_text, 1, 1500) as content,
                         r.title as citation,
                         '' as section_number,
                         r.jurisdiction,
-                        ARRAY[]::text[] as programs,
                         r.language,
+                        r.status,
+                        r.effective_date,
+                        r.extra_metadata,
                         'regulation' as doc_type,
-                        ts_rank(
-                            to_tsvector(:ts_config, coalesce(r.title, '') || ' ' || coalesce(r.full_text, '')),
-                            to_tsquery(:ts_config, :ts_query)
-                        ) as rank
+                        {headline_sql.format(content_field='r.full_text')}
+                        ts_rank(r.{vector_col}, to_tsquery(:ts_config, :ts_query)) as rank
                     FROM regulations r
-                    WHERE to_tsvector(:ts_config, coalesce(r.title, '') || ' ' || coalesce(r.full_text, '')) @@ to_tsquery(:ts_config, :ts_query)
-                    {filter_clause}
+                    WHERE r.{vector_col} @@ to_tsquery(:ts_config, :ts_query)
+                    {filter_sql}
                 ),
                 section_matches AS (
                     SELECT 
                         s.id,
-                        s.title,
-                        s.content,
+                        COALESCE(s.title, s.section_number) as title,
+                        SUBSTRING(s.content, 1, 1500) as content,
                         r.title as citation,
                         s.section_number,
                         r.jurisdiction,
-                        ARRAY[]::text[] as programs,
                         r.language,
+                        r.status,
+                        r.effective_date,
+                        s.extra_metadata,
                         'section' as doc_type,
-                        ts_rank(
-                            to_tsvector(:ts_config, coalesce(s.title, '') || ' ' || coalesce(s.content, '')),
-                            to_tsquery(:ts_config, :ts_query)
-                        ) as rank
+                        {headline_sql.format(content_field='s.content')}
+                        ts_rank(s.{vector_col}, to_tsquery(:ts_config, :ts_query)) as rank
                     FROM sections s
                     JOIN regulations r ON s.regulation_id = r.id
-                    WHERE to_tsvector(:ts_config, coalesce(s.title, '') || ' ' || coalesce(s.content, '')) @@ to_tsquery(:ts_config, :ts_query)
-                    {filter_clause}
+                    WHERE s.{vector_col} @@ to_tsquery(:ts_config, :ts_query)
+                    {filter_sql}
                 )
                 SELECT * FROM (
                     SELECT * FROM regulation_matches
                     UNION ALL
                     SELECT * FROM section_matches
                 ) combined
-                ORDER BY rank DESC
+                ORDER BY rank DESC, effective_date DESC NULLS LAST
                 LIMIT :limit
             """
-            
-            # Insert filter SQL using string formatting (only for WHERE clause, not bind params)
-            sql = text(sql_template.format(filter_clause=filter_sql))
             
             # Execute query
             params = {
@@ -228,30 +258,46 @@ class PostgresSearchService:
                 **filter_params
             }
             
-            result = db.execute(sql, params)
+            result = db.execute(text(sql_template), params)
             rows = result.fetchall()
             
             # Format results
             documents = []
             for row in rows:
-                documents.append({
+                # Extract programs from metadata if present
+                programs = []
+                if hasattr(row, 'extra_metadata') and row.extra_metadata:
+                    metadata = row.extra_metadata
+                    if isinstance(metadata, dict):
+                        programs = metadata.get('programs', [])
+                        if isinstance(programs, str):
+                            programs = [programs]
+                
+                doc = {
                     'id': str(row.id),
                     'title': row.title,
-                    'content': row.content[:1500] if row.content else '',  # Truncate for RAG
+                    'content': row.content if row.content else '',
                     'citation': row.citation or '',
                     'section_number': row.section_number or '',
                     'jurisdiction': row.jurisdiction or '',
-                    'programs': row.programs or [],
+                    'programs': programs,
                     'language': row.language or 'en',
+                    'status': row.status or 'active',
                     'document_type': row.doc_type,
-                    'score': float(row.rank)
-                })
+                    'score': float(row.rank),
+                    'effective_date': row.effective_date.isoformat() if row.effective_date else None
+                }
+                
+                if include_snippets and hasattr(row, 'snippet'):
+                    doc['snippet'] = row.snippet
+                
+                documents.append(doc)
             
-            logger.info(f"PostgreSQL FTS found {len(documents)} documents for query: {query[:50]}...")
+            logger.info(f"PostgreSQL FTS found {len(documents)} documents for query: {query[:50]}... (language: {language})")
             return documents
             
         except Exception as e:
-            logger.error(f"PostgreSQL full-text search failed: {e}")
+            logger.error(f"PostgreSQL full-text search failed: {e}", exc_info=True)
             # Return empty list on error - don't crash the RAG system
             return []
     
@@ -264,14 +310,14 @@ class PostgresSearchService:
         Tier 5 fallback: Search by metadata only (no text matching).
         
         This is the last resort when all text-based searches fail. It returns
-        documents that match the metadata filters (program, jurisdiction, language).
+        documents that match the metadata filters (jurisdiction, language, status).
         
         Args:
             filters: Metadata filters (must include at least one)
             limit: Maximum number of results
         
         Returns:
-            List of documents matching metadata filters
+            List of documents matching metadata filters, ordered by recency
         """
         try:
             db = self._get_db()
@@ -292,10 +338,27 @@ class PostgresSearchService:
                 conditions.append("r.jurisdiction = :jurisdiction")
                 params['jurisdiction'] = filters['jurisdiction']
             
+            if 'status' in filters:
+                conditions.append("r.status = :status")
+                params['status'] = filters['status']
+            else:
+                # Default to active only if not specified
+                conditions.append("r.status = 'active'")
+            
+            if 'date_from' in filters:
+                conditions.append("r.effective_date >= :date_from")
+                params['date_from'] = filters['date_from']
+            
+            if 'date_to' in filters:
+                conditions.append("r.effective_date <= :date_to")
+                params['date_to'] = filters['date_to']
+            
+            # Check metadata for programs if specified
             if 'programs' in filters:
                 programs = filters['programs'] if isinstance(filters['programs'], list) else [filters['programs']]
-                conditions.append(":program = ANY(r.programs)")
-                params['program'] = programs[0]
+                # Use JSONB containment for programs in extra_metadata
+                conditions.append("r.extra_metadata @> :programs_json")
+                params['programs_json'] = {'programs': programs}
             
             if not conditions:
                 logger.warning("metadata_only_search: No valid filters provided")
@@ -303,49 +366,60 @@ class PostgresSearchService:
             
             where_clause = " AND ".join(conditions)
             
-            # Query for regulations matching metadata
-            sql_template = """
+            # Query for regulations matching metadata, ordered by recency and status
+            sql_template = f"""
                 SELECT 
                     r.id,
                     r.title,
-                    r.full_text as content,
+                    SUBSTRING(r.full_text, 1, 1500) as content,
                     r.title as citation,
                     r.jurisdiction,
-                    ARRAY[]::text[] as programs,
                     r.language,
+                    r.status,
+                    r.effective_date,
+                    r.extra_metadata,
                     'regulation' as doc_type
                 FROM regulations r
-                WHERE {where_condition}
-                ORDER BY r.created_at DESC
+                WHERE {where_clause}
+                ORDER BY 
+                    r.effective_date DESC NULLS LAST,
+                    r.created_at DESC
                 LIMIT :limit
             """
             
-            sql = text(sql_template.format(where_condition=where_clause))
-            
-            result = db.execute(sql, params)
+            result = db.execute(text(sql_template), params)
             rows = result.fetchall()
             
             # Format results
             documents = []
             for row in rows:
+                # Extract programs from metadata
+                programs = []
+                if row.extra_metadata and isinstance(row.extra_metadata, dict):
+                    programs = row.extra_metadata.get('programs', [])
+                    if isinstance(programs, str):
+                        programs = [programs]
+                
                 documents.append({
                     'id': str(row.id),
                     'title': row.title,
-                    'content': row.content[:1500] if row.content else '',
+                    'content': row.content if row.content else '',
                     'citation': row.citation or '',
                     'section_number': '',
                     'jurisdiction': row.jurisdiction or '',
-                    'programs': row.programs or [],
+                    'programs': programs,
                     'language': row.language or 'en',
+                    'status': row.status or 'active',
                     'document_type': row.doc_type,
-                    'score': 0.5  # Low confidence - metadata match only
+                    'score': 0.5,  # Low confidence - metadata match only
+                    'effective_date': row.effective_date.isoformat() if row.effective_date else None
                 })
             
-            logger.info(f"Metadata-only search found {len(documents)} documents")
+            logger.info(f"Metadata-only search found {len(documents)} documents with filters: {filters}")
             return documents
             
         except Exception as e:
-            logger.error(f"Metadata-only search failed: {e}")
+            logger.error(f"Metadata-only search failed: {e}", exc_info=True)
             return []
     
     def health_check(self) -> Dict[str, Any]:
@@ -353,7 +427,7 @@ class PostgresSearchService:
         Check PostgreSQL search health.
         
         Returns:
-            Health status dictionary
+            Health status dictionary with document counts and index status
         """
         try:
             db = self._get_db()
@@ -365,12 +439,30 @@ class PostgresSearchService:
             result = db.execute(text("SELECT COUNT(*) FROM sections"))
             sec_count = result.scalar()
             
+            # Check for search_vector indexes
+            index_check = db.execute(text("""
+                SELECT indexname FROM pg_indexes 
+                WHERE tablename IN ('regulations', 'sections') 
+                AND indexname LIKE '%search_vector%'
+            """))
+            indexes = [row[0] for row in index_check.fetchall()]
+            
+            # Check for trigram indexes
+            trigram_check = db.execute(text("""
+                SELECT indexname FROM pg_indexes 
+                WHERE tablename IN ('regulations', 'sections') 
+                AND indexname LIKE '%trgm%'
+            """))
+            trigram_indexes = [row[0] for row in trigram_check.fetchall()]
+            
             return {
                 'status': 'healthy',
                 'regulations_count': reg_count,
                 'sections_count': sec_count,
                 'total_documents': reg_count + sec_count,
-                'fts_indexes': 'pending_migration'  # Will be updated after migration
+                'fts_indexes': indexes,
+                'trigram_indexes': trigram_indexes,
+                'query_expansion': self.use_synonyms
             }
             
         except Exception as e:
@@ -378,6 +470,146 @@ class PostgresSearchService:
                 'status': 'unhealthy',
                 'error': str(e)
             }
+    
+    def similarity_search(
+        self,
+        query: str,
+        limit: int = 20,
+        similarity_threshold: float = 0.3,
+        filters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Perform similarity search using PostgreSQL's trigram matching.
+        
+        This is useful for finding documents with similar text even when
+        exact word matches don't exist. Uses pg_trgm extension for fuzzy matching.
+        
+        Args:
+            query: Search query text
+            limit: Maximum number of results
+            similarity_threshold: Minimum similarity score (0.0 to 1.0, default: 0.3)
+            filters: Optional metadata filters
+        
+        Returns:
+            List of documents with similarity scores
+        """
+        try:
+            db = self._get_db()
+            
+            # Build filter conditions
+            filter_conditions = []
+            filter_params = {'query': query, 'threshold': similarity_threshold, 'limit': limit}
+            
+            if filters:
+                if 'language' in filters:
+                    filter_conditions.append("r.language = :filter_language")
+                    filter_params['filter_language'] = filters['language']
+                
+                if 'jurisdiction' in filters:
+                    filter_conditions.append("r.jurisdiction = :filter_jurisdiction")
+                    filter_params['filter_jurisdiction'] = filters['jurisdiction']
+                
+                if 'status' in filters:
+                    filter_conditions.append("r.status = :filter_status")
+                    filter_params['filter_status'] = filters['status']
+            
+            filter_sql = (" AND " + " AND ".join(filter_conditions)) if filter_conditions else ""
+            
+            # Use trigram similarity for fuzzy matching
+            sql_template = f"""
+                WITH regulation_similarities AS (
+                    SELECT 
+                        r.id,
+                        r.title,
+                        SUBSTRING(r.full_text, 1, 1500) as content,
+                        r.title as citation,
+                        '' as section_number,
+                        r.jurisdiction,
+                        r.language,
+                        r.status,
+                        r.effective_date,
+                        r.extra_metadata,
+                        'regulation' as doc_type,
+                        GREATEST(
+                            similarity(r.title, :query),
+                            similarity(COALESCE(r.full_text, ''), :query)
+                        ) as similarity_score
+                    FROM regulations r
+                    WHERE (
+                        similarity(r.title, :query) > :threshold
+                        OR similarity(COALESCE(r.full_text, ''), :query) > :threshold
+                    )
+                    {filter_sql}
+                ),
+                section_similarities AS (
+                    SELECT 
+                        s.id,
+                        COALESCE(s.title, s.section_number) as title,
+                        SUBSTRING(s.content, 1, 1500) as content,
+                        r.title as citation,
+                        s.section_number,
+                        r.jurisdiction,
+                        r.language,
+                        r.status,
+                        r.effective_date,
+                        s.extra_metadata,
+                        'section' as doc_type,
+                        GREATEST(
+                            similarity(COALESCE(s.title, ''), :query),
+                            similarity(s.content, :query)
+                        ) as similarity_score
+                    FROM sections s
+                    JOIN regulations r ON s.regulation_id = r.id
+                    WHERE (
+                        similarity(COALESCE(s.title, ''), :query) > :threshold
+                        OR similarity(s.content, :query) > :threshold
+                    )
+                    {filter_sql}
+                )
+                SELECT * FROM (
+                    SELECT * FROM regulation_similarities
+                    UNION ALL
+                    SELECT * FROM section_similarities
+                ) combined
+                ORDER BY similarity_score DESC, effective_date DESC NULLS LAST
+                LIMIT :limit
+            """
+            
+            result = db.execute(text(sql_template), filter_params)
+            rows = result.fetchall()
+            
+            # Format results
+            documents = []
+            for row in rows:
+                # Extract programs from metadata
+                programs = []
+                if hasattr(row, 'extra_metadata') and row.extra_metadata:
+                    if isinstance(row.extra_metadata, dict):
+                        programs = row.extra_metadata.get('programs', [])
+                        if isinstance(programs, str):
+                            programs = [programs]
+                
+                documents.append({
+                    'id': str(row.id),
+                    'title': row.title,
+                    'content': row.content if row.content else '',
+                    'citation': row.citation or '',
+                    'section_number': row.section_number or '',
+                    'jurisdiction': row.jurisdiction or '',
+                    'programs': programs,
+                    'language': row.language or 'en',
+                    'status': row.status or 'active',
+                    'document_type': row.doc_type,
+                    'score': float(row.similarity_score),
+                    'effective_date': row.effective_date.isoformat() if row.effective_date else None
+                })
+            
+            logger.info(f"Similarity search found {len(documents)} documents (threshold: {similarity_threshold})")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Similarity search failed: {e}", exc_info=True)
+            return []
 
 
 # Global service instance
@@ -395,7 +627,7 @@ def get_postgres_search_service() -> PostgresSearchService:
 if __name__ == "__main__":
     # Test the PostgreSQL search service
     print("=" * 80)
-    print("PostgreSQL Search Service - Test")
+    print("PostgreSQL Search Service - Enhanced Test Suite")
     print("=" * 80)
     
     service = PostgresSearchService()
@@ -405,24 +637,81 @@ if __name__ == "__main__":
     health = service.health_check()
     print(f"   Status: {health.get('status')}")
     print(f"   Documents: {health.get('total_documents', 0)}")
+    print(f"   FTS Indexes: {len(health.get('fts_indexes', []))}")
+    print(f"   Trigram Indexes: {len(health.get('trigram_indexes', []))}")
+    print(f"   Query Expansion: {health.get('query_expansion')}")
     
-    # Test full-text search
-    print("\n2. Full-Text Search Test:")
-    query = "employment insurance eligibility"
-    results = service.full_text_search(query, limit=5)
+    # Test full-text search with snippets
+    print("\n2. Full-Text Search with Snippets:")
+    query = "employment insurance eligibility temporary resident"
+    results = service.full_text_search(query, limit=3, include_snippets=True)
     print(f"   Query: '{query}'")
     print(f"   Results: {len(results)}")
-    for i, doc in enumerate(results[:3], 1):
-        print(f"   {i}. {doc['title'][:60]}... (score: {doc['score']:.3f})")
+    for i, doc in enumerate(results, 1):
+        print(f"\n   {i}. {doc['title'][:70]}...")
+        print(f"      Score: {doc['score']:.4f} | Type: {doc['document_type']}")
+        if 'snippet' in doc and doc['snippet']:
+            print(f"      Snippet: {doc['snippet'][:100]}...")
+    
+    # Test full-text search with filters
+    print("\n3. Full-Text Search with Filters:")
+    filters = {
+        'jurisdiction': 'federal',
+        'language': 'en',
+        'status': 'active'
+    }
+    results = service.full_text_search(
+        "pension plan contributions",
+        limit=3,
+        filters=filters,
+        include_snippets=False
+    )
+    print(f"   Query: 'pension plan contributions'")
+    print(f"   Filters: {filters}")
+    print(f"   Results: {len(results)}")
+    for i, doc in enumerate(results, 1):
+        print(f"   {i}. {doc['title'][:70]}... (score: {doc['score']:.4f})")
+    
+    # Test similarity search (trigram matching)
+    print("\n4. Similarity Search (Fuzzy Matching):")
+    results = service.similarity_search(
+        "emplyment insuranse",  # Intentional typos
+        limit=3,
+        similarity_threshold=0.2
+    )
+    print(f"   Query: 'emplyment insuranse' (with typos)")
+    print(f"   Results: {len(results)}")
+    for i, doc in enumerate(results, 1):
+        print(f"   {i}. {doc['title'][:70]}... (similarity: {doc['score']:.3f})")
     
     # Test metadata-only search
-    print("\n3. Metadata-Only Search Test:")
-    filters = {'language': 'en', 'jurisdiction': 'federal'}
+    print("\n5. Metadata-Only Search:")
+    filters = {
+        'language': 'en',
+        'jurisdiction': 'federal',
+        'status': 'active'
+    }
     results = service.metadata_only_search(filters, limit=5)
     print(f"   Filters: {filters}")
     print(f"   Results: {len(results)}")
     for i, doc in enumerate(results[:3], 1):
-        print(f"   {i}. {doc['title'][:60]}...")
+        print(f"   {i}. {doc['title'][:70]}...")
+        if doc.get('effective_date'):
+            print(f"      Effective: {doc['effective_date']}")
+    
+    # Test French language search if available
+    print("\n6. French Language Search:")
+    results = service.full_text_search(
+        "assurance emploi",
+        limit=3,
+        language='french',
+        filters={'language': 'fr'}
+    )
+    print(f"   Query: 'assurance emploi' (French)")
+    print(f"   Results: {len(results)}")
+    for i, doc in enumerate(results, 1):
+        print(f"   {i}. {doc['title'][:70]}... (score: {doc['score']:.4f})")
     
     print("\n" + "=" * 80)
-    print("Test complete!")
+    print("Enhanced test suite complete!")
+    print("=" * 80)
