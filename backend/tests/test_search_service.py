@@ -77,7 +77,7 @@ class TestSearchService:
         filter_clauses = search_service._build_filters(filters)
 
         assert len(filter_clauses) == 1
-        assert filter_clauses[0] == {"terms": {"program": ["employment_insurance"]}}
+        assert filter_clauses[0] == {"terms": {"programs": ["employment_insurance"]}}
 
     def test_build_filters_multiple_programs(self, search_service):
         """Test building filter with multiple programs"""
@@ -85,7 +85,7 @@ class TestSearchService:
         filter_clauses = search_service._build_filters(filters)
 
         assert len(filter_clauses) == 1
-        assert filter_clauses[0] == {"terms": {"program": ['employment_insurance', 'canada_pension_plan']}}
+        assert filter_clauses[0] == {"terms": {"programs": ['employment_insurance', 'canada_pension_plan']}}
 
     def test_build_filters_date_range(self, search_service):
         """Test building date range filter"""
@@ -298,7 +298,12 @@ class TestSearchService:
 
             assert 'knn' in body
             assert 'filter' in body['knn']
-            filter_clauses = body['knn']['filter']
+            filter_structure = body['knn']['filter']
+            
+            # Filters are wrapped in a bool query with a 'must' clause
+            assert 'bool' in filter_structure
+            assert 'must' in filter_structure['bool']
+            filter_clauses = filter_structure['bool']['must']
 
             # Should have 2 filter clauses
             assert len(filter_clauses) == 2
@@ -363,7 +368,7 @@ class TestSearchService:
 
             results = search_service.hybrid_search("test query", keyword_weight=0.6, vector_weight=0.4)
 
-            assert results['search_type'] == 'hybrid'
+            assert results['search_type'] == 'hybrid_intelligent'
             assert results['total'] == 2
             assert 'weights' in results
             assert results['weights']['keyword'] == 0.6

@@ -21,7 +21,7 @@ class TestOllamaClient:
         """Test initialization with default values"""
         with patch.object(OllamaClient, '_check_availability', return_value=True):
             client = OllamaClient()
-            assert client.host == "http://localhost:11434"
+            assert client.host == "http://ollama:11434"
             assert client.model_name == "llama3.2:3b"
             assert client.available is True
     

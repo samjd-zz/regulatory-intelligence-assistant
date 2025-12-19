@@ -69,11 +69,11 @@ class TestStatisticsRouting:
         # Get total documents
         total = stats_service.get_total_documents()
         
-        assert "total_documents" in total
+        assert "total_searchable_documents" in total
         assert "total_regulations" in total
-        assert isinstance(total["total_documents"], int)
+        assert isinstance(total["total_searchable_documents"], int)
         assert isinstance(total["total_regulations"], int)
-        assert total["total_documents"] >= 0
+        assert total["total_searchable_documents"] >= 0
         assert total["total_regulations"] >= 0
     
     def test_statistics_with_filters(self):
@@ -85,7 +85,7 @@ class TestStatisticsRouting:
             filters={"jurisdiction": "federal"}
         )
         
-        assert "total_documents" in filtered
+        assert "total_searchable_documents" in filtered
         assert "filters_applied" in filtered
         assert filtered["filters_applied"]["jurisdiction"] == "federal"
     
@@ -129,15 +129,17 @@ class TestStatisticsRouting:
     
     def test_edge_cases(self):
         """Test edge cases for statistics routing"""
-        rag = RAGService()
+        parser = LegalQueryParser(use_spacy=False)
         
         # Question with "how many" but not really asking for count
         question = "How many days do I have to apply for EI?"
-        answer = rag.answer_question(question, use_cache=False)
+        parsed = parser.parse_query(question)
         
         # This should probably not route to statistics
         # (depends on detection patterns - this is a content question, not a count)
-        # The parser will decide based on context
+        assert parsed.intent != QueryIntent.STATISTICS, (
+            "Question about 'how many days' should not be STATISTICS intent"
+        )
 
 
 if __name__ == "__main__":

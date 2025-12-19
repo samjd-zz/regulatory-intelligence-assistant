@@ -27,7 +27,7 @@ class TestLLMClientFactory:
         reset_clients()
     
     @patch.dict(os.environ, {'LLM_PROVIDER': 'gemini'})
-    @patch('services.llm_client_factory.GeminiClient')
+    @patch('services.gemini_client.GeminiClient')
     def test_get_llm_client_gemini(self, mock_gemini_class):
         """Test getting Gemini client"""
         mock_client = Mock()
@@ -38,7 +38,7 @@ class TestLLMClientFactory:
         mock_gemini_class.assert_called_once()
     
     @patch.dict(os.environ, {'LLM_PROVIDER': 'ollama'})
-    @patch('services.llm_client_factory.OllamaClient')
+    @patch('services.ollama_client.OllamaClient')
     def test_get_llm_client_ollama(self, mock_ollama_class):
         """Test getting Ollama client"""
         mock_client = Mock()
@@ -48,7 +48,7 @@ class TestLLMClientFactory:
         assert client is mock_client
         mock_ollama_class.assert_called_once()
     
-    @patch('services.llm_client_factory.GeminiClient')
+    @patch('services.gemini_client.GeminiClient')
     def test_get_llm_client_default_gemini(self, mock_gemini_class):
         """Test default to Gemini when LLM_PROVIDER not set"""
         mock_client = Mock()
@@ -64,7 +64,7 @@ class TestLLMClientFactory:
         with pytest.raises(ValueError, match="Unknown LLM provider: invalid"):
             get_llm_client("invalid")
     
-    @patch('services.llm_client_factory.OllamaClient')
+    @patch('services.ollama_client.OllamaClient')
     def test_get_llm_client_explicit_provider(self, mock_ollama_class):
         """Test explicit provider parameter"""
         mock_client = Mock()
@@ -73,7 +73,7 @@ class TestLLMClientFactory:
         client = get_llm_client("ollama")
         assert client is mock_client
     
-    @patch('services.llm_client_factory.GeminiClient')
+    @patch('services.gemini_client.GeminiClient')
     def test_singleton_behavior(self, mock_gemini_class):
         """Test that clients are singleton instances"""
         mock_client = Mock()
@@ -101,8 +101,8 @@ class TestLLMClientFactory:
         # This test mainly ensures the function runs without error
         reset_clients()
     
-    @patch('services.llm_client_factory.GeminiClient')
-    @patch('services.llm_client_factory.OllamaClient')
+    @patch('services.gemini_client.GeminiClient')
+    @patch('services.ollama_client.OllamaClient')
     def test_get_available_providers(self, mock_ollama_class, mock_gemini_class):
         """Test getting available providers"""
         providers = get_available_providers()
