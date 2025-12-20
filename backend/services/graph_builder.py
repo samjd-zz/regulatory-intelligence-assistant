@@ -138,6 +138,7 @@ class GraphBuilder:
         
         properties = {
             "id": str(regulation.id),
+            "name": regulation.title,  # Add name property for better Neo4j visualization
             "title": regulation.title,
             "jurisdiction": regulation.jurisdiction,
             "authority": regulation.authority if regulation.authority else "Unknown",
