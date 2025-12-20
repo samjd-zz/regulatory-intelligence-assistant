@@ -102,6 +102,14 @@
       "document_type": {
         "type": "keyword"
       },
+      "node_type": {
+        "type": "keyword",
+        "fields": {
+          "raw": {
+            "type": "text"
+          }
+        }
+      },
       "jurisdiction": {
         "type": "keyword"
       },

@@ -115,11 +115,13 @@ class CanadianLawXMLParser:
             # Detect namespace
             self._detect_namespace(root)
             
-            # Determine format: Statute (real format) vs Consolidation (test format)
+            # Determine format: Statute, Regulation (real formats) vs Consolidation (test format)
             root_tag = root.tag.split('}')[-1] if '}' in root.tag else root.tag
             
             if root_tag == 'Statute':
                 return self._parse_statute(root)
+            elif root_tag == 'Regulation':
+                return self._parse_regulation(root)
             else:
                 # Fall back to old consolidation format
                 return self._parse_consolidation(root)
@@ -443,6 +445,125 @@ class CanadianLawXMLParser:
         )
         
         logger.info(f"Parsed {len(sections)} sections from Statute format")
+        return regulation
+    
+    def _parse_regulation(self, root: ET.Element) -> ParsedRegulation:
+        """
+        Parse Regulation element (SOR/DORS format).
+        
+        Structure:
+        <Regulation regulation-type="ministerial" xml:lang="en">
+          <Identification>
+            <ConsolidatedNumber>SOR/96-445</ConsolidatedNumber>
+            <Title>Employment Insurance Regulations</Title>
+            <EnablingAuthority>Employment Insurance Act</EnablingAuthority>
+          </Identification>
+          <Body>
+            <Section>...</Section>
+          </Body>
+          <RecentAmendments>...</RecentAmendments>
+        </Regulation>
+        """
+        logger.info("Parsing Regulation format (SOR/DORS)")
+        
+        # Get regulation type from root attribute
+        regulation_type = root.get('regulation-type', 'regulation')
+        
+        # Extract identification info
+        identification = self._find(root, 'Identification')
+        if identification is None:
+            raise ValueError("No Identification section found in Regulation XML")
+        
+        # Title extraction - try multiple fields
+        title = (
+            self._get_text(self._find(identification, 'Title')) or
+            self._get_text(self._find(identification, 'LongTitle')) or
+            self._get_text(self._find(identification, 'ShortTitle')) or
+            "Untitled Regulation"
+        )
+        
+        # Get SOR/DORS number
+        chapter = self._get_text(self._find(identification, 'ConsolidatedNumber'), "")
+        if not chapter:
+            chapter = self._get_text(self._find(identification, 'Chapter'), "")
+        
+        # Get enabling authority (parent Act)
+        enabling_authority = self._get_text(self._find(identification, 'EnablingAuthority'))
+        
+        # Get dates
+        enabled_date = None
+        consolidation_date = None
+        
+        # Check for dates in Identification
+        date_elem = self._find(identification, 'Date')
+        if date_elem is not None:
+            year = self._get_text(self._find(date_elem, 'YYYY'))
+            month = self._get_text(self._find(date_elem, 'MM'))
+            day = self._get_text(self._find(date_elem, 'DD'))
+            if year and month and day:
+                enabled_date = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+        
+        # Check root attributes for dates
+        if hasattr(root, 'attrib'):
+            consolidation_date = root.get('current-date') or root.get('pit-date')
+            if not enabled_date:
+                enabled_date = root.get('inforce-start-date')
+        
+        # Parse body sections
+        body = self._find(root, 'Body')
+        sections = []
+        full_text_parts = []
+        
+        if body is not None:
+            for section_elem in self._findall(body, './/Section'):
+                section, text = self._parse_statute_section(section_elem)
+                if section:
+                    sections.append(section)
+                    full_text_parts.append(text)
+        
+        # Build full text
+        full_text = "\n\n".join(full_text_parts) if full_text_parts else ""
+        
+        # Parse RecentAmendments
+        amendments = self._parse_recent_amendments(root)
+        
+        # Detect jurisdiction
+        jurisdiction = self._detect_jurisdiction_from_metadata(root, title, chapter)
+        
+        # Extract metadata
+        metadata = {
+            'chapter': chapter,
+            'act_type': 'Regulation',
+            'regulation_type': regulation_type,
+            'enabling_authority': enabling_authority,
+            'source': 'Justice Laws Canada',
+            'format': 'Regulation XML (LIMS)'
+        }
+        
+        # Add LIMS attributes
+        if hasattr(root, 'attrib'):
+            for key, value in root.attrib.items():
+                clean_key = key.split('}')[-1] if '}' in key else key
+                if clean_key in ['pit-date', 'lastAmendedDate', 'current-date', 'inforce-start-date']:
+                    metadata[clean_key] = value
+        
+        regulation = ParsedRegulation(
+            title=title,
+            chapter=chapter,
+            act_type='Regulation',
+            enabled_date=enabled_date,
+            consolidation_date=consolidation_date or metadata.get('current-date'),
+            jurisdiction=jurisdiction,
+            full_text=full_text,
+            sections=sections,
+            amendments=amendments,
+            cross_references=self._extract_cross_references(sections),
+            metadata=metadata
+        )
+        
+        logger.info(f"Parsed Regulation: {title} ({chapter})")
+        logger.info(f"Enabling Authority: {enabling_authority}")
+        logger.info(f"Parsed {len(sections)} sections from Regulation format")
         return regulation
     
     def _extract_statute_title(self, root: ET.Element) -> str:

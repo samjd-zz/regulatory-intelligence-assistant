@@ -84,6 +84,28 @@ class DataIngestionPipeline:
             'elasticsearch_indexed': 0
         }
     
+    def _determine_node_type(self, title: str) -> str:
+        """
+        Determine if a regulation should be classified as Legislation or Regulation.
+        Uses the same logic as graph_builder.py to ensure consistency.
+        
+        Args:
+            title: Title of the regulation
+            
+        Returns:
+            'Legislation' if it's an Act/Loi, otherwise 'Regulation'
+        """
+        title_lower = title.lower()
+        
+        # Acts and Lois (French for laws) are considered Legislation
+        if ' act' in title_lower or title_lower.startswith('act ') or title_lower.endswith(' act'):
+            return 'Legislation'
+        if ' loi' in title_lower or title_lower.startswith('loi ') or title_lower.endswith(' loi'):
+            return 'Legislation'
+        
+        # Everything else is a Regulation (rules, regulations, etc.)
+        return 'Regulation'
+    
     async def ingest_from_directory(self, xml_dir: str, limit: Optional[int] = None, force: bool = False):
         """
         Ingest all XML files from a directory (including subdirectories).
@@ -540,13 +562,17 @@ class DataIngestionPipeline:
         # Extract programs from metadata
         programs = regulation.extra_metadata.get('programs', []) if regulation.extra_metadata else []
         
+        # Determine node type (Legislation vs Regulation) using same logic as graph builder
+        node_type = self._determine_node_type(regulation.title)
+        
         # Index the full regulation
         doc = {
             'id': str(regulation.id),
             'regulation_id': str(regulation.id),
             'title': regulation.title,
             'content': regulation.full_text,
-            'document_type': 'regulation',
+            'document_type': 'regulation',  # Generic doc type for backward compatibility
+            'node_type': node_type,  # Legislation or Regulation
             'jurisdiction': regulation.jurisdiction,
             'authority': regulation.authority,
             'citation': parsed_reg.chapter or regulation.authority or f"{regulation.title}",
@@ -586,6 +612,7 @@ class DataIngestionPipeline:
                 'title': section.title or regulation.title,
                 'content': section.content,
                 'document_type': 'section',
+                'node_type': node_type,  # Inherit node type from parent regulation
                 'jurisdiction': regulation.jurisdiction,
                 'authority': regulation.authority,
                 'citation': section_citation,

@@ -15,8 +15,7 @@ from sqlalchemy.orm import Session
 from database import SessionLocal
 from utils.neo4j_client import Neo4jClient
 from services.graph_builder import GraphBuilder
-from services.document_parser import DocumentParser
-from models.document_models import Document, DocumentType
+from models import Regulation
 
 # Configure logging
 logging.basicConfig(
@@ -78,7 +77,7 @@ def setup_neo4j_constraints(neo4j: Neo4jClient):
 
 def clear_graph(neo4j: Neo4jClient, confirm: bool = False):
     """
-    Clear all nodes and relationships from the graph.
+    Clear all nodes and relationships from the graph in batches.
     
     Args:
         neo4j: Neo4j client instance
@@ -90,47 +89,62 @@ def clear_graph(neo4j: Neo4jClient, confirm: bool = False):
     
     logger.warning("CLEARING ALL DATA FROM NEO4J GRAPH...")
     
-    query = "MATCH (n) DETACH DELETE n"
-    result = neo4j.execute_write(query)
+    # Delete in batches to avoid memory issues
+    batch_size = 10000
+    total_deleted = 0
     
-    logger.info("Graph cleared successfully")
+    while True:
+        query = f"""
+        MATCH (n)
+        WITH n LIMIT {batch_size}
+        DETACH DELETE n
+        RETURN count(n) as deleted
+        """
+        
+        result = neo4j.execute_query(query)
+        deleted = result[0]["deleted"] if result else 0
+        
+        if deleted == 0:
+            break
+        
+        total_deleted += deleted
+        logger.info(f"Deleted {deleted} nodes (total: {total_deleted})...")
+    
+    logger.info(f"Graph cleared successfully - {total_deleted} nodes deleted")
 
 
 def populate_from_postgresql(
     db: Session,
     neo4j: Neo4jClient,
     limit: int = None,
-    document_types: list = None
+    batch_size: int = 100
 ):
     """
-    Populate Neo4j graph from PostgreSQL documents.
+    Populate Neo4j graph from PostgreSQL regulations.
     
     Args:
         db: SQLAlchemy database session
         neo4j: Neo4j client instance
-        limit: Maximum number of documents to process
-        document_types: List of document types to include
+        limit: Maximum number of regulations to process
+        batch_size: Number of regulations to process before logging progress
     """
     logger.info("Starting graph population from PostgreSQL...")
     
     # Build query
-    query = db.query(Document).filter_by(is_processed=True)
-    
-    if document_types:
-        query = query.filter(Document.document_type.in_(document_types))
+    query = db.query(Regulation)
     
     if limit:
         query = query.limit(limit)
     
-    documents = query.all()
-    logger.info(f"Found {len(documents)} documents to process")
+    regulations = query.all()
+    logger.info(f"Found {len(regulations)} regulations to process")
     
     # Initialize graph builder
     builder = GraphBuilder(db, neo4j)
     
-    # Process each document
+    # Process each regulation
     stats = {
-        "total": len(documents),
+        "total": len(regulations),
         "successful": 0,
         "failed": 0,
         "total_nodes": 0,
@@ -138,26 +152,29 @@ def populate_from_postgresql(
         "errors": []
     }
     
-    for i, doc in enumerate(documents, 1):
-        logger.info(f"Processing document {i}/{len(documents)}: {doc.title}")
+    for i, regulation in enumerate(regulations, 1):
+        logger.info(f"Processing regulation {i}/{len(regulations)}: {regulation.title[:60]}...")
         
         try:
-            result = builder.build_document_graph(doc.id)
+            result = builder.build_document_graph(regulation.id)
             
             stats["successful"] += 1
             stats["total_nodes"] += result.get("nodes_created", 0)
             stats["total_relationships"] += result.get("relationships_created", 0)
             
-            logger.info(
-                f"  ✓ Created {result.get('nodes_created', 0)} nodes, "
-                f"{result.get('relationships_created', 0)} relationships"
-            )
+            # Log progress every batch_size regulations
+            if i % batch_size == 0:
+                logger.info(
+                    f"  Progress: {i}/{len(regulations)} | "
+                    f"Nodes: {stats['total_nodes']} | "
+                    f"Relationships: {stats['total_relationships']}"
+                )
             
         except Exception as e:
-            logger.error(f"  ✗ Failed to process {doc.title}: {e}")
+            logger.error(f"  ✗ Failed to process {regulation.title[:60]}: {e}")
             stats["failed"] += 1
             stats["errors"].append({
-                "document": doc.title,
+                "regulation": regulation.title,
                 "error": str(e)
             })
     
@@ -173,7 +190,7 @@ def populate_from_postgresql(
     logger.info("\n" + "="*60)
     logger.info("GRAPH POPULATION SUMMARY")
     logger.info("="*60)
-    logger.info(f"Total documents processed: {stats['total']}")
+    logger.info(f"Total regulations processed: {stats['total']}")
     logger.info(f"Successful: {stats['successful']}")
     logger.info(f"Failed: {stats['failed']}")
     logger.info(f"Total nodes created: {stats['total_nodes']}")
@@ -182,161 +199,9 @@ def populate_from_postgresql(
     if stats['errors']:
         logger.warning(f"\nErrors encountered: {len(stats['errors'])}")
         for error in stats['errors'][:5]:  # Show first 5 errors
-            logger.warning(f"  - {error['document']}: {error['error']}")
+            logger.warning(f"  - {error['regulation']}: {error['error']}")
     
     return stats
-
-
-def upload_sample_documents(db: Session, count: int = 50):
-    """
-    Create sample documents for testing.
-    
-    Args:
-        db: SQLAlchemy database session
-        count: Number of sample documents to create
-    """
-    logger.info(f"Creating {count} sample documents...")
-    
-    from datetime import datetime, timedelta
-    import uuid
-    
-    sample_docs = [
-        {
-            "title": "Employment Insurance Act",
-            "type": DocumentType.LEGISLATION,
-            "jurisdiction": "federal",
-            "authority": "Parliament of Canada",
-            "content": """
-            Section 7: Eligibility Requirements
-            (1) A person is eligible for benefits if they have accumulated 
-            sufficient insurable hours of employment.
-            
-            Section 8: Benefit Period
-            (1) The benefit period begins the Sunday of the week in which 
-            the interruption of earnings occurs.
-            
-            Section 9: Rate of Benefits
-            (1) The rate of weekly benefits is 55% of average insurable earnings.
-            """
-        },
-        {
-            "title": "Canada Pension Plan",
-            "type": DocumentType.LEGISLATION,
-            "jurisdiction": "federal",
-            "authority": "Parliament of Canada",
-            "content": """
-            Section 44: Retirement Pension
-            (1) A retirement pension shall be paid to a contributor who has 
-            reached 60 years of age.
-            
-            Section 45: Amount of Retirement Pension
-            (1) The amount of the monthly retirement pension is calculated 
-            based on contributory period.
-            """
-        },
-        {
-            "title": "Old Age Security Act",
-            "type": DocumentType.LEGISLATION,
-            "jurisdiction": "federal",
-            "authority": "Parliament of Canada",
-            "content": """
-            Section 3: Eligibility
-            (1) A person who has attained 65 years of age and is a Canadian 
-            citizen or legal resident is entitled to an old age pension.
-            
-            Section 5: Amount of Pension
-            (1) The amount is determined by the Governor in Council.
-            """
-        },
-        {
-            "title": "Employment Insurance Regulations",
-            "type": DocumentType.REGULATION,
-            "jurisdiction": "federal",
-            "authority": "Governor in Council",
-            "content": """
-            Section 2: Insurable Hours
-            (1) Hours of work are insurable if performed under a contract 
-            of service.
-            
-            Section 3: Earnings
-            (1) Insurable earnings are the total amount of earnings paid.
-            """
-        },
-        {
-            "title": "Immigration and Refugee Protection Act",
-            "type": DocumentType.LEGISLATION,
-            "jurisdiction": "federal",
-            "authority": "Parliament of Canada",
-            "content": """
-            Section 11: Application
-            (1) A foreign national must apply for authorization to enter Canada.
-            
-            Section 20: Work Permits
-            (1) Work permits may be issued to foreign nationals.
-            """
-        },
-    ]
-    
-    # Replicate samples to reach desired count
-    created_count = 0
-    base_date = datetime(2020, 1, 1)
-    
-    while created_count < count:
-        for sample in sample_docs:
-            if created_count >= count:
-                break
-            
-            doc = Document(
-                id=uuid.uuid4(),
-                title=f"{sample['title']} (Version {created_count + 1})",
-                document_type=sample['type'],
-                jurisdiction=sample['jurisdiction'],
-                authority=sample['authority'],
-                full_text=sample['content'],
-                file_format="txt",
-                file_size=len(sample['content']),
-                file_hash=str(uuid.uuid4()),
-                effective_date=base_date + timedelta(days=created_count * 30),
-                status="active",
-                is_processed=True,
-                processed_date=datetime.utcnow()
-            )
-            
-            db.add(doc)
-            created_count += 1
-    
-    db.commit()
-    logger.info(f"✓ Created {created_count} sample documents")
-    
-    # Parse documents to create sections
-    logger.info("Parsing documents to create sections...")
-    parser = DocumentParser(db)
-    
-    docs = db.query(Document).filter_by(is_processed=True).all()
-    for doc in docs:
-        try:
-            # Create basic sections from content
-            if doc.full_text:
-                sections = doc.full_text.split("Section ")
-                for i, section_text in enumerate(sections[1:], 1):
-                    lines = section_text.strip().split("\n", 1)
-                    if len(lines) >= 2:
-                        from models.document_models import DocumentSection
-                        section = DocumentSection(
-                            id=uuid.uuid4(),
-                            document_id=doc.id,
-                            section_number=str(i),
-                            section_title=lines[0].strip(),
-                            content=lines[1].strip() if len(lines) > 1 else lines[0],
-                            order_index=i-1,
-                            level=0
-                        )
-                        db.add(section)
-        except Exception as e:
-            logger.warning(f"Failed to parse {doc.title}: {e}")
-    
-    db.commit()
-    logger.info("✓ Sections created")
 
 
 def main():
@@ -355,21 +220,14 @@ def main():
         "--limit",
         type=int,
         default=None,
-        help="Maximum number of documents to process"
+        help="Maximum number of regulations to process"
     )
     
     parser.add_argument(
-        "--types",
-        nargs="+",
-        choices=["legislation", "regulation", "policy", "guideline", "directive"],
-        help="Document types to include"
-    )
-    
-    parser.add_argument(
-        "--create-samples",
+        "--batch-size",
         type=int,
-        default=0,
-        help="Create N sample documents before populating"
+        default=100,
+        help="Number of regulations to process before logging progress (default: 100)"
     )
     
     parser.add_argument(
@@ -410,21 +268,12 @@ def main():
                 logger.info("Graph clear cancelled")
                 return 1
         
-        # Create sample documents if requested
-        if args.create_samples > 0:
-            upload_sample_documents(db, args.create_samples)
-        
-        # Convert document types to enum if provided
-        doc_types = None
-        if args.types:
-            doc_types = [DocumentType(t) for t in args.types]
-        
         # Populate graph
         stats = populate_from_postgresql(
             db,
             neo4j,
             limit=args.limit,
-            document_types=doc_types
+            batch_size=args.batch_size
         )
         
         # Print Neo4j graph stats

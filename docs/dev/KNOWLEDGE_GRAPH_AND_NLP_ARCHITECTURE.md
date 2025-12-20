@@ -4,6 +4,13 @@
 
 This document provides comprehensive visual diagrams showing how our knowledge graph is created and where Natural Language Processing (NLP) is integrated throughout the system.
 
+**✅ Implementation Status (Updated Dec 2024):**
+- **Node Types**: Legislation (Acts/Lois) and Regulation nodes are now distinguished by title parsing
+- **Relationships**: HAS_SECTION, REFERENCES, APPLIES_TO, RELEVANT_FOR implemented; IMPLEMENTS partially implemented
+- **Entity Extraction**: Program and Situation extraction code exists (needs testing with real data)
+- **Inter-Document**: Links regulations to legislation based on title mentions
+- **NOT YET**: Policy nodes, INTERPRETS, SUPERSEDES relationships
+
 ---
 
 ## Table of Contents
@@ -62,59 +69,60 @@ flowchart TB
 
 This diagram shows the step-by-step process of how the knowledge graph is built from parsed documents.
 
+**✅ = Implemented | ⚠️ = Partially Implemented | ❌ = Not Implemented**
+
 ```mermaid
 flowchart TD
-    Start([Start: Document Ingested]) --> FetchDoc["Fetch Document from PostgreSQL"]
+    Start([Start: Document Ingested]) --> FetchDoc["✅ Fetch Regulation from PostgreSQL"]
     
-    FetchDoc --> CreateDocNode["Create Document Node"]
-    CreateDocNode --> DocNode[("Document Node in Neo4j")]
+    FetchDoc --> DetermineType["✅ Determine Node Type (Act/Loi = Legislation)"]
+    DetermineType --> CreateDocNode["✅ Create Legislation or Regulation Node"]
+    CreateDocNode --> DocNode[("✅ Legislation/Regulation Node in Neo4j")]
     
-    DocNode --> CreateSections["Create Section Nodes"]
+    DocNode --> CreateSections["✅ Create Section Nodes"]
     CreateSections --> SectionLoop{For Each Section}
     
-    SectionLoop -->|Next Section| CreateSectionNode["Create Section Node"]
-    CreateSectionNode --> LinkSection["Create HAS_SECTION Relationship"]
+    SectionLoop -->|Next Section| CreateSectionNode["✅ Create Section Node"]
+    CreateSectionNode --> LinkSection["✅ Create HAS_SECTION Relationship"]
     LinkSection --> SectionLoop
     
-    SectionLoop -->|All Sections Done| CreateHierarchy["Create Hierarchy (PART_OF)"]
-    CreateHierarchy --> HierarchyComplete["Section Tree Created"]
+    SectionLoop -->|All Sections Done| CreateRefs["✅ Create Cross-References (REFERENCES)"]
+    CreateRefs --> RefsComplete["✅ Citations Mapped"]
     
-    HierarchyComplete --> CreateRefs["Create Cross-References (REFERENCES)"]
-    CreateRefs --> RefsComplete["Citations Mapped"]
+    RefsComplete --> ExtractEntities{"⚠️ Extract Entities (NLP Processing)"}
     
-    RefsComplete --> ExtractEntities{"Extract Entities (NLP Processing)"}
+    ExtractEntities -->|Extract Programs| ExtractPrograms["⚠️ Extract Program Mentions (code exists)"]
+    ExtractPrograms --> CreatePrograms["⚠️ Create Program Nodes"]
+    CreatePrograms --> LinkPrograms["⚠️ Link Documents APPLIES_TO Programs"]
     
-    ExtractEntities -->|Extract Programs| ExtractPrograms["Extract Program Mentions"]
-    ExtractPrograms --> CreatePrograms["Create Program Nodes"]
-    CreatePrograms --> LinkPrograms["Link Documents APPLIES_TO Programs"]
+    ExtractEntities -->|Extract Situations| ExtractSituations["⚠️ Extract Applicable Situations (code exists)"]
+    ExtractSituations --> CreateSituations["⚠️ Create Situation Nodes"]
+    CreateSituations --> LinkSituations["⚠️ Link Sections RELEVANT_FOR Situations"]
     
-    ExtractEntities -->|Extract Situations| ExtractSituations["Extract Applicable Situations"]
-    ExtractSituations --> CreateSituations["Create Situation Nodes"]
-    CreateSituations --> LinkSituations["Link Sections RELEVANT_FOR Situations"]
-    
-    LinkPrograms --> InterDoc["Create Inter-Document Relationships"]
+    LinkPrograms --> InterDoc["⚠️ Create Inter-Document Relationships"]
     LinkSituations --> InterDoc
     
-    InterDoc --> LinkRegs["Link Regulations IMPLEMENTS Legislation"]
-    InterDoc --> LinkPolicies["Link Policies INTERPRETS Legislation"]
-    InterDoc --> LinkSupersedes["Link Updates SUPERSEDES older versions"]
+    InterDoc --> LinkRegs["⚠️ Link Regulations IMPLEMENTS Legislation (title matching)"]
+    InterDoc --> LinkPolicies["❌ Link Policies INTERPRETS Legislation (no policies yet)"]
+    InterDoc --> LinkSupersedes["❌ Link Updates SUPERSEDES older versions (not implemented)"]
     
     LinkRegs --> Complete([Graph Building Complete])
     LinkPolicies --> Complete
     LinkSupersedes --> Complete
     
+    style DetermineType fill:#9f9,stroke:#333,stroke-width:2px
     style ExtractEntities fill:#ff9,stroke:#333,stroke-width:3px
     style ExtractPrograms fill:#ffc,stroke:#333,stroke-width:2px
     style ExtractSituations fill:#ffc,stroke:#333,stroke-width:2px
 ```
 
 **Graph Building Steps:**
-1. **Document Node Creation**: Top-level legislation/regulation/policy
-2. **Section Nodes**: All sections with content and metadata
-3. **Hierarchy Creation**: Parent-child relationships (PART_OF)
-4. **Cross-References**: Citation links (REFERENCES)
-5. **Entity Extraction (NLP)**: Programs and situations from text
-6. **Inter-Document Links**: IMPLEMENTS, INTERPRETS, SUPERSEDES
+1. **✅ Document Node Creation**: Creates Legislation node (for Acts/Lois) or Regulation node based on title
+2. **✅ Section Nodes**: All sections with content and metadata
+3. **❌ Hierarchy Creation**: PART_OF relationships removed (parent_section_id doesn't exist)
+4. **✅ Cross-References**: Citation links via REFERENCES relationships
+5. **⚠️ Entity Extraction (NLP)**: Code exists for Programs and Situations (needs data to trigger)
+6. **⚠️ Inter-Document Links**: IMPLEMENTS implemented for Regulations→Legislation; INTERPRETS/SUPERSEDES not yet
 
 ---
 
@@ -187,53 +195,59 @@ flowchart TB
 
 This diagram shows all the node types and relationship types in the knowledge graph.
 
+**CURRENT IMPLEMENTATION STATUS:**
+
+✅ **Implemented and Active:**
+- Node Types: `Regulation`, `Section`
+- Relationships: `HAS_SECTION`, `PART_OF`, `REFERENCES`
+
+⚠️ **Code Exists But Not Creating Data:**
+- Node Types: `Program`, `Situation`
+- Relationships: `APPLIES_TO`, `RELEVANT_FOR`, `IMPLEMENTS`, `INTERPRETS`, `SUPERSEDES`
+
 ```mermaid
 flowchart LR
-    L["Legislation"]
-    R["Regulation"]
-    P["Policy"]
-    S["Section"]
-    PR["Program (from NLP)"]
-    SI["Situation (from NLP)"]
+    R["Regulation (✅ 1,827 nodes)"]
+    S["Section (✅ 277,031 nodes)"]
+    PR["Program (⚠️ Planned)"]
+    SI["Situation (⚠️ Planned)"]
     
-    R -->|IMPLEMENTS| L
-    P -->|INTERPRETS| L
-    L -->|SUPERSEDES| L
-    L -->|HAS_SECTION| S
-    R -->|HAS_SECTION| S
-    S -->|PART_OF| S
-    S -->|REFERENCES| S
-    L -->|APPLIES_TO| PR
-    R -->|APPLIES_TO| PR
-    S -->|RELEVANT_FOR| SI
+    R -->|HAS_SECTION ✅| S
+    S -->|PART_OF ✅| S
+    S -->|REFERENCES ✅| S
+    R -.->|APPLIES_TO ⚠️| PR
+    S -.->|RELEVANT_FOR ⚠️| SI
+    R -.->|IMPLEMENTS ⚠️| R
     
-    style PR fill:#ff9,stroke:#333,stroke-width:3px
-    style SI fill:#ff9,stroke:#333,stroke-width:3px
+    style R fill:#4CAF50,stroke:#333,stroke-width:3px
+    style S fill:#4CAF50,stroke:#333,stroke-width:3px
+    style PR fill:#FFC107,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+    style SI fill:#FFC107,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
 ```
 
 **Node Types:**
 
-| Node | Description | Created By | NLP Used |
-|------|-------------|------------|----------|
-| **Legislation** | Acts, laws, statutes | Graph Builder | ❌ |
-| **Regulation** | Implementing regulations | Graph Builder | ❌ |
-| **Policy** | Guidelines, directives | Graph Builder | ❌ |
-| **Section** | Content segments | Graph Builder | ❌ |
-| **Program** | Government programs | Graph Builder | ✅ Regex + Keywords |
-| **Situation** | Applicable scenarios | Graph Builder | ✅ Pattern Matching |
+| Node | Description | Status | Count | Database Table |
+|------|-------------|--------|-------|----------------|
+| **Regulation** | Acts, laws, regulations | ✅ Active | 1,827 | `regulations` |
+| **Section** | Content segments | ✅ Active | 277,031 | `sections` |
+| **Program** | Government programs | ⚠️ Planned | 0 | N/A |
+| **Situation** | Applicable scenarios | ⚠️ Planned | 0 | N/A |
 
 **Relationship Types:**
 
-| Relationship | From → To | Description | NLP Used |
-|--------------|-----------|-------------|----------|
-| **HAS_SECTION** | Document → Section | Document structure | ❌ |
-| **PART_OF** | Section → Section | Hierarchy | ❌ |
-| **REFERENCES** | Section → Section | Citations | ❌ |
-| **IMPLEMENTS** | Regulation → Legislation | Implementing relationship | ✅ Keyword Matching |
-| **INTERPRETS** | Policy → Legislation | Interpretation | ✅ Keyword Matching |
-| **SUPERSEDES** | Document → Document | Version updates | ✅ Title + Date Analysis |
-| **APPLIES_TO** | Document → Program | Program applicability | ✅ Entity Extraction |
-| **RELEVANT_FOR** | Section → Situation | Scenario relevance | ✅ Situation Detection |
+| Relationship | From → To | Description | Status | Count |
+|--------------|-----------|-------------|--------|-------|
+| **HAS_SECTION** | Regulation → Section | Document structure | ✅ Active | 277,027 |
+| **PART_OF** | Section → Section | Hierarchy | ✅ Active | 164,722 |
+| **REFERENCES** | Section → Section | Citations | ✅ Active | 28,604 |
+| **IMPLEMENTS** | Regulation → Regulation | Implementing relationship | ⚠️ Planned | 0 |
+| **APPLIES_TO** | Regulation → Program | Program applicability | ⚠️ Planned | 0 |
+| **RELEVANT_FOR** | Section → Situation | Scenario relevance | ⚠️ Planned | 0 |
+| **INTERPRETS** | Regulation → Regulation | Interpretation | ⚠️ Planned | 0 |
+| **SUPERSEDES** | Regulation → Regulation | Version updates | ⚠️ Planned | 0 |
+
+**Note:** The system currently uses a single `Regulation` node type for all regulatory documents (legislation, regulations, policies). The original design had separate node types (`Legislation`, `Policy`) but the implementation consolidated them.
 
 ---
 

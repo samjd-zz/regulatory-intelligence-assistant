@@ -686,6 +686,10 @@ class SearchService:
         if 'document_type' in filters:
             filter_clauses.append({"term": {"document_type": filters['document_type']}})
 
+        # Node type filter (Legislation vs Regulation)
+        if 'node_type' in filters:
+            filter_clauses.append({"term": {"node_type": filters['node_type']}})
+
         # Person type filter
         if 'person_type' in filters:
             person_types = filters['person_type'] if isinstance(filters['person_type'], list) else [filters['person_type']]

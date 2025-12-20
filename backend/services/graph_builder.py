@@ -5,18 +5,12 @@ Extracts entities, creates nodes, and builds relationships.
 from typing import Dict, List, Any, Optional, Set, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
 import uuid
 import logging
 import re
 
-from models.document_models import (
-    Document, DocumentSection, DocumentSubsection, 
-    DocumentClause, CrossReference, DocumentType
-)
 from models import Regulation, Section
 from utils.neo4j_client import Neo4jClient
-from services.document_parser import DocumentParser
 
 logger = logging.getLogger(__name__)
 
@@ -86,122 +80,152 @@ class GraphBuilder:
             # Log warning but don't fail the graph building process
             logger.warning(f"Could not ensure fulltext indexes: {e}")
     
-    def build_document_graph(self, document_id: uuid.UUID) -> Dict[str, Any]:
+    def build_document_graph(self, regulation_id: uuid.UUID) -> Dict[str, Any]:
         """
-        Build graph for a single document.
+        Build graph for a single regulation.
         
         Args:
-            document_id: Document UUID
+            regulation_id: Regulation UUID
             
         Returns:
             Statistics about graph construction
         """
-        logger.info(f"Building graph for document {document_id}")
+        logger.info(f"Building graph for regulation {regulation_id}")
         
-        # Fetch document from database
-        document = self.db.query(Document).filter_by(id=document_id).first()
-        if not document:
-            raise ValueError(f"Document {document_id} not found")
+        # Fetch regulation from database
+        regulation = self.db.query(Regulation).filter_by(id=regulation_id).first()
+        if not regulation:
+            raise ValueError(f"Regulation {regulation_id} not found")
         
         try:
-            # Create legislation/regulation node
-            node_type = self._get_node_type(document.document_type)
-            doc_node = self._create_document_node(document, node_type)
+            # Create regulation node (all regulations are labeled as "Regulation" in Neo4j)
+            reg_node = self._create_regulation_node(regulation)
             
             # Create section nodes and relationships
-            section_nodes = self._create_section_nodes(document)
+            section_nodes = self._create_section_nodes(regulation)
             
-            # Create hierarchy relationships (PART_OF)
-            self._create_hierarchy_relationships(document)
-            
-            # Create cross-reference relationships
-            self._create_cross_reference_relationships(document)
+            # Create cross-reference relationships (REFERENCES)
+            self._create_cross_reference_relationships(regulation)
             
             # Extract and create entities (Programs, Situations)
-            self._extract_and_create_entities(document)
+            self._extract_and_create_entities(regulation)
             
-            logger.info(f"Graph built successfully for {document.title}")
+            # Create inter-document relationships (ENACTED_UNDER, INTERPRETS)
+            self._create_parent_act_relationship(regulation)
+            self._create_policy_interpretation_relationship(regulation)
+            
+            logger.info(f"Graph built successfully for {regulation.title}")
             return self.stats
             
         except Exception as e:
-            logger.error(f"Error building graph for document {document_id}: {e}")
+            logger.error(f"Error building graph for regulation {regulation_id}: {e}")
             self.stats["errors"].append(str(e))
             raise
     
-    def _get_node_type(self, document_type: DocumentType) -> str:
-        """Map document type to Neo4j node label."""
-        mapping = {
-            DocumentType.LEGISLATION: "Legislation",
-            DocumentType.REGULATION: "Regulation",
-            DocumentType.POLICY: "Policy",
-            DocumentType.GUIDELINE: "Policy",
-            DocumentType.DIRECTIVE: "Policy"
-        }
-        return mapping.get(document_type, "Document")
-    
-    def _create_document_node(self, document: Document, node_type: str) -> Dict[str, Any]:
+    def _create_regulation_node(self, regulation: Regulation) -> Dict[str, Any]:
         """
-        Create a Legislation/Regulation/Policy node in Neo4j.
+        Create a Legislation or Regulation node in Neo4j based on title.
         
         Args:
-            document: Document model instance
-            node_type: Neo4j node label
+            regulation: Regulation model instance
             
         Returns:
             Created node data
         """
+        # Determine node label and type based on title
+        # Acts/Lois = Legislation, everything else = Regulation
+        node_label = self._determine_node_label(regulation.title)
+        
         properties = {
-            "id": str(document.id),
-            "title": document.title,
-            "jurisdiction": document.jurisdiction,
-            "authority": document.authority,
-            "status": document.status.value,
+            "id": str(regulation.id),
+            "title": regulation.title,
+            "jurisdiction": regulation.jurisdiction,
+            "authority": regulation.authority if regulation.authority else "Unknown",
+            "status": regulation.status,
+            "language": regulation.language,
+            "node_type": node_label,  # Add node_type property
             "created_at": datetime.utcnow().isoformat()
         }
         
         # Add optional properties
-        if document.document_number:
-            properties["act_number"] = document.document_number
-        if document.effective_date:
-            properties["effective_date"] = document.effective_date.isoformat()
-        if document.full_text and len(document.full_text) < 1000000:  # Limit size
-            properties["full_text"] = document.full_text
-        if document.document_metadata:
-            properties["metadata"] = document.document_metadata
+        if regulation.effective_date:
+            properties["effective_date"] = regulation.effective_date.isoformat()
+        if regulation.full_text and len(regulation.full_text) < 1000000:  # Limit size
+            properties["full_text"] = regulation.full_text
+        if regulation.extra_metadata:
+            properties["metadata"] = regulation.extra_metadata
         
         # Create node
-        node = self.neo4j.create_node(node_type, properties)
+        node = self.neo4j.create_node(node_label, properties)
         self.stats["nodes_created"] += 1
         
-        logger.info(f"Created {node_type} node: {document.title}")
+        logger.info(f"Created {node_label} node: {regulation.title}")
         return node
     
-    def _create_section_nodes(self, document: Document) -> List[Dict[str, Any]]:
+    def _determine_node_label(self, title: str) -> str:
         """
-        Create Section nodes for all sections in a document.
+        Determine if regulation should be labeled as Legislation, Regulation, or Policy.
         
         Args:
-            document: Document model instance
+            title: Regulation title
+            
+        Returns:
+            'Legislation' for Acts/Lois, 'Policy' for policies/guidelines/directives, otherwise 'Regulation'
+        """
+        title_lower = title.lower()
+        
+        # Policy documents - check specific patterns first
+        if 'order issuing' in title_lower:
+            return 'Policy'
+        if 'ministerial order' in title_lower:
+            return 'Policy'
+        if title_lower.endswith('guidelines') or title_lower.endswith('guideline'):
+            return 'Policy'
+        if title_lower.endswith('directive') or title_lower.endswith('directives'):
+            return 'Policy'
+        if 'policy' in title_lower and 'act' not in title_lower:
+            return 'Policy'
+        if 'proclamation' in title_lower:
+            return 'Policy'
+        
+        # Acts and Lois (French for laws) are considered Legislation
+        if ' act' in title_lower or title_lower.startswith('act ') or title_lower.endswith(' act'):
+            return 'Legislation'
+        if ' loi' in title_lower or title_lower.startswith('loi ') or title_lower.endswith(' loi'):
+            return 'Legislation'
+        
+        # Everything else is a Regulation (rules, regulations, etc.)
+        return 'Regulation'
+    
+    def _create_section_nodes(self, regulation: Regulation) -> List[Dict[str, Any]]:
+        """
+        Create Section nodes for all sections in a regulation.
+        
+        Args:
+            regulation: Regulation model instance
             
         Returns:
             List of created section nodes
         """
         section_nodes = []
         
-        for section in document.sections:
+        for idx, section in enumerate(regulation.sections):
             properties = {
                 "id": str(section.id),
                 "section_number": section.section_number,
-                "content": section.content,
-                "level": section.level,
+                "content": section.content if section.content else "",
+                "level": 0,  # Can be enhanced later
                 "created_at": datetime.utcnow().isoformat()
             }
             
             # Add optional properties
-            if section.section_title:
-                properties["title"] = section.section_title
-            if section.document_metadata:
-                properties["metadata"] = section.document_metadata
+            if section.title:
+                properties["title"] = section.title
+            if section.extra_metadata:
+                properties["metadata"] = section.extra_metadata
+            
+            # Add citation property for easier reference
+            properties["citation"] = f"{regulation.title[:50]} Section {section.section_number}"
             
             # Create Section node
             node = self.neo4j.create_node("Section", properties)
@@ -210,9 +234,9 @@ class GraphBuilder:
             
             # Create HAS_SECTION relationship
             self._create_has_section_relationship(
-                document.id,
+                regulation.id,
                 section.id,
-                section.order_index
+                idx
             )
         
         logger.info(f"Created {len(section_nodes)} Section nodes")
@@ -225,8 +249,9 @@ class GraphBuilder:
         order: int
     ):
         """Create HAS_SECTION relationship between document and section."""
+        # Match any node type (Legislation, Regulation, Policy) with the document_id
         query = """
-        MATCH (d {id: $doc_id})
+        MATCH (d) WHERE d.id = $doc_id
         MATCH (s:Section {id: $sec_id})
         MERGE (d)-[r:HAS_SECTION]->(s)
         SET r.order = $order
@@ -244,131 +269,107 @@ class GraphBuilder:
         )
         self.stats["relationships_created"] += 1
     
-    def _create_hierarchy_relationships(self, document: Document):
+    def _create_cross_reference_relationships(self, regulation: Regulation):
         """
-        Create PART_OF relationships for section hierarchy.
+        Create REFERENCES relationships between sections based on citations.
         
         Args:
-            document: Document model instance
+            regulation: Regulation model instance
         """
-        for section in document.sections:
-            if section.parent_section_id:
-                query = """
-                MATCH (child:Section {id: $child_id})
-                MATCH (parent:Section {id: $parent_id})
-                MERGE (child)-[r:PART_OF]->(parent)
-                SET r.order = $order
-                SET r.created_at = datetime()
-                RETURN r
-                """
-                
-                self.neo4j.execute_write(
-                    query,
-                    {
-                        "child_id": str(section.id),
-                        "parent_id": str(section.parent_section_id),
-                        "order": section.order_index
-                    }
-                )
-                self.stats["relationships_created"] += 1
+        for section in regulation.sections:
+            # Use the Section model's citations relationship
+            for citation in section.citations:
+                if citation.cited_section_id:
+                    query = """
+                    MATCH (s1:Section {id: $from_id})
+                    MATCH (s2:Section {id: $to_id})
+                    MERGE (s1)-[r:REFERENCES]->(s2)
+                    SET r.citation_text = $citation_text
+                    SET r.created_at = datetime()
+                    RETURN r
+                    """
+                    
+                    self.neo4j.execute_write(
+                        query,
+                        {
+                            "from_id": str(section.id),
+                            "to_id": str(citation.cited_section_id),
+                            "citation_text": citation.citation_text or ""
+                        }
+                    )
+                    self.stats["relationships_created"] += 1
     
-    def _create_cross_reference_relationships(self, document: Document):
-        """
-        Create REFERENCES relationships from cross-references.
-        
-        Args:
-            document: Document model instance
-        """
-        for ref in document.cross_references:
-            if not ref.target_section_id:
-                continue
-            
-            query = """
-            MATCH (source:Section {id: $source_id})
-            MATCH (target:Section {id: $target_id})
-            MERGE (source)-[r:REFERENCES]->(target)
-            SET r.citation_text = $citation
-            SET r.context = $context
-            SET r.created_at = datetime()
-            RETURN r
-            """
-            
-            self.neo4j.execute_write(
-                query,
-                {
-                    "source_id": str(ref.source_section_id),
-                    "target_id": str(ref.target_section_id),
-                    "citation": ref.citation_text or "",
-                    "context": ref.context or ""
-                }
-            )
-            self.stats["relationships_created"] += 1
-    
-    def _extract_and_create_entities(self, document: Document):
+    def _extract_and_create_entities(self, regulation: Regulation):
         """
         Extract and create Program and Situation entities.
         
         Args:
-            document: Document model instance
+            regulation: Regulation model instance
         """
         # Extract programs
-        programs = self._extract_programs(document)
+        programs = self._extract_programs(regulation)
         for program in programs:
-            self._create_program_node(program, document)
+            self._create_program_node(program, regulation)
         
         # Extract situations
-        situations = self._extract_situations(document)
+        situations = self._extract_situations(regulation)
         for situation in situations:
-            self._create_situation_node(situation, document)
+            self._create_situation_node(situation, regulation)
     
-    def _extract_programs(self, document: Document) -> List[Dict[str, Any]]:
+    def _extract_programs(self, regulation: Regulation) -> List[Dict[str, Any]]:
         """
-        Extract program mentions from document text.
+        Extract program mentions from regulation title and text.
         
         Args:
-            document: Document model instance
+            regulation: Regulation model instance
             
         Returns:
             List of extracted programs
         """
+        from config.program_mappings import FEDERAL_PROGRAMS
+        
         programs = []
+        title_lower = regulation.title.lower()
         
-        # Program keywords to look for
-        program_patterns = [
-            r"(?i)(employment\s+insurance)\s+(program|benefits?)",
-            r"(?i)(old\s+age\s+security)\s+(program|benefits?)",
-            r"(?i)(canada\s+pension\s+plan)\s+(benefits?|program)?",
-            r"(?i)(workers['']?\s+compensation)\s+(program|benefits?)",
-            r"(?i)(disability\s+benefits?)\s+program",
-            r"(?i)(parental\s+benefits?)\s+program",
-            r"(?i)(maternity\s+benefits?)\s+program",
-            r"(?i)(sickness\s+benefits?)\s+program",
-        ]
-        
-        text = document.full_text or ""
-        
-        for pattern in program_patterns:
-            matches = re.finditer(pattern, text)
-            for match in matches:
-                program_name = match.group(0).strip()
+        # Check title and text for each known program
+        for program_key, program_config in FEDERAL_PROGRAMS.items():
+            found = False
+            
+            # Check keywords in title (most reliable)
+            for keyword in program_config.get('keywords', []):
+                if keyword.lower() in title_lower:
+                    found = True
+                    break
+            
+            # Check patterns in title
+            if not found:
+                for pattern in program_config.get('patterns', []):
+                    if re.search(pattern, regulation.title, re.IGNORECASE):
+                        found = True
+                        break
+            
+            if found:
+                # Convert program_key to readable name
+                program_name = program_key.replace('_', ' ').title()
                 
                 # Avoid duplicates
                 if not any(p["name"] == program_name for p in programs):
                     programs.append({
                         "name": program_name,
-                        "department": document.authority,
-                        "description": f"Program mentioned in {document.title}",
-                        "source_document_id": str(document.id)
+                        "program_key": program_key,
+                        "department": regulation.authority,
+                        "description": f"Program related to {regulation.title}",
+                        "source_regulation_id": str(regulation.id)
                     })
         
-        return programs[:10]  # Limit to 10 programs per document
+        return programs
     
-    def _extract_situations(self, document: Document) -> List[Dict[str, Any]]:
+    def _extract_situations(self, regulation: Regulation) -> List[Dict[str, Any]]:
         """
-        Extract applicable situations from document text.
+        Extract applicable situations from regulation text.
         
         Args:
-            document: Document model instance
+            regulation: Regulation model instance
             
         Returns:
             List of extracted situations
@@ -383,9 +384,9 @@ class GraphBuilder:
             r"(?i)when\s+(?:a|an|the)\s+([^.]{10,100})",
         ]
         
-        text = document.full_text or ""
+        text = regulation.full_text or ""
         
-        for section in document.sections[:20]:  # Limit to first 20 sections
+        for section in regulation.sections[:20]:  # Limit to first 20 sections
             for pattern in situation_patterns:
                 matches = re.finditer(pattern, section.content)
                 for match in matches:
@@ -425,7 +426,7 @@ class GraphBuilder:
         
         return tags
     
-    def _create_program_node(self, program: Dict[str, Any], document: Document):
+    def _create_program_node(self, program: Dict[str, Any], regulation: Regulation):
         """Create Program node and relationships."""
         program_id = str(uuid.uuid4())
         
@@ -441,9 +442,9 @@ class GraphBuilder:
         self.neo4j.create_node("Program", properties)
         self.stats["nodes_created"] += 1
         
-        # Create APPLIES_TO relationship from document to program
+        # Create APPLIES_TO relationship from regulation to program
         query = """
-        MATCH (d {id: $doc_id})
+        MATCH (d) WHERE d.id = $doc_id
         MATCH (p:Program {id: $prog_id})
         MERGE (d)-[r:APPLIES_TO]->(p)
         SET r.created_at = datetime()
@@ -453,13 +454,13 @@ class GraphBuilder:
         self.neo4j.execute_write(
             query,
             {
-                "doc_id": str(document.id),
+                "doc_id": str(regulation.id),
                 "prog_id": program_id
             }
         )
         self.stats["relationships_created"] += 1
     
-    def _create_situation_node(self, situation: Dict[str, Any], document: Document):
+    def _create_situation_node(self, situation: Dict[str, Any], regulation: Regulation):
         """Create Situation node and relationships."""
         situation_id = str(uuid.uuid4())
         
@@ -494,27 +495,296 @@ class GraphBuilder:
             )
             self.stats["relationships_created"] += 1
     
-    def build_all_documents(self, limit: Optional[int] = None) -> Dict[str, Any]:
+    def _create_parent_act_relationship(self, regulation: Regulation):
         """
-        Build graphs for all processed documents.
+        Create ENACTED_UNDER relationship from Regulation to its parent Act.
         
         Args:
-            limit: Maximum number of documents to process
+            regulation: Regulation model instance
+        """
+        # Only process regulations (not Acts)
+        node_label = self._determine_node_label(regulation.title)
+        if node_label != 'Regulation':
+            return
+        
+        # Extract parent Act name from title
+        parent_act_name = self._extract_parent_act_name(regulation.title)
+        
+        if not parent_act_name:
+            return
+        
+        # Try to find matching Act in Neo4j
+        query = """
+        MATCH (r:Regulation {id: $reg_id})
+        MATCH (a:Regulation)
+        WHERE a.node_type = 'Legislation'
+        AND (
+            toLower(a.title) = toLower($parent_name)
+            OR toLower(a.title) CONTAINS toLower($parent_base)
+        )
+        WITH r, a
+        LIMIT 1
+        MERGE (r)-[:ENACTED_UNDER]->(a)
+        RETURN a.title as act_title
+        """
+        
+        # Remove "Act" for fuzzy matching
+        parent_base = parent_act_name.replace(' Act', '').replace(' Loi', '').strip()
+        
+        result = self.neo4j.execute_write(
+            query,
+            {
+                "reg_id": str(regulation.id),
+                "parent_name": parent_act_name,
+                "parent_base": parent_base
+            }
+        )
+        
+        if result:
+            logger.info(f"Linked {regulation.title} → {result[0]['act_title']}")
+            self.stats["relationships_created"] += 1
+    
+    def _create_policy_interpretation_relationship(self, regulation: Regulation):
+        """
+        Create INTERPRETS relationship from Policy to Legislation it interprets.
+        
+        Args:
+            regulation: Regulation model instance
+        """
+        # Only process policies
+        node_label = self._determine_node_label(regulation.title)
+        if node_label != 'Policy':
+            return
+        
+        # Extract the Act/Legislation that this policy interprets
+        interpreted_act = self._extract_interpreted_legislation(regulation.title, regulation.full_text)
+        
+        if not interpreted_act:
+            return
+        
+        # Try to find matching Legislation in Neo4j
+        query = """
+        MATCH (p:Policy {id: $policy_id})
+        MATCH (l:Regulation)
+        WHERE l.node_type = 'Legislation'
+        AND (
+            toLower(l.title) = toLower($act_name)
+            OR toLower(l.title) CONTAINS toLower($act_base)
+        )
+        WITH p, l
+        LIMIT 1
+        MERGE (p)-[:INTERPRETS]->(l)
+        RETURN l.title as act_title
+        """
+        
+        # Remove "Act" for fuzzy matching
+        act_base = interpreted_act.replace(' Act', '').replace(' Loi', '').strip()
+        
+        result = self.neo4j.execute_write(
+            query,
+            {
+                "policy_id": str(regulation.id),
+                "act_name": interpreted_act,
+                "act_base": act_base
+            }
+        )
+        
+        if result:
+            logger.info(f"Policy INTERPRETS: {regulation.title} → {result[0]['act_title']}")
+            self.stats["relationships_created"] += 1
+    
+    def _extract_interpreted_legislation(self, title: str, full_text: str) -> str:
+        """
+        Extract the name of the Act/Legislation that a policy interprets.
+        
+        Args:
+            title: Policy title
+            full_text: Full text of the policy
+            
+        Returns:
+            Name of the interpreted Act, or empty string
+        """
+        # Manual mappings for known policies
+        known_mappings = {
+            'Federal Child Support Guidelines': 'Divorce Act',
+            'Order Issuing a Direction to the CRTC on a Renewed Approach to Telecommunications Policy': 'Telecommunications Act',
+        }
+        
+        if title in known_mappings:
+            return known_mappings[title]
+        
+        # Try to find Act/Loi references in the title first
+        # Example: "Order Issuing a Direction to the CRTC on Telecommunications Policy" -> "Telecommunications Act"
+        
+        # Pattern 1: "Guidelines" or "Policy" followed by "under the X Act"
+        match = re.search(r'under the ([^,\\.]+Act)', title, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        
+        # Pattern 2: "X Act Regulations/Guidelines/Policy"
+        match = re.search(r'^(.+Act)\\s+(Guidelines?|Policy|Directive)', title, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        
+        # Pattern 3: Look for common Act references in the text
+        if full_text:
+            # Find first mention of an Act in the text (first 2000 chars)
+            text_sample = full_text[:2000] if len(full_text) > 2000 else full_text
+            act_mentions = re.findall(r'([A-Z][\\w\\s]+Act)', text_sample)
+            if act_mentions:
+                # Return the most common Act mention
+                from collections import Counter
+                most_common = Counter(act_mentions).most_common(1)
+                if most_common:
+                    return most_common[0][0].strip()
+        
+        return ""
+    
+    def _extract_parent_act_name(self, regulation_title: str) -> str:
+        """
+        Extract the parent Act name from a regulation title.
+        
+        Examples:
+        - "Employment Insurance (Fishing) Regulations" → "Employment Insurance Act"
+        - "Canada Pension Plan Regulations" → "Canada Pension Plan"
+        
+        Args:
+            regulation_title: Title of the regulation
+            
+        Returns:
+            Likely parent Act name or empty string
+        """
+        title_lower = regulation_title.lower()
+        
+        # Remove common regulation suffixes
+        patterns = [
+            r'\s+regulations?$',
+            r'\s+\(.*?\)\s+regulations?$',
+            r'\s+rules?$',
+            r'\s+\(.*?\)\s+rules?$',
+            r'\s+order$',
+            r'\s+\(.*?\)\s+order$',
+        ]
+        
+        base_name = regulation_title
+        for pattern in patterns:
+            base_name = re.sub(pattern, '', base_name, flags=re.IGNORECASE)
+        
+        # If it doesn't end with "Act" or "Loi", add "Act"
+        if not base_name.lower().endswith('act') and not base_name.lower().endswith('loi'):
+            if 'act' not in title_lower and 'loi' not in title_lower:
+                return f"{base_name.strip()} Act"
+        
+        return base_name.strip()
+    
+    def _create_policy_interpretation_relationship(self, regulation: Regulation):
+        """
+        Create INTERPRETS relationship from Policy to Legislation it interprets.
+        
+        Args:
+            regulation: Regulation model instance
+        """
+        # Only process policies
+        node_label = self._determine_node_label(regulation.title)
+        if node_label != 'Policy':
+            return
+        
+        # Extract the Act/Legislation that this policy interprets
+        interpreted_act = self._extract_interpreted_legislation(regulation.title, regulation.full_text)
+        
+        if not interpreted_act:
+            return
+        
+        # Try to find matching Legislation in Neo4j
+        query = """
+        MATCH (p:Policy {id: $policy_id})
+        MATCH (l:Regulation)
+        WHERE l.node_type = 'Legislation'
+        AND (
+            toLower(l.title) = toLower($act_name)
+            OR toLower(l.title) CONTAINS toLower($act_base)
+        )
+        WITH p, l
+        LIMIT 1
+        MERGE (p)-[:INTERPRETS]->(l)
+        RETURN l.title as act_title
+        """
+        
+        # Remove "Act" for fuzzy matching
+        act_base = interpreted_act.replace(' Act', '').replace(' Loi', '').strip()
+        
+        result = self.neo4j.execute_write(
+            query,
+            {
+                "policy_id": str(regulation.id),
+                "act_name": interpreted_act,
+                "act_base": act_base
+            }
+        )
+        
+        if result:
+            logger.info(f"Policy INTERPRETS: {regulation.title} → {result[0]['act_title']}")
+            self.stats["relationships_created"] += 1
+    
+    def _extract_interpreted_legislation(self, title: str, full_text: str) -> str:
+        """
+        Extract the name of the Act/Legislation that a policy interprets.
+        
+        Args:
+            title: Policy title
+            full_text: Full text of the policy
+            
+        Returns:
+            Name of the interpreted Act, or empty string
+        """
+        # Try to find Act/Loi references in the title first
+        # Example: "Order Issuing a Direction to the CRTC on Telecommunications Policy" -> "Telecommunications Act"
+        
+        # Pattern 1: "Guidelines" or "Policy" followed by "under the X Act"
+        match = re.search(r'under the ([^,\.]+Act)', title, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        
+        # Pattern 2: "X Act Regulations/Guidelines/Policy"
+        match = re.search(r'^(.+Act)\s+(Guidelines?|Policy|Directive)', title, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+        
+        # Pattern 3: Look for common Act references in the text
+        if full_text:
+            # Find first mention of an Act in the text (first 2000 chars)
+            text_sample = full_text[:2000] if len(full_text) > 2000 else full_text
+            act_mentions = re.findall(r'([A-Z][\w\s]+Act)', text_sample)
+            if act_mentions:
+                # Return the most common Act mention
+                from collections import Counter
+                most_common = Counter(act_mentions).most_common(1)
+                if most_common:
+                    return most_common[0][0].strip()
+        
+        return ""
+    
+    def build_all_documents(self, limit: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Build graphs for all processed regulations.
+        
+        Args:
+            limit: Maximum number of regulations to process
             
         Returns:
             Overall statistics
         """
-        query = self.db.query(Document).filter_by(is_processed=True)
+        query = self.db.query(Regulation)
         
         if limit:
             query = query.limit(limit)
         
-        documents = query.all()
+        regulations = query.all()
         
-        logger.info(f"Building graphs for {len(documents)} documents")
+        logger.info(f"Building graphs for {len(regulations)} regulations")
         
         overall_stats = {
-            "total_documents": len(documents),
+            "total_regulations": len(regulations),
             "successful": 0,
             "failed": 0,
             "total_nodes": 0,
@@ -522,7 +792,7 @@ class GraphBuilder:
             "errors": []
         }
         
-        for doc in documents:
+        for reg in regulations:
             try:
                 self.stats = {
                     "nodes_created": 0,
@@ -530,18 +800,18 @@ class GraphBuilder:
                     "errors": []
                 }
                 
-                self.build_document_graph(doc.id)
+                self.build_document_graph(reg.id)
                 
                 overall_stats["successful"] += 1
                 overall_stats["total_nodes"] += self.stats["nodes_created"]
                 overall_stats["total_relationships"] += self.stats["relationships_created"]
                 
             except Exception as e:
-                logger.error(f"Failed to build graph for {doc.title}: {e}")
+                logger.error(f"Failed to build graph for {reg.title}: {e}")
                 overall_stats["failed"] += 1
                 overall_stats["errors"].append({
-                    "document_id": str(doc.id),
-                    "title": doc.title,
+                    "regulation_id": str(reg.id),
+                    "title": reg.title,
                     "error": str(e)
                 })
         
@@ -554,37 +824,48 @@ class GraphBuilder:
         """
         logger.info("Creating inter-document relationships")
         
-        # Find regulations that implement legislation
+        # Link regulations that implement legislation
         self._link_regulations_to_legislation()
         
-        # Find policies that interpret legislation
-        self._link_policies_to_legislation()
-        
-        # Create SUPERSEDES relationships
+        # Create supersedes relationships from amendment history
         self._create_supersedes_relationships()
+        
+        logger.info("Inter-document relationships complete")
     
     def _link_regulations_to_legislation(self):
         """Link Regulation nodes to Legislation nodes they implement."""
-        # Get all regulations
-        regulations = self.db.query(Document).filter_by(
-            document_type=DocumentType.REGULATION
-        ).all()
+        logger.info("Linking Regulations to Legislation...")
         
+        # Get all regulations from Neo4j (those without 'Act' or 'Loi' in title)
+        # These should have been labeled as 'Regulation' during creation
+        regulations_query = """
+        MATCH (r:Regulation)
+        RETURN r.id as id, r.title as title
+        """
+        
+        regulations = self.neo4j.execute_query(regulations_query)
+        
+        linked_count = 0
         for reg in regulations:
-            # Search for legislation mentions in regulation title/text
-            keywords = self._extract_legislation_keywords(reg.title)
+            # Search for legislation mentions in regulation title
+            keywords = self._extract_legislation_keywords(reg["title"])
             
             for keyword in keywords:
-                # Find matching legislation
-                legislation = self.db.query(Document).filter(
-                    and_(
-                        Document.document_type == DocumentType.LEGISLATION,
-                        Document.title.ilike(f"%{keyword}%")
-                    )
-                ).first()
+                # Find matching legislation in Neo4j
+                query = """
+                MATCH (l:Legislation)
+                WHERE l.title CONTAINS $keyword
+                RETURN l.id as id, l.title as title
+                LIMIT 1
+                """
                 
-                if legislation:
-                    query = """
+                matches = self.neo4j.execute_query(query, {"keyword": keyword})
+                
+                if matches:
+                    legislation = matches[0]
+                    
+                    # Create IMPLEMENTS relationship
+                    link_query = """
                     MATCH (r:Regulation {id: $reg_id})
                     MATCH (l:Legislation {id: $leg_id})
                     MERGE (r)-[rel:IMPLEMENTS]->(l)
@@ -594,97 +875,104 @@ class GraphBuilder:
                     """
                     
                     self.neo4j.execute_write(
-                        query,
+                        link_query,
                         {
-                            "reg_id": str(reg.id),
-                            "leg_id": str(legislation.id),
-                            "description": f"Implements provisions of {legislation.title}"
+                            "reg_id": reg["id"],
+                            "leg_id": legislation["id"],
+                            "description": f"Implements provisions of {legislation['title']}"
                         }
                     )
                     
-                    logger.info(f"Linked {reg.title} to {legislation.title}")
-    
-    def _link_policies_to_legislation(self):
-        """Link Policy nodes to Legislation nodes they interpret."""
-        policies = self.db.query(Document).filter_by(
-            document_type=DocumentType.POLICY
-        ).all()
+                    linked_count += 1
+                    logger.info(f"Linked {reg['title'][:60]} to {legislation['title'][:60]}")
+                    break  # Only link to first matching legislation
         
-        for policy in policies:
-            keywords = self._extract_legislation_keywords(policy.title)
-            
-            for keyword in keywords:
-                legislation = self.db.query(Document).filter(
-                    and_(
-                        Document.document_type == DocumentType.LEGISLATION,
-                        Document.title.ilike(f"%{keyword}%")
-                    )
-                ).first()
-                
-                if legislation:
-                    query = """
-                    MATCH (p:Policy {id: $pol_id})
-                    MATCH (l:Legislation {id: $leg_id})
-                    MERGE (p)-[rel:INTERPRETS]->(l)
-                    SET rel.created_at = datetime()
-                    RETURN rel
-                    """
-                    
-                    self.neo4j.execute_write(
-                        query,
-                        {
-                            "pol_id": str(policy.id),
-                            "leg_id": str(legislation.id)
-                        }
-                    )
+        logger.info(f"Created {linked_count} IMPLEMENTS relationships")
     
     def _create_supersedes_relationships(self):
-        """Create SUPERSEDES relationships for updated legislation."""
-        # This would require metadata about which legislation supersedes which
-        # For now, we'll use a simple date-based heuristic
+        """
+        Create SUPERSEDES relationships based on amendment history.
+        Uses the amendments table to find which Acts supersede others.
+        """
+        logger.info("Creating SUPERSEDES relationships from amendment history...")
         
-        documents = self.db.query(Document).filter_by(
-            document_type=DocumentType.LEGISLATION
-        ).order_by(Document.effective_date).all()
+        from models import Amendment
         
-        # Group by similar titles
-        title_groups = {}
-        for doc in documents:
-            base_title = self._get_base_title(doc.title)
-            if base_title not in title_groups:
-                title_groups[base_title] = []
-            title_groups[base_title].append(doc)
+        # Get all amendments from database
+        amendments = self.db.query(Amendment).all()
         
-        # Create SUPERSEDES relationships for same-titled documents
-        for base_title, docs in title_groups.items():
-            if len(docs) > 1:
-                # Sort by effective date
-                sorted_docs = sorted(
-                    [d for d in docs if d.effective_date],
-                    key=lambda x: x.effective_date
-                )
-                
-                for i in range(len(sorted_docs) - 1):
-                    older = sorted_docs[i]
-                    newer = sorted_docs[i + 1]
+        supersedes_count = 0
+        
+        for amendment in amendments:
+            # Get the regulation this amendment belongs to
+            source_reg = self.db.query(Regulation).filter_by(id=amendment.regulation_id).first()
+            if not source_reg:
+                continue
+            
+            # Extract bill number or citation from amendment metadata
+            bill_info = amendment.extra_metadata.get('bill_number') if amendment.extra_metadata else None
+            if not bill_info:
+                continue
+            
+            # Try to find the superseding legislation by bill number in title
+            # Format: "2023, c. 29" or "S.C. 2023, c. 29"
+            # Parse to find Act with this chapter
+            if ', c. ' in bill_info:
+                # Extract year and chapter
+                import re
+                match = re.search(r'(\d{4}).*c\.\s*(\d+)', bill_info)
+                if match:
+                    year = match.group(1)
+                    chapter_num = match.group(2)
                     
+                    # Search for Act with this chapter reference
                     query = """
-                    MATCH (new:Legislation {id: $new_id})
-                    MATCH (old:Legislation {id: $old_id})
-                    MERGE (new)-[rel:SUPERSEDES]->(old)
-                    SET rel.effective_date = $effective_date
-                    SET rel.created_at = datetime()
-                    RETURN rel
+                    MATCH (newer:Legislation)
+                    WHERE newer.title CONTAINS $year 
+                       OR newer.id IN (
+                           SELECT r.id FROM regulations r 
+                           WHERE r.extra_metadata->>'chapter' LIKE $pattern
+                       )
+                    RETURN newer.id as id, newer.title as title
+                    LIMIT 1
                     """
                     
-                    self.neo4j.execute_write(
-                        query,
-                        {
-                            "new_id": str(newer.id),
-                            "old_id": str(older.id),
-                            "effective_date": newer.effective_date.isoformat()
-                        }
-                    )
+                    # Try to find matching legislation in Neo4j
+                    # Use source regulation's node
+                    source_node_query = """
+                    MATCH (n)
+                    WHERE n.id = $reg_id
+                    RETURN n.id as id, n.title as title, labels(n) as labels
+                    """
+                    
+                    source_nodes = self.neo4j.execute_query(source_node_query, {"reg_id": str(source_reg.id)})
+                    
+                    if source_nodes:
+                        source_node = source_nodes[0]
+                        
+                        # Create SUPERSEDES relationship if we can identify the amending act
+                        # For now, create self-reference with amendment info
+                        # This tracks that the Act was amended/superseded
+                        link_query = """
+                        MATCH (source {id: $source_id})
+                        SET source.last_amended = $amendment_date
+                        SET source.amendment_info = $bill_info
+                        RETURN source
+                        """
+                        
+                        self.neo4j.execute_write(
+                            link_query,
+                            {
+                                "source_id": str(source_reg.id),
+                                "amendment_date": amendment.effective_date.isoformat() if amendment.effective_date else None,
+                                "bill_info": bill_info
+                            }
+                        )
+                        
+                        supersedes_count += 1
+        
+        logger.info(f"Processed {supersedes_count} amendment relationships")
+        logger.info("Note: Full SUPERSEDES implementation requires matching bill numbers to actual Acts")
     
     def _extract_legislation_keywords(self, title: str) -> List[str]:
         """Extract key legislation names from text."""
@@ -745,6 +1033,7 @@ class GraphBuilder:
             # Create Regulation node
             reg_properties = {
                 "id": str(regulation.id),
+                "name": regulation.title,  # Add name property for better Neo4j visualization
                 "title": regulation.title,
                 "jurisdiction": regulation.jurisdiction,
                 "authority": regulation.authority or "",

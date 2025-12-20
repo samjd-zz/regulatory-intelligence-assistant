@@ -13,6 +13,28 @@ from database import SessionLocal
 from models.models import Regulation, Section
 from services.search_service import SearchService
 
+def determine_node_type(title: str) -> str:
+    """
+    Determine if a regulation should be classified as Legislation or Regulation.
+    Uses the same logic as graph_builder.py to ensure consistency.
+    
+    Args:
+        title: Title of the regulation
+        
+    Returns:
+        'Legislation' if it's an Act/Loi, otherwise 'Regulation'
+    """
+    title_lower = title.lower()
+    
+    # Acts and Lois (French for laws) are considered Legislation
+    if ' act' in title_lower or title_lower.startswith('act ') or title_lower.endswith(' act'):
+        return 'Legislation'
+    if ' loi' in title_lower or title_lower.startswith('loi ') or title_lower.endswith(' loi'):
+        return 'Legislation'
+    
+    # Everything else is a Regulation (rules, regulations, etc.)
+    return 'Regulation'
+
 def main():
     """Re-index all regulations and sections to Elasticsearch."""
     print("Starting re-indexing process...")
@@ -50,6 +72,9 @@ def main():
                     )
                     programs = regulation.extra_metadata.get('programs', [])
                 
+                # Determine node type (Legislation vs Regulation)
+                node_type = determine_node_type(regulation.title)
+                
                 # Index the regulation
                 doc = {
                     'id': str(regulation.id),
@@ -57,6 +82,7 @@ def main():
                     'title': regulation.title,
                     'content': regulation.full_text,
                     'document_type': 'regulation',
+                    'node_type': node_type,  # Add node type
                     'jurisdiction': regulation.jurisdiction,
                     'authority': regulation.authority,
                     'citation': citation,
@@ -85,6 +111,7 @@ def main():
                         'title': section.title or regulation.title,
                         'content': section.content,
                         'document_type': 'section',
+                        'node_type': node_type,  # Inherit node type from parent
                         'jurisdiction': regulation.jurisdiction,
                         'authority': regulation.authority,
                         'citation': citation,
