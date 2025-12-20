@@ -137,7 +137,7 @@ done
 # Get total node count
 TOTAL_NODES=$(docker exec $NEO4J_CONTAINER cypher-shell -u neo4j -p "$NEO4J_PASS" "
 MATCH (n) RETURN count(n) as total;
-" 2>/dev/null | grep -E '^[0-9]+$' || echo "0")
+" 2>/dev/null | tail -n 1 | xargs || echo "0")
 
 echo ""
 echo -e "  ${BOLD}Total Nodes:${NC}       ${GREEN}${TOTAL_NODES}${NC}"
@@ -162,7 +162,7 @@ done
 # Get total relationship count
 TOTAL_RELS=$(docker exec $NEO4J_CONTAINER cypher-shell -u neo4j -p "$NEO4J_PASS" "
 MATCH ()-[r]->() RETURN count(r) as total;
-" 2>/dev/null | grep -E '^[0-9]+$' || echo "0")
+" 2>/dev/null | tail -n 1 | xargs || echo "0")
 
 echo ""
 echo -e "  ${BOLD}Total Relationships:${NC} ${GREEN}${TOTAL_RELS}${NC}"
