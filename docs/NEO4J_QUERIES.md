@@ -6,7 +6,7 @@ Quick reference for exploring the regulatory intelligence database using the Neo
 
 - **URL**: http://localhost:7474/browser/
 - **Username**: `neo4j`
-- **Password**: `your_neo4j_password` (from docker-compose.yml or .env)
+- **Password**: `password123` (default, change in production)
 - **Database**: `neo4j` (default)
 
 ---
@@ -29,6 +29,14 @@ RETURN labels(n) AS node_type, count(*) AS count
 ORDER BY count DESC
 ```
 
+### Show Document Types (Legislation/Regulation/Policy)
+```cypher
+// Count regulations by node_type property
+MATCH (n:Regulation)
+RETURN n.node_type AS document_type, count(*) AS count
+ORDER BY count DESC
+```
+
 ### Show Relationship Types and Counts
 ```cypher
 // Count relationships by type
@@ -37,10 +45,17 @@ RETURN type(r) AS relationship_type, count(*) AS count
 ORDER BY count DESC
 ```
 
-### Show Database Schema
+### Show Database Schema (Visual)
 ```cypher
-// Visualize the schema
+// Visualize the schema (shows virtual nodes with negative IDs)
 CALL db.schema.visualization()
+```
+
+### Show Actual Data Graph
+```cypher
+// View real connected data (not schema)
+MATCH (n)-[r]->(m)
+RETURN n, r, m LIMIT 100
 ```
 
 ### List All Indexes
@@ -51,388 +66,581 @@ SHOW INDEXES
 
 ---
 
-## 🔍 Exploring Regulations
+## 🔍 Exploring Documents (Legislation, Regulations, Policies)
 
-### List All Regulations
+### List All Legislation (Acts/Lois)
 ```cypher
-// Get first 25 regulations with basic info
+// Get first 25 Acts with basic info
 MATCH (r:Regulation)
-RETURN r.regulation_id, r.title, r.effective_date, r.jurisdiction
-ORDER BY r.title
+WHERE r.node_type = 'Legislation'
+RETURN r.name, r.jurisdiction, r.effective_date, r.language
+ORDER BY r.name
 LIMIT 25
 ```
 
-### Find Regulations by Keyword
+### List All Regulations (SOR/DORS)
 ```cypher
-// Search regulations by title (case-insensitive)
+// Get federal regulations
 MATCH (r:Regulation)
-WHERE toLower(r.title) CONTAINS toLower('privacy')
-RETURN r.regulation_id, r.title, r.jurisdiction, r.effective_date
-ORDER BY r.title
+WHERE r.node_type = 'Regulation'
+RETURN r.name, r.authority, r.effective_date, r.language
+ORDER BY r.name
+LIMIT 25
 ```
 
-### Get Regulation Details
+### List All Policies
 ```cypher
-// Get full details for a specific regulation
-MATCH (r:Regulation {regulation_id: 'PIPEDA'})
-RETURN r
+// Get policies, guidelines, and directives
+MATCH (p:Policy)
+RETURN p.name, p.jurisdiction, p.effective_date
+ORDER BY p.name
 ```
 
-### Regulations by Jurisdiction
+### Find Policy Relationships
 ```cypher
-// Count regulations by jurisdiction
+// Find policies and the legislation they interpret
+MATCH (p:Policy)-[:INTERPRETS]->(l:Regulation)
+WHERE l.node_type = 'Legislation'
+RETURN p.name AS policy,
+       l.name AS legislation,
+       l.jurisdiction
+ORDER BY p.name
+```
+
+### Find Documents by Keyword
+```cypher
+// Search by title (case-insensitive)
 MATCH (r:Regulation)
+WHERE toLower(r.name) CONTAINS toLower('privacy')
+RETURN r.name, r.node_type, r.jurisdiction, r.effective_date
+ORDER BY r.name
+```
+
+### Legislation by Jurisdiction
+```cypher
+// Count Acts by jurisdiction
+MATCH (r:Regulation)
+WHERE r.node_type = 'Legislation'
 RETURN r.jurisdiction, count(*) AS count
 ORDER BY count DESC
 ```
 
-### Recent Regulations
+### Recent Legislation
 ```cypher
-// Find regulations by effective date
+// Find Acts by effective date
 MATCH (r:Regulation)
-WHERE r.effective_date IS NOT NULL
-RETURN r.regulation_id, r.title, r.effective_date, r.jurisdiction
+WHERE r.node_type = 'Legislation' AND r.effective_date IS NOT NULL
+RETURN r.name, r.effective_date, r.jurisdiction, r.language
 ORDER BY r.effective_date DESC
 LIMIT 20
+```
+
+### Find Regulations by Parent Act
+```cypher
+// Find regulations enacted under a specific Act
+MATCH (reg:Regulation)-[:ENACTED_UNDER]->(act:Regulation)
+WHERE act.name CONTAINS 'Canada Labour Code'
+RETURN reg.name AS regulation,
+       act.name AS parent_act
+ORDER BY reg.name
 ```
 
 ---
 
 ## 📄 Exploring Sections
 
-### List Sections for a Regulation
+### List Sections for a Document
 ```cypher
-// Get all sections for a specific regulation
-MATCH (r:Regulation {regulation_id: 'PIPEDA'})-[:HAS_SECTION]->(s:Section)
-RETURN s.section_number, s.title, s.citation
+// Get all sections for a specific Act
+MATCH (r:Regulation)-[:HAS_SECTION]->(s:Section)
+WHERE r.name CONTAINS 'Criminal Code'
+RETURN s.section_number, s.title, substring(s.content, 0, 100) AS preview
 ORDER BY s.section_number
 LIMIT 50
 ```
 
 ### Search Section Content
 ```cypher
-// Full-text search in section content
-CALL db.index.fulltext.queryNodes('section_content_index', 'data breach notification')
-YIELD node, score
-RETURN node.section_number, node.title, node.citation, score
-ORDER BY score DESC
-LIMIT 20
-```
-
-### Search Section Titles
-```cypher
-// Full-text search in section titles
-CALL db.index.fulltext.queryNodes('section_title_index', 'consent')
-YIELD node, score
-MATCH (r:Regulation)-[:HAS_SECTION]->(node)
-RETURN r.regulation_id, node.section_number, node.title, score
-ORDER BY score DESC
-LIMIT 20
-```
-
-### Get Section with Full Content
-```cypher
-// Get complete section details
-MATCH (s:Section {citation: 'PIPEDA Section 4.3'})
-RETURN s.section_number, s.title, s.content, s.citation
-```
-
-### Sections by Keyword in Content
-```cypher
-// Find sections containing specific keywords
+// Search in section content
 MATCH (s:Section)
-WHERE toLower(s.content) CONTAINS toLower('personal information')
+WHERE toLower(s.content) CONTAINS toLower('consent')
 MATCH (r:Regulation)-[:HAS_SECTION]->(s)
-RETURN r.regulation_id, s.section_number, s.title, s.citation
-LIMIT 25
+RETURN r.name AS document,
+       s.section_number,
+       s.title,
+       substring(s.content, 0, 200) + '...' AS preview
+LIMIT 20
 ```
 
----
-
-## 🔗 Relationship Queries
-
-### Show Regulation-Section Structure
-```cypher
-// Visualize regulation and its sections
-MATCH path = (r:Regulation {regulation_id: 'PIPEDA'})-[:HAS_SECTION]->(s:Section)
-RETURN path
-LIMIT 25
-```
-
-### Count Sections per Regulation
-```cypher
-// How many sections does each regulation have?
-MATCH (r:Regulation)-[:HAS_SECTION]->(s:Section)
-RETURN r.regulation_id, r.title, count(s) AS section_count
-ORDER BY section_count DESC
-```
-
-### Find Cross-References
+### Find Cross-References Between Sections
 ```cypher
 // Find sections that reference other sections
-MATCH (s1:Section)-[rel:REFERENCES|CITES]->(s2:Section)
-RETURN s1.citation, type(rel), s2.citation
+MATCH (s1:Section)-[r:REFERENCES]->(s2:Section)
+MATCH (doc1:Regulation)-[:HAS_SECTION]->(s1)
+MATCH (doc2:Regulation)-[:HAS_SECTION]->(s2)
+RETURN doc1.name AS from_document,
+       s1.section_number AS from_section,
+       doc2.name AS to_document,
+       s2.section_number AS to_section
 LIMIT 50
 ```
-
-### Find Related Sections (if similarity relationships exist)
-```cypher
-// Find sections similar to a given section
-MATCH (s1:Section {citation: 'PIPEDA Section 4.3'})-[rel:SIMILAR_TO]->(s2:Section)
-RETURN s1.citation, s2.citation, rel.score
-ORDER BY rel.score DESC
-LIMIT 10
-```
-
----
-
-## 🔎 Advanced Search Queries
-
-### Multi-Term Full-Text Search
-```cypher
-// Search with multiple terms
-CALL db.index.fulltext.queryNodes('section_content_index', 'privacy AND consent AND collection')
-YIELD node, score
-MATCH (r:Regulation)-[:HAS_SECTION]->(node)
-RETURN r.regulation_id, node.section_number, node.title, node.citation, score
-ORDER BY score DESC
-LIMIT 20
-```
-
-### Fuzzy Search (Approximate Matching)
-```cypher
-// Fuzzy search with ~1 character difference
-CALL db.index.fulltext.queryNodes('section_content_index', 'privasy~1')
-YIELD node, score
-RETURN node.citation, node.title, score
-ORDER BY score DESC
-LIMIT 10
-```
-
-### Search Across Multiple Fields
-```cypher
-// Search in both title and content
-CALL db.index.fulltext.queryNodes('section_title_index', 'security breach')
-YIELD node AS title_match, score AS title_score
-WITH collect({node: title_match, score: title_score}) AS title_matches
-
-CALL db.index.fulltext.queryNodes('section_content_index', 'security breach')
-YIELD node AS content_match, score AS content_score
-WITH title_matches, collect({node: content_match, score: content_score}) AS content_matches
-
-UNWIND title_matches + content_matches AS result
-RETURN DISTINCT result.node.citation, result.node.title, result.score
-ORDER BY result.score DESC
-LIMIT 20
-```
-
-### Find Sections with Specific Properties
-```cypher
-// Find sections with certain characteristics
-MATCH (s:Section)
-WHERE s.content IS NOT NULL 
-  AND size(s.content) > 1000
-MATCH (r:Regulation)-[:HAS_SECTION]->(s)
-RETURN r.regulation_id, s.citation, size(s.content) AS content_length
-ORDER BY content_length DESC
-LIMIT 20
-```
-
----
-
-## 📈 Analytics Queries
 
 ### Most Referenced Sections
 ```cypher
 // Find sections with most incoming references
-MATCH (s:Section)<-[r:REFERENCES|CITES]-()
+MATCH (s:Section)<-[r:REFERENCES]-()
 WITH s, count(r) AS ref_count
-WHERE ref_count > 0
-RETURN s.citation, s.title, ref_count
+WHERE ref_count > 5
+MATCH (doc:Regulation)-[:HAS_SECTION]->(s)
+RETURN doc.name,
+       s.section_number,
+       s.title,
+       ref_count
 ORDER BY ref_count DESC
 LIMIT 20
 ```
 
-### Regulation Coverage Analysis
+---
+
+## 🏛️ Programs and Situations
+
+### List All Programs
 ```cypher
-// Analyze data completeness
-MATCH (r:Regulation)
-OPTIONAL MATCH (r)-[:HAS_SECTION]->(s:Section)
-RETURN r.regulation_id,
-       r.title,
-       count(s) AS section_count,
-       count(s.content) AS sections_with_content,
-       round(100.0 * count(s.content) / count(s), 2) AS completeness_pct
-ORDER BY section_count DESC
+// Find all government programs
+MATCH (p:Program)
+RETURN p.name, p.department, p.description
+ORDER BY p.department, p.name
 ```
 
-### Content Size Distribution
+### Find Programs and Their Regulations
 ```cypher
-// Analyze section content sizes
-MATCH (s:Section)
-WHERE s.content IS NOT NULL
-WITH size(s.content) AS content_size
-RETURN 
-  min(content_size) AS min_size,
-  max(content_size) AS max_size,
-  round(avg(content_size)) AS avg_size,
-  percentileCont(content_size, 0.5) AS median_size
+// Find which regulations/Acts apply to specific programs
+MATCH (doc:Regulation)-[:APPLIES_TO]->(p:Program)
+RETURN p.name AS program,
+       p.department,
+       collect(doc.name) AS applicable_regulations
+ORDER BY p.department, p.name
+```
+
+### List All Situations
+```cypher
+// Find all legal situations extracted from regulations
+MATCH (s:Situation)
+RETURN s.description, s.tags
+ORDER BY s.description
+LIMIT 50
+```
+
+### Find Sections Relevant to a Situation
+```cypher
+// Find sections that address specific situations
+MATCH (sec:Section)-[:RELEVANT_FOR]->(sit:Situation)
+MATCH (doc:Regulation)-[:HAS_SECTION]->(sec)
+WHERE toLower(sit.description) CONTAINS 'employment'
+RETURN doc.name AS document,
+       sec.section_number,
+       sit.description AS situation
+LIMIT 25
+```
+
+---
+
+## 🔗 Relationship Exploration
+
+### Visualize Complete Document Structure
+```cypher
+// See document with sections and programs
+MATCH path = (doc:Regulation)-[r]->(target)
+WHERE doc.name CONTAINS 'Criminal Code'
+  AND type(r) IN ['HAS_SECTION', 'APPLIES_TO']
+RETURN path
+LIMIT 50
+```
+
+### View Policy Interpretation Structure
+```cypher
+// See policies and the legislation they interpret
+MATCH path = (p:Policy)-[:INTERPRETS]->(l:Regulation)
+RETURN path
+```
+
+### Count Sections per Document
+```cypher
+// How many sections does each document have?
+MATCH (r:Regulation)-[:HAS_SECTION]->(s:Section)
+RETURN r.name,
+       r.node_type,
+       count(s) AS section_count
+ORDER BY section_count DESC
+LIMIT 30
+```
+
+### Find All Relationship Types for a Document
+```cypher
+// See all relationships connected to a specific document
+MATCH (doc:Regulation)-[r]-(other)
+WHERE doc.name CONTAINS 'Criminal Code'
+RETURN type(r) AS relationship_type,
+       labels(other)[0] AS connected_to_type,
+       count(*) AS count
+ORDER BY count DESC
+```
+
+### Explore Document Hierarchy
+```cypher
+// Find regulations and their parent Acts (if ENACTED_UNDER exists)
+MATCH (reg:Regulation)-[:ENACTED_UNDER]->(act:Regulation)
+WHERE act.node_type = 'Legislation'
+RETURN act.name AS parent_act,
+       reg.name AS child_regulation
+ORDER BY parent_act
+LIMIT 20
+```
+
+### Find Policy Interpretation Chain
+```cypher
+// Trace from Policy to Legislation
+MATCH (p:Policy)-[:INTERPRETS]->(l:Regulation)
+WHERE l.node_type = 'Legislation'
+RETURN p.name AS policy,
+       l.name AS interprets_legislation
+```
+
+---
+
+## 🔎 Advanced Analysis Queries
+
+### Language Distribution
+```cypher
+// Count documents by language
+MATCH (r:Regulation)
+RETURN r.language, r.node_type, count(*) AS count
+ORDER BY r.node_type, r.language
+```
+
+### Find Bilingual Document Pairs
+```cypher
+// Find English/French versions of same document
+MATCH (en:Regulation), (fr:Regulation)
+WHERE en.language = 'en' 
+  AND fr.language = 'fr'
+  AND replace(toLower(en.name), 'act', 'loi') = toLower(fr.name)
+RETURN en.name AS english_title,
+       fr.name AS french_title
+LIMIT 20
+```
+
+### Documents with Most Programs
+```cypher
+// Find which documents govern the most programs
+MATCH (doc:Regulation)-[:APPLIES_TO]->(p:Program)
+WITH doc, count(p) AS program_count
+WHERE program_count > 1
+RETURN doc.name,
+       doc.node_type,
+       program_count
+ORDER BY program_count DESC
+```
+
+### Cross-Reference Network Analysis
+```cypher
+// Find documents with most internal cross-references
+MATCH (doc:Regulation)-[:HAS_SECTION]->(s1:Section)
+MATCH (s1)-[:REFERENCES]->(s2:Section)
+MATCH (doc)-[:HAS_SECTION]->(s2)
+WITH doc, count(DISTINCT s1) AS referencing_sections
+WHERE referencing_sections > 10
+RETURN doc.name,
+       doc.node_type,
+       referencing_sections
+ORDER BY referencing_sections DESC
+LIMIT 20
+```
+
+### Content Completeness Check
+```cypher
+// Find sections without content
+MATCH (doc:Regulation)-[:HAS_SECTION]->(s:Section)
+WHERE s.content IS NULL OR s.content = ''
+RETURN doc.name,
+       doc.node_type,
+       count(s) AS empty_sections
+ORDER BY empty_sections DESC
 ```
 
 ### Find Orphaned Nodes
 ```cypher
-// Find sections not connected to any regulation
-MATCH (s:Section)
-WHERE NOT exists((s)<-[:HAS_SECTION]-(:Regulation))
-RETURN s.citation, s.title
-LIMIT 20
-```
-
----
-
-## 🛠️ Maintenance Queries
-
-### Delete a Specific Regulation and Its Sections
-```cypher
-// ⚠️ WARNING: This deletes data permanently!
-MATCH (r:Regulation {regulation_id: 'TEST_REG'})
-OPTIONAL MATCH (r)-[rel:HAS_SECTION]->(s:Section)
-DELETE r, rel, s
-RETURN 'Deleted' AS status
-```
-
-### Delete All Test Data
-```cypher
-// ⚠️ WARNING: Deletes all test/sample data
+// Find any disconnected nodes (should be 0)
 MATCH (n)
-WHERE n.regulation_id STARTS WITH 'TEST_' 
-   OR n.citation STARTS WITH 'TEST_'
-DETACH DELETE n
-RETURN 'Test data deleted' AS status
-```
-
-### Update Regulation Metadata
-```cypher
-// Update a regulation's properties
-MATCH (r:Regulation {regulation_id: 'PIPEDA'})
-SET r.last_updated = datetime(),
-    r.notes = 'Updated metadata'
-RETURN r
-```
-
-### Find Duplicate Sections
-```cypher
-// Find sections with duplicate citations
-MATCH (s:Section)
-WITH s.citation AS citation, collect(s) AS sections
-WHERE size(sections) > 1
-RETURN citation, size(sections) AS duplicate_count
-ORDER BY duplicate_count DESC
+WHERE NOT (n)-[]-()
+RETURN labels(n) AS node_type, count(n) AS disconnected_count
 ```
 
 ---
 
-## 🎯 Use Case Examples
+## 📈 Analytics and Statistics
 
-### Compliance Check: Find All Privacy-Related Sections
+### Node Type Distribution
 ```cypher
-// Find all sections related to privacy across regulations
-CALL db.index.fulltext.queryNodes('section_content_index', 
-  'privacy OR "personal information" OR "data protection"')
-YIELD node, score
-MATCH (r:Regulation)-[:HAS_SECTION]->(node)
-WHERE score > 1.0
-RETURN r.regulation_id, 
-       r.jurisdiction,
-       node.citation, 
-       node.title,
-       round(score, 2) AS relevance_score
-ORDER BY score DESC
+// Complete breakdown of all node types
+MATCH (n)
+RETURN labels(n)[0] AS node_label,
+       CASE 
+         WHEN 'Regulation' IN labels(n) THEN n.node_type
+         ELSE NULL
+       END AS node_type_property,
+       count(*) AS count
+ORDER BY count DESC
+```
+
+### Relationship Statistics
+```cypher
+// Detailed relationship analysis
+MATCH (source)-[r]->(target)
+RETURN labels(source)[0] AS from_type,
+       type(r) AS relationship,
+       labels(target)[0] AS to_type,
+       count(*) AS count
+ORDER BY count DESC
+```
+
+### Document Size Analysis
+```cypher
+// Analyze document sizes by section count
+MATCH (doc:Regulation)-[:HAS_SECTION]->(s:Section)
+WITH doc, count(s) AS section_count
+RETURN doc.node_type AS document_type,
+       min(section_count) AS min_sections,
+       max(section_count) AS max_sections,
+       round(avg(section_count)) AS avg_sections,
+       count(doc) AS document_count
+ORDER BY document_type
+```
+
+### Program Coverage by Department
+```cypher
+// See which departments have most programs
+MATCH (p:Program)
+RETURN p.department,
+       count(p) AS program_count
+ORDER BY program_count DESC
+```
+
+### Graph Connectivity Health Check
+```cypher
+// Verify all major nodes are connected
+MATCH (n)
+WITH labels(n)[0] AS node_type,
+     count(n) AS total,
+     count{(n)-[]-()) AS connected
+RETURN node_type,
+       total,
+       connected,
+       total - connected AS disconnected,
+       round(100.0 * connected / total, 2) AS connectivity_pct
+ORDER BY total DESC
+```
+
+---
+
+## 🛠️ Maintenance and Cleanup
+
+### Clear Entire Database (USE WITH CAUTION!)
+```cypher
+// ⚠️ WARNING: Deletes ALL data!
+MATCH (n)
+DETACH DELETE n
+RETURN 'Database cleared' AS status
+```
+
+### Delete Specific Document and Its Sections
+```cypher
+// Delete a document and all its sections
+MATCH (doc:Regulation)
+WHERE doc.name CONTAINS 'TEST'
+OPTIONAL MATCH (doc)-[r:HAS_SECTION]->(s:Section)
+DETACH DELETE doc, s
+RETURN 'Document deleted' AS status
+```
+
+### Update Document Properties
+```cypher
+// Update metadata for a document
+MATCH (doc:Regulation)
+WHERE doc.name CONTAINS 'Privacy Act'
+SET doc.last_updated = datetime(),
+    doc.notes = 'Updated metadata'
+RETURN doc.name, doc.last_updated
+```
+
+### Find and Fix Missing Names
+```cypher
+// Find documents without name property
+MATCH (r:Regulation)
+WHERE r.name IS NULL OR r.name = ''
+RETURN r.title, labels(r)
+LIMIT 10
+```
+
+### Verify Data Integrity
+```cypher
+// Check for sections without parent documents
+MATCH (s:Section)
+WHERE NOT EXISTS {
+  MATCH (doc)-[:HAS_SECTION]->(s)
+}
+RETURN count(s) AS orphaned_sections
+```
+
+---
+
+## 🎯 Common Use Cases
+
+### Find All Privacy-Related Content
+```cypher
+// Search for privacy across all documents
+MATCH (doc:Regulation)-[:HAS_SECTION]->(s:Section)
+WHERE toLower(s.content) CONTAINS 'privacy'
+   OR toLower(s.content) CONTAINS 'personal information'
+   OR toLower(doc.name) CONTAINS 'privacy'
+RETURN doc.name,
+       doc.node_type,
+       s.section_number,
+       s.title
 LIMIT 50
 ```
 
-### Audit Trail: Find Consent Requirements
+### Compliance Check: Employment Standards
 ```cypher
-// Find all sections about consent requirements
-CALL db.index.fulltext.queryNodes('section_content_index', 
-  'consent AND (obtain OR required OR mandatory)')
-YIELD node, score
-MATCH (r:Regulation)-[:HAS_SECTION]->(node)
-RETURN r.regulation_id,
-       r.title,
-       node.section_number,
-       node.title AS section_title,
-       node.citation
-ORDER BY score DESC
-LIMIT 30
+// Find all employment-related regulations
+MATCH (doc:Regulation)
+WHERE toLower(doc.name) CONTAINS 'employment'
+   OR toLower(doc.name) CONTAINS 'labour'
+   OR toLower(doc.name) CONTAINS 'labor'
+OPTIONAL MATCH (doc)-[:HAS_SECTION]->(s:Section)
+RETURN doc.name,
+       doc.node_type,
+       count(s) AS section_count
+ORDER BY doc.name
 ```
 
-### Gap Analysis: Compare Regulations
+### Find Programs for a Department
 ```cypher
-// Find regulations covering similar topics
-MATCH (r1:Regulation)-[:HAS_SECTION]->(s1:Section)
-WHERE toLower(s1.title) CONTAINS 'breach notification'
-WITH collect(DISTINCT r1.regulation_id) AS regs_with_breach
-MATCH (r:Regulation)
-RETURN r.regulation_id,
-       r.title,
-       r.jurisdiction,
-       CASE WHEN r.regulation_id IN regs_with_breach 
-            THEN 'Has Breach Notification' 
-            ELSE 'Missing' 
-       END AS coverage
-ORDER BY r.jurisdiction, r.title
+// Get all programs administered by a department
+MATCH (p:Program)
+WHERE toLower(p.department) CONTAINS 'employment'
+OPTIONAL MATCH (doc:Regulation)-[:APPLIES_TO]->(p)
+RETURN p.name AS program,
+       p.description,
+       collect(doc.name) AS governing_regulations
+ORDER BY p.name
+```
+
+### Cross-Jurisdiction Analysis
+```cypher
+// Compare similar legislation across jurisdictions
+MATCH (doc:Regulation)
+WHERE doc.node_type = 'Legislation'
+  AND toLower(doc.name) CONTAINS 'human rights'
+RETURN doc.jurisdiction,
+       doc.name,
+       doc.language
+ORDER BY doc.jurisdiction, doc.language
+```
+
+### Find Sections Citing Specific Terms
+```cypher
+// Find all sections mentioning specific legal terms
+MATCH (doc:Regulation)-[:HAS_SECTION]->(s:Section)
+WHERE toLower(s.content) CONTAINS 'reasonable person'
+   OR toLower(s.content) CONTAINS 'due diligence'
+   OR toLower(s.content) CONTAINS 'good faith'
+RETURN doc.name,
+       s.section_number,
+       s.title,
+       substring(s.content, 0, 150) + '...' AS snippet
+LIMIT 30
 ```
 
 ---
 
 ## 💡 Tips for Neo4j Browser
 
-### Visualization Settings
-- **Limit results**: Add `LIMIT 25` to avoid overwhelming visualizations
-- **Style nodes**: Click on node labels in the bottom panel to customize colors
-- **Expand nodes**: Double-click nodes to see their connections
-- **Pan/Zoom**: Use mouse wheel to zoom, drag to pan
+### Best Practices
+- **Limit results**: Always add `LIMIT 25-100` to avoid overwhelming visualizations
+- **Use properties**: Access `r.name` instead of relying on visual labels
+- **Filter early**: Add `WHERE` clauses before collecting or aggregating
+- **Real data vs schema**: `db.schema.visualization()` shows schema (negative IDs), use `MATCH (n)-[r]->(m) RETURN * LIMIT 100` for real data
+
+### Visualization Controls
+- **Style nodes**: Click node labels in bottom panel to customize colors and sizes
+- **Expand nodes**: Double-click nodes to show their connections
+- **Pan/Zoom**: Mouse wheel to zoom, drag to pan
+- **Node labels**: Configure which property shows as label (use `name` property)
 
 ### Query Performance
-- **Use indexes**: The database has fulltext indexes on section_content and section_title
-- **Profile queries**: Prefix with `PROFILE` to see execution plan
-- **Explain queries**: Prefix with `EXPLAIN` to see query plan without executing
+- **Use node labels**: `MATCH (r:Regulation)` is faster than `MATCH (r)`
+- **Add WHERE early**: Filter before traversing relationships
+- **Profile queries**: Add `PROFILE` to see execution plan
+- **Explain queries**: Add `EXPLAIN` to see query plan without executing
 
 ### Example: Profile a Query
 ```cypher
 PROFILE
-MATCH (r:Regulation)-[:HAS_SECTION]->(s:Section)
-WHERE toLower(s.title) CONTAINS 'privacy'
-RETURN r.regulation_id, count(s) AS section_count
+MATCH (doc:Regulation)-[:HAS_SECTION]->(s:Section)
+WHERE doc.node_type = 'Legislation'
+RETURN doc.name, count(s) AS section_count
 ORDER BY section_count DESC
+LIMIT 20
 ```
 
-### Save Favorites
-- Click the star icon ⭐ in the query editor to save frequently used queries
-- Access saved queries from the "Favorites" tab
-
-### Export Results
-- Use the download icon to export results as CSV or JSON
-- For programmatic access, use the REST API or Python driver
+### Save and Export
+- **Favorites**: Click star icon ⭐ to save frequently used queries
+- **Export**: Use download icon to export as CSV or JSON
+- **History**: Access recent queries from history tab
+- **Frames**: Pin result frames to keep them visible
 
 ---
 
 ## 📚 Additional Resources
 
-- **Neo4j Cypher Documentation**: https://neo4j.com/docs/cypher-manual/current/
-- **Full-Text Search Syntax**: https://neo4j.com/docs/cypher-manual/current/indexes-for-full-text-search/
+- **Neo4j Cypher Manual**: https://neo4j.com/docs/cypher-manual/current/
+- **Cypher Cheat Sheet**: https://neo4j.com/docs/cypher-refcard/current/
 - **Graph Data Science**: https://neo4j.com/docs/graph-data-science/current/
+- **Neo4j Python Driver**: https://neo4j.com/docs/api/python-driver/current/
+
+---
+
+## 🏗️ Knowledge Graph Architecture
+
+### Node Types
+- **Regulation** (with node_type property):
+  - `Legislation`: Acts/Lois (1,815 nodes)
+  - `Regulation`: SOR/DORS (254 nodes)
+  - `Policy`: Guidelines, Directives (2 nodes)
+- **Section**: Individual sections within documents (300,331 nodes)
+- **Program**: Government programs (94 nodes)
+- **Situation**: Legal situations/scenarios (931 nodes)
+
+### Relationships
+- **HAS_SECTION**: Document → Section (300,331)
+- **REFERENCES**: Section → Section cross-references (30,171)
+- **RELEVANT_FOR**: Section → Situation (931)
+- **APPLIES_TO**: Document/Program → Program/Document (94)
+- **ENACTED_UNDER**: Regulation → Parent Act (7)
+- **INTERPRETS**: Policy → Legislation (7)
 
 ---
 
 ## 🔒 Security Notes
 
-- Never run `DELETE` queries without `WHERE` clauses in production
-- Always test queries on a small subset first using `LIMIT`
+- Never run `DETACH DELETE` queries without `WHERE` clauses
+- Always test on small dataset first using `LIMIT`
 - Back up data before running maintenance queries
-- Use read-only credentials for exploration in production environments
+- Use read-only credentials for exploration in production
+- Schema visualization shows virtual nodes (negative IDs) - not real data
 
 ---
 
-**Last Updated**: v1.3.7 - December 2025
+**Last Updated**: December 20, 2025 - v2.0  
+**Graph Stats**: 303,427 nodes | 331,534 relationships | 2,071 documents
