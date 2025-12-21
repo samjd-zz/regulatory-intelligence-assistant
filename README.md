@@ -231,6 +231,57 @@ docker compose up -d frontend
 
 See [Development Guide](./docs/DEVELOPMENT.md) for full setup.
 
+## 🐋 Docker Deployment
+
+### Development Mode (Hot Reload)
+```bash
+# Start all services with hot reload
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop services
+docker compose down
+```
+
+### Production Mode
+```bash
+# Set up production environment
+cp .env.production.example backend/.env.production
+# Edit backend/.env.production with your secure values
+
+# Build and start production services
+docker compose -f docker-compose.prod.yml up -d
+
+# View logs
+docker compose -f docker-compose.prod.yml logs -f
+```
+
+### Publishing to Docker Hub
+```bash
+# Build images
+docker build -t yourusername/regulatory-frontend:latest ./frontend
+docker build -t yourusername/regulatory-backend:latest ./backend
+docker build -t yourusername/regulatory-neo4j:latest ./backend/neo4j
+
+# Tag with version
+docker tag yourusername/regulatory-frontend:latest yourusername/regulatory-frontend:1.0.0
+docker tag yourusername/regulatory-backend:latest yourusername/regulatory-backend:1.0.0
+docker tag yourusername/regulatory-neo4j:latest yourusername/regulatory-neo4j:1.0.0
+
+# Login and push
+docker login
+docker push yourusername/regulatory-frontend:latest
+docker push yourusername/regulatory-frontend:1.0.0
+docker push yourusername/regulatory-backend:latest
+docker push yourusername/regulatory-backend:1.0.0
+docker push yourusername/regulatory-neo4j:latest
+docker push yourusername/regulatory-neo4j:1.0.0
+```
+
+See [Docker Deployment Guide](./DOCKER_DEPLOYMENT.md) for complete documentation.
+
 ## 📊 Data Sources
 
 ### Currently Supported
