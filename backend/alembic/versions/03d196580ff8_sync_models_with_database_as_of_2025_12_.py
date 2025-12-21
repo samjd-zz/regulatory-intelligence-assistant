@@ -1,8 +1,8 @@
-"""sync_models_with_database_v1_4_3
+"""sync models with database as of 2025-12-21
 
-Revision ID: 78dc791e15d0
+Revision ID: 03d196580ff8
 Revises: g2h4j5k6m7n8
-Create Date: 2025-12-21 04:27:33.393367
+Create Date: 2025-12-21 06:44:29.053968
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '78dc791e15d0'
+revision = '03d196580ff8'
 down_revision = 'g2h4j5k6m7n8'
 branch_labels = None
 depends_on = None
@@ -71,7 +71,6 @@ def upgrade() -> None:
     op.alter_column('alerts', 'extra_metadata',
                existing_type=postgresql.JSONB(astext_type=sa.Text()),
                server_default=None,
-               type_=sa.JSON(),
                existing_nullable=True)
     op.alter_column('alerts', 'created_at',
                existing_type=postgresql.TIMESTAMP(timezone=True),
@@ -91,7 +90,6 @@ def upgrade() -> None:
     op.alter_column('amendments', 'extra_metadata',
                existing_type=postgresql.JSONB(astext_type=sa.Text()),
                server_default=None,
-               type_=sa.JSON(),
                existing_nullable=True)
     op.alter_column('amendments', 'created_at',
                existing_type=postgresql.TIMESTAMP(timezone=True),
@@ -113,10 +111,10 @@ def upgrade() -> None:
                existing_nullable=True)
     op.drop_index('idx_citations_cited', table_name='citations')
     op.drop_index('idx_citations_section', table_name='citations')
-    op.drop_constraint('citations_cited_section_id_fkey', 'citations', type_='foreignkey')
     op.drop_constraint('citations_section_id_fkey', 'citations', type_='foreignkey')
-    op.create_foreign_key(None, 'citations', 'sections', ['cited_section_id'], ['id'])
+    op.drop_constraint('citations_cited_section_id_fkey', 'citations', type_='foreignkey')
     op.create_foreign_key(None, 'citations', 'sections', ['section_id'], ['id'])
+    op.create_foreign_key(None, 'citations', 'sections', ['cited_section_id'], ['id'])
     op.add_column('cross_references', sa.Column('document_id', sa.UUID(), nullable=False))
     op.add_column('cross_references', sa.Column('source_section', sa.String(length=100), nullable=True))
     op.add_column('cross_references', sa.Column('source_text', sa.Text(), nullable=True))
@@ -132,17 +130,17 @@ def upgrade() -> None:
     op.drop_index('idx_cross_references_target_doc', table_name='cross_references')
     op.drop_index('idx_cross_references_type', table_name='cross_references')
     op.drop_constraint('cross_references_source_section_id_fkey', 'cross_references', type_='foreignkey')
+    op.drop_constraint('cross_references_target_document_id_fkey', 'cross_references', type_='foreignkey')
     op.drop_constraint('cross_references_target_section_id_fkey', 'cross_references', type_='foreignkey')
     op.drop_constraint('cross_references_source_document_id_fkey', 'cross_references', type_='foreignkey')
-    op.drop_constraint('cross_references_target_document_id_fkey', 'cross_references', type_='foreignkey')
     op.create_foreign_key(None, 'cross_references', 'documents', ['document_id'], ['id'])
+    op.drop_column('cross_references', 'source_location')
+    op.drop_column('cross_references', 'target_section_id')
+    op.drop_column('cross_references', 'context')
     op.drop_column('cross_references', 'source_section_id')
     op.drop_column('cross_references', 'citation_text')
     op.drop_column('cross_references', 'source_document_id')
-    op.drop_column('cross_references', 'target_section_id')
     op.drop_column('cross_references', 'target_location')
-    op.drop_column('cross_references', 'context')
-    op.drop_column('cross_references', 'source_location')
     op.add_column('document_clauses', sa.Column('section_id', sa.UUID(), nullable=False))
     op.add_column('document_clauses', sa.Column('clause_number', sa.String(length=50), nullable=True))
     op.add_column('document_clauses', sa.Column('clause_type', sa.String(length=50), nullable=True))
@@ -160,8 +158,8 @@ def upgrade() -> None:
     op.drop_constraint('document_clauses_subsection_id_fkey', 'document_clauses', type_='foreignkey')
     op.create_foreign_key(None, 'document_clauses', 'document_sections', ['section_id'], ['id'])
     op.drop_column('document_clauses', 'clause_identifier')
-    op.drop_column('document_clauses', 'subsection_id')
     op.drop_column('document_clauses', 'updated_at')
+    op.drop_column('document_clauses', 'subsection_id')
     op.add_column('document_sections', sa.Column('section_metadata', sa.JSON(), nullable=True))
     op.alter_column('document_sections', 'section_number',
                existing_type=sa.VARCHAR(length=100),
@@ -256,9 +254,9 @@ def upgrade() -> None:
     op.drop_index('idx_documents_type', table_name='documents')
     op.create_index(op.f('ix_documents_jurisdiction'), 'documents', ['jurisdiction'], unique=False)
     op.create_index('ix_documents_type_jurisdiction', 'documents', ['document_type', 'jurisdiction'], unique=False)
-    op.drop_column('documents', 'processed_date')
     op.drop_column('documents', 'original_filename')
     op.drop_column('documents', 'metadata')
+    op.drop_column('documents', 'processed_date')
     op.alter_column('query_history', 'user_id',
                existing_type=sa.UUID(),
                nullable=True)
@@ -284,10 +282,6 @@ def upgrade() -> None:
     op.drop_index('idx_query_history_user_date', table_name='query_history')
     op.drop_constraint('query_history_user_id_fkey', 'query_history', type_='foreignkey')
     op.create_foreign_key(None, 'query_history', 'users', ['user_id'], ['id'])
-    op.alter_column('regulations', 'title',
-               existing_type=sa.TEXT(),
-               type_=sa.String(length=500),
-               existing_nullable=False)
     op.alter_column('regulations', 'jurisdiction',
                existing_type=sa.VARCHAR(length=50),
                type_=sa.String(length=100),
@@ -304,7 +298,6 @@ def upgrade() -> None:
     op.alter_column('regulations', 'extra_metadata',
                existing_type=postgresql.JSONB(astext_type=sa.Text()),
                server_default=None,
-               type_=sa.JSON(),
                existing_nullable=True)
     op.alter_column('regulations', 'created_at',
                existing_type=postgresql.TIMESTAMP(timezone=True),
@@ -326,23 +319,16 @@ def upgrade() -> None:
     op.create_index(op.f('ix_regulations_status'), 'regulations', ['status'], unique=False)
     op.create_index(op.f('ix_regulations_title'), 'regulations', ['title'], unique=False)
     op.create_index('ix_regulations_title_jurisdiction', 'regulations', ['title', 'jurisdiction'], unique=False)
-    op.drop_column('regulations', 'search_vector')
-    op.drop_column('regulations', 'search_vector_fr')
     op.drop_column('regulations', 'metadata')
     op.alter_column('sections', 'section_number',
                existing_type=sa.VARCHAR(length=255),
                nullable=False)
-    op.alter_column('sections', 'title',
-               existing_type=sa.TEXT(),
-               type_=sa.String(length=500),
-               existing_nullable=True)
     op.alter_column('sections', 'content',
                existing_type=sa.TEXT(),
                nullable=True)
     op.alter_column('sections', 'extra_metadata',
                existing_type=postgresql.JSONB(astext_type=sa.Text()),
                server_default=None,
-               type_=sa.JSON(),
                existing_nullable=True)
     op.alter_column('sections', 'created_at',
                existing_type=postgresql.TIMESTAMP(timezone=True),
@@ -362,8 +348,6 @@ def upgrade() -> None:
     op.create_unique_constraint('uq_section_regulation', 'sections', ['regulation_id', 'section_number'])
     op.drop_constraint('sections_regulation_id_fkey', 'sections', type_='foreignkey')
     op.create_foreign_key(None, 'sections', 'regulations', ['regulation_id'], ['id'])
-    op.drop_column('sections', 'search_vector')
-    op.drop_column('sections', 'search_vector_fr')
     op.drop_column('sections', 'metadata')
     op.alter_column('users', 'department',
                existing_type=sa.VARCHAR(length=100),
@@ -410,7 +394,6 @@ def upgrade() -> None:
     op.alter_column('workflow_sessions', 'extra_metadata',
                existing_type=postgresql.JSONB(astext_type=sa.Text()),
                server_default=None,
-               type_=sa.JSON(),
                existing_nullable=True)
     op.drop_index('idx_workflow_sessions_started_at', table_name='workflow_sessions')
     op.drop_index('idx_workflow_sessions_status', table_name='workflow_sessions')
@@ -460,9 +443,8 @@ def downgrade() -> None:
     op.create_index('idx_workflow_sessions_status', 'workflow_sessions', ['status'], unique=False)
     op.create_index('idx_workflow_sessions_started_at', 'workflow_sessions', ['started_at'], unique=False)
     op.alter_column('workflow_sessions', 'extra_metadata',
-               existing_type=sa.JSON(),
+               existing_type=postgresql.JSONB(astext_type=sa.Text()),
                server_default=sa.text("'{}'::jsonb"),
-               type_=postgresql.JSONB(astext_type=sa.Text()),
                existing_nullable=True)
     op.alter_column('workflow_sessions', 'completed_at',
                existing_type=sa.DateTime(),
@@ -507,8 +489,6 @@ def downgrade() -> None:
                type_=sa.VARCHAR(length=100),
                existing_nullable=True)
     op.add_column('sections', sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"), autoincrement=False, nullable=True))
-    op.add_column('sections', sa.Column('search_vector_fr', postgresql.TSVECTOR(), sa.Computed('(setweight(to_tsvector(\'french\'::regconfig, COALESCE(title, \'\'::text)), \'A\'::"char") || setweight(to_tsvector(\'french\'::regconfig, COALESCE(content, \'\'::text)), \'B\'::"char"))', persisted=True), autoincrement=False, nullable=True))
-    op.add_column('sections', sa.Column('search_vector', postgresql.TSVECTOR(), sa.Computed('(setweight(to_tsvector(\'english\'::regconfig, COALESCE(title, \'\'::text)), \'A\'::"char") || setweight(to_tsvector(\'english\'::regconfig, COALESCE(content, \'\'::text)), \'B\'::"char"))', persisted=True), autoincrement=False, nullable=True))
     op.drop_constraint(None, 'sections', type_='foreignkey')
     op.create_foreign_key('sections_regulation_id_fkey', 'sections', 'regulations', ['regulation_id'], ['id'], ondelete='CASCADE')
     op.drop_constraint('uq_section_regulation', 'sections', type_='unique')
@@ -528,23 +508,16 @@ def downgrade() -> None:
                type_=postgresql.TIMESTAMP(timezone=True),
                existing_nullable=True)
     op.alter_column('sections', 'extra_metadata',
-               existing_type=sa.JSON(),
+               existing_type=postgresql.JSONB(astext_type=sa.Text()),
                server_default=sa.text("'{}'::jsonb"),
-               type_=postgresql.JSONB(astext_type=sa.Text()),
                existing_nullable=True)
     op.alter_column('sections', 'content',
                existing_type=sa.TEXT(),
                nullable=False)
-    op.alter_column('sections', 'title',
-               existing_type=sa.String(length=500),
-               type_=sa.TEXT(),
-               existing_nullable=True)
     op.alter_column('sections', 'section_number',
                existing_type=sa.VARCHAR(length=255),
                nullable=True)
     op.add_column('regulations', sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), server_default=sa.text("'{}'::jsonb"), autoincrement=False, nullable=True))
-    op.add_column('regulations', sa.Column('search_vector_fr', postgresql.TSVECTOR(), sa.Computed('(setweight(to_tsvector(\'french\'::regconfig, COALESCE(title, \'\'::text)), \'A\'::"char") || setweight(to_tsvector(\'french\'::regconfig, COALESCE(full_text, \'\'::text)), \'B\'::"char"))', persisted=True), autoincrement=False, nullable=True))
-    op.add_column('regulations', sa.Column('search_vector', postgresql.TSVECTOR(), sa.Computed('(setweight(to_tsvector(\'english\'::regconfig, COALESCE(title, \'\'::text)), \'A\'::"char") || setweight(to_tsvector(\'english\'::regconfig, COALESCE(full_text, \'\'::text)), \'B\'::"char"))', persisted=True), autoincrement=False, nullable=True))
     op.drop_index('ix_regulations_title_jurisdiction', table_name='regulations')
     op.drop_index(op.f('ix_regulations_title'), table_name='regulations')
     op.drop_index(op.f('ix_regulations_status'), table_name='regulations')
@@ -566,9 +539,8 @@ def downgrade() -> None:
                type_=postgresql.TIMESTAMP(timezone=True),
                existing_nullable=True)
     op.alter_column('regulations', 'extra_metadata',
-               existing_type=sa.JSON(),
+               existing_type=postgresql.JSONB(astext_type=sa.Text()),
                server_default=sa.text("'{}'::jsonb"),
-               type_=postgresql.JSONB(astext_type=sa.Text()),
                existing_nullable=True)
     op.alter_column('regulations', 'status',
                existing_type=sa.String(length=50),
@@ -582,10 +554,6 @@ def downgrade() -> None:
     op.alter_column('regulations', 'jurisdiction',
                existing_type=sa.String(length=100),
                type_=sa.VARCHAR(length=50),
-               existing_nullable=False)
-    op.alter_column('regulations', 'title',
-               existing_type=sa.String(length=500),
-               type_=sa.TEXT(),
                existing_nullable=False)
     op.drop_constraint(None, 'query_history', type_='foreignkey')
     op.create_foreign_key('query_history_user_id_fkey', 'query_history', 'users', ['user_id'], ['id'], ondelete='CASCADE')
@@ -612,9 +580,9 @@ def downgrade() -> None:
     op.alter_column('query_history', 'user_id',
                existing_type=sa.UUID(),
                nullable=False)
+    op.add_column('documents', sa.Column('processed_date', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True))
     op.add_column('documents', sa.Column('metadata', postgresql.JSONB(astext_type=sa.Text()), autoincrement=False, nullable=True))
     op.add_column('documents', sa.Column('original_filename', sa.VARCHAR(length=255), autoincrement=False, nullable=True))
-    op.add_column('documents', sa.Column('processed_date', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True))
     op.drop_index('ix_documents_type_jurisdiction', table_name='documents')
     op.drop_index(op.f('ix_documents_jurisdiction'), table_name='documents')
     op.create_index('idx_documents_type', 'documents', ['document_type'], unique=False)
@@ -709,8 +677,8 @@ def downgrade() -> None:
                existing_type=sa.VARCHAR(length=100),
                nullable=True)
     op.drop_column('document_sections', 'section_metadata')
-    op.add_column('document_clauses', sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True))
     op.add_column('document_clauses', sa.Column('subsection_id', sa.UUID(), autoincrement=False, nullable=False))
+    op.add_column('document_clauses', sa.Column('updated_at', postgresql.TIMESTAMP(timezone=True), autoincrement=False, nullable=True))
     op.add_column('document_clauses', sa.Column('clause_identifier', sa.VARCHAR(length=100), autoincrement=False, nullable=True))
     op.drop_constraint(None, 'document_clauses', type_='foreignkey')
     op.create_foreign_key('document_clauses_subsection_id_fkey', 'document_clauses', 'document_subsections', ['subsection_id'], ['id'], ondelete='CASCADE')
@@ -728,17 +696,17 @@ def downgrade() -> None:
     op.drop_column('document_clauses', 'clause_type')
     op.drop_column('document_clauses', 'clause_number')
     op.drop_column('document_clauses', 'section_id')
-    op.add_column('cross_references', sa.Column('source_location', sa.VARCHAR(length=255), autoincrement=False, nullable=True))
-    op.add_column('cross_references', sa.Column('context', sa.TEXT(), autoincrement=False, nullable=True))
     op.add_column('cross_references', sa.Column('target_location', sa.VARCHAR(length=255), autoincrement=False, nullable=True))
-    op.add_column('cross_references', sa.Column('target_section_id', sa.UUID(), autoincrement=False, nullable=True))
     op.add_column('cross_references', sa.Column('source_document_id', sa.UUID(), autoincrement=False, nullable=False))
     op.add_column('cross_references', sa.Column('citation_text', sa.TEXT(), autoincrement=False, nullable=True))
     op.add_column('cross_references', sa.Column('source_section_id', sa.UUID(), autoincrement=False, nullable=True))
+    op.add_column('cross_references', sa.Column('context', sa.TEXT(), autoincrement=False, nullable=True))
+    op.add_column('cross_references', sa.Column('target_section_id', sa.UUID(), autoincrement=False, nullable=True))
+    op.add_column('cross_references', sa.Column('source_location', sa.VARCHAR(length=255), autoincrement=False, nullable=True))
     op.drop_constraint(None, 'cross_references', type_='foreignkey')
-    op.create_foreign_key('cross_references_target_document_id_fkey', 'cross_references', 'documents', ['target_document_id'], ['id'], ondelete='SET NULL')
     op.create_foreign_key('cross_references_source_document_id_fkey', 'cross_references', 'documents', ['source_document_id'], ['id'], ondelete='CASCADE')
     op.create_foreign_key('cross_references_target_section_id_fkey', 'cross_references', 'document_sections', ['target_section_id'], ['id'], ondelete='SET NULL')
+    op.create_foreign_key('cross_references_target_document_id_fkey', 'cross_references', 'documents', ['target_document_id'], ['id'], ondelete='SET NULL')
     op.create_foreign_key('cross_references_source_section_id_fkey', 'cross_references', 'document_sections', ['source_section_id'], ['id'], ondelete='CASCADE')
     op.create_index('idx_cross_references_type', 'cross_references', ['reference_type'], unique=False)
     op.create_index('idx_cross_references_target_doc', 'cross_references', ['target_document_id'], unique=False)
@@ -756,8 +724,8 @@ def downgrade() -> None:
     op.drop_column('cross_references', 'document_id')
     op.drop_constraint(None, 'citations', type_='foreignkey')
     op.drop_constraint(None, 'citations', type_='foreignkey')
-    op.create_foreign_key('citations_section_id_fkey', 'citations', 'sections', ['section_id'], ['id'], ondelete='CASCADE')
     op.create_foreign_key('citations_cited_section_id_fkey', 'citations', 'sections', ['cited_section_id'], ['id'], ondelete='CASCADE')
+    op.create_foreign_key('citations_section_id_fkey', 'citations', 'sections', ['section_id'], ['id'], ondelete='CASCADE')
     op.create_index('idx_citations_section', 'citations', ['section_id'], unique=False)
     op.create_index('idx_citations_cited', 'citations', ['cited_section_id'], unique=False)
     op.alter_column('citations', 'created_at',
@@ -779,9 +747,8 @@ def downgrade() -> None:
                type_=postgresql.TIMESTAMP(timezone=True),
                existing_nullable=True)
     op.alter_column('amendments', 'extra_metadata',
-               existing_type=sa.JSON(),
+               existing_type=postgresql.JSONB(astext_type=sa.Text()),
                server_default=sa.text("'{}'::jsonb"),
-               type_=postgresql.JSONB(astext_type=sa.Text()),
                existing_nullable=True)
     op.alter_column('amendments', 'effective_date',
                existing_type=sa.DATE(),
@@ -799,9 +766,8 @@ def downgrade() -> None:
                type_=postgresql.TIMESTAMP(timezone=True),
                existing_nullable=True)
     op.alter_column('alerts', 'extra_metadata',
-               existing_type=sa.JSON(),
+               existing_type=postgresql.JSONB(astext_type=sa.Text()),
                server_default=sa.text("'{}'::jsonb"),
-               type_=postgresql.JSONB(astext_type=sa.Text()),
                existing_nullable=True)
     op.alter_column('alerts', 'read',
                existing_type=sa.BOOLEAN(),

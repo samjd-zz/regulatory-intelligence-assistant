@@ -16,7 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, TSVECTOR, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -50,7 +50,7 @@ class Regulation(Base):
     __tablename__ = "regulations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    title = Column(String(500), nullable=False, index=True)
+    title = Column(Text, nullable=False, index=True)
     jurisdiction = Column(String(100), nullable=False, index=True)
     authority = Column(String(255), nullable=True)
     language = Column(String(10), nullable=False, default="en", index=True)
@@ -58,9 +58,14 @@ class Regulation(Base):
     status = Column(String(50), default="active", index=True)
     full_text = Column(Text, nullable=True)
     content_hash = Column(String(64), nullable=True, index=True)
-    extra_metadata = Column(JSON, default=dict)
+    extra_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Full-text search vectors (generated columns - defined in migration g2h4j5k6m7n8)
+    # These are auto-populated by PostgreSQL and indexed with GIN for fast search
+    search_vector = Column(TSVECTOR, nullable=True)  # English FTS
+    search_vector_fr = Column(TSVECTOR, nullable=True)  # French FTS
 
     # Relationships
     sections = relationship(
@@ -86,11 +91,16 @@ class Section(Base):
         UUID(as_uuid=True), ForeignKey("regulations.id"), nullable=False
     )
     section_number = Column(String(255), nullable=False)  # Increased from 50 to handle long titles
-    title = Column(String(500), nullable=True)
+    title = Column(Text, nullable=True)
     content = Column(Text, nullable=True)
-    extra_metadata = Column(JSON, default=dict)
+    extra_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Full-text search vectors (generated columns - defined in migration g2h4j5k6m7n8)
+    # These are auto-populated by PostgreSQL and indexed with GIN for fast search
+    search_vector = Column(TSVECTOR, nullable=True)  # English FTS
+    search_vector_fr = Column(TSVECTOR, nullable=True)  # French FTS
 
     # Relationships
     regulation = relationship("Regulation", back_populates="sections")
@@ -149,7 +159,7 @@ class Amendment(Base):
     amendment_type = Column(String(50), nullable=False)
     effective_date = Column(Date, nullable=True)
     description = Column(Text, nullable=True)
-    extra_metadata = Column(JSON, default=dict)
+    extra_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -186,7 +196,7 @@ class WorkflowSession(Base):
     status = Column(String(50), default="active")
     started_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
-    extra_metadata = Column(JSON, default=dict)
+    extra_metadata = Column(JSONB, default=dict)
 
     # Relationships
     user = relationship("User", back_populates="workflow_sessions")
@@ -250,7 +260,7 @@ class Alert(Base):
     )
     summary = Column(Text, nullable=True)
     read = Column(Boolean, default=False)
-    extra_metadata = Column(JSON, default=dict)
+    extra_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
