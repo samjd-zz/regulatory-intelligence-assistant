@@ -6,7 +6,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: regulatory-frontend
     environment:
-      VITE_API_URL: http://localhost:8000
+      VITE_API_URL: http://backend:8000
     ports:
       - "5173:5173"
     volumes:
