@@ -18,9 +18,14 @@ cp backend/.env.example backend/.env
 # 3. Start all services
 docker compose up -d
 
-# 4. Initialize database and load sample data
-docker compose exec backend python create_tables.py
-docker compose exec backend python seed_data.py
+# 4. Initialize database with data (interactive wizard)
+docker compose exec backend python scripts/init_data.py
+
+# Choose what to load:
+#   1. Canadian Laws (Acts) - ~800 documents
+#   2. Regulations - ~1,000 documents  
+#   3. Both (Full Dataset) - ~1,827 documents
+#   Or specify a custom limit for testing
 
 # 5. Access the application
 # Frontend: http://localhost:5173
@@ -29,6 +34,8 @@ docker compose exec backend python seed_data.py
 ```
 
 **First time?** See the [Quick Start Guide](./docs/QUICKSTART.md) for detailed instructions.
+
+**Quick test?** Load a small dataset: `docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive`
 
 ## ✨ Key Features
 
@@ -104,6 +111,7 @@ See [Architecture Guide](./docs/ARCHITECTURE.md) for details.
 
 ### Getting Started
 - **[Quick Start Guide](./docs/QUICKSTART.md)** - Get running in 5 minutes
+- **[Docker Deployment](./DOCKER_DEPLOYMENT.md)** - Production deployment & Docker Hub publishing
 - **[Architecture Overview](./docs/ARCHITECTURE.md)** - System design and data flow
 - **[Features Guide](./docs/FEATURES.md)** - Complete feature documentation
 - **[API Reference](./docs/API_REFERENCE.md)** - REST API endpoints
@@ -238,12 +246,43 @@ See [Development Guide](./docs/DEVELOPMENT.md) for full setup.
 # Start all services with hot reload
 docker compose up -d
 
+# Initialize with data (interactive)
+docker compose exec backend python scripts/init_data.py
+
 # View logs
 docker compose logs -f
 
 # Stop services
 docker compose down
 ```
+
+### Data Initialization Options
+
+The intelligent data loader offers flexible options:
+
+```bash
+# Interactive wizard (recommended)
+docker compose exec backend python scripts/init_data.py
+
+# Quick test with 10 documents
+docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive
+
+# Load all Canadian laws (~800 documents)
+docker compose exec backend python scripts/init_data.py --type laws --non-interactive
+
+# Load all regulations (~1,000 documents)  
+docker compose exec backend python scripts/init_data.py --type regulations --non-interactive
+
+# Load everything (production, ~1,827 documents)
+docker compose exec backend python scripts/init_data.py --type both --non-interactive
+```
+
+The script will:
+- ✅ Check if data files exist (offer to download if missing)
+- ✅ Filter by type (laws vs regulations)
+- ✅ Apply limits for testing
+- ✅ Load into PostgreSQL, Neo4j, and Elasticsearch
+- ✅ Show progress and statistics
 
 ### Production Mode
 ```bash

@@ -17,6 +17,12 @@ The application now supports both **development** and **production** Docker conf
 # Start all services with hot reload
 docker compose up -d
 
+# Initialize database with sample data (interactive)
+docker compose exec backend python scripts/init_data.py
+
+# Or auto-initialize with 50 sample documents
+docker compose exec backend python scripts/init_data.py --type both --limit 50 --non-interactive
+
 # View logs
 docker compose logs -f
 
@@ -26,6 +32,39 @@ docker compose down
 
 Frontend available at: http://localhost:5173  
 Backend API available at: http://localhost:8000
+
+### First-Time Data Setup
+
+The `init_data.py` script provides an intelligent setup wizard:
+
+**Interactive Mode:**
+```bash
+docker compose exec backend python scripts/init_data.py
+```
+
+Prompts you to choose:
+1. **Canadian Laws** (Acts/Lois) - ~800 documents  
+2. **Regulations** - ~1,000 documents  
+3. **Both** (Full Dataset) - ~1,827 documents  
+4. **Custom limit** - Specify number of documents for testing
+
+**Non-Interactive Mode:**
+```bash
+# Load all laws
+docker compose exec backend python scripts/init_data.py --type laws --non-interactive
+
+# Load 100 regulations for testing
+docker compose exec backend python scripts/init_data.py --type regulations --limit 100 --non-interactive
+
+# Load everything (production)
+docker compose exec backend python scripts/init_data.py --type both --non-interactive
+```
+
+**Automatic Setup** (set in docker-compose.yml):
+```yaml
+environment:
+  AUTO_INIT_DATA: "true"  # Auto-loads 50 samples on first start
+```
 
 ### Production Mode
 
