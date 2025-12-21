@@ -358,7 +358,7 @@ GET /api/health
     "elasticsearch": "up",
     "redis": "up"
   },
-  "version": "1.3.7"
+  "version": "1.4.3"
 }
 ```
 

@@ -65,7 +65,7 @@ docker compose exec backend python scripts/init_data.py
 
 ## 📊 System Status
 
-**Current Version**: v1.4.2 (Docker Deployment & Intelligent Data Initialization)
+**Current Version**: v1.4.3 (Docker Deployment & Intelligent Data Initialization)
 
 ### Data Loaded
 - **PostgreSQL**: 1,827 regulations + 277,031 sections (278,858 total)
@@ -160,7 +160,7 @@ curl -X POST http://localhost:8000/api/compliance/check \
 
 **Full API documentation**: http://localhost:8000/docs
 
-## 🚀 Recent Enhancements (v1.4.2)
+## 🚀 Recent Enhancements (v1.4.3)
 
 ### Docker Production Deployment
 - ✅ Multi-stage frontend build (Node → nginx)
@@ -387,7 +387,9 @@ See [Development Guide](./docs/DEVELOPMENT.md) for guidelines.
 
 ## 📝 License
 
-[Add your license here]
+MIT License - Copyright (c) 2025 Team Astro
+
+See [LICENSE](./LICENSE) for full details.
 
 ## 🙏 Acknowledgments
 
