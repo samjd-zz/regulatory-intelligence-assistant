@@ -65,7 +65,7 @@ docker compose exec backend python scripts/init_data.py
 
 ## 📊 System Status
 
-**Current Version**: v1.3.7 (Multi-Tier RAG Search Enhancements)
+**Current Version**: v1.4.2 (Docker Deployment & Intelligent Data Initialization)
 
 ### Data Loaded
 - **PostgreSQL**: 1,827 regulations + 277,031 sections (278,858 total)
@@ -160,23 +160,28 @@ curl -X POST http://localhost:8000/api/compliance/check \
 
 **Full API documentation**: http://localhost:8000/docs
 
-## 🚀 Recent Enhancements (v1.3.7)
+## 🚀 Recent Enhancements (v1.4.2)
 
-### PostgreSQL Search Service
-- ✅ Pre-generated search_vector columns (5-10x faster)
-- ✅ pg_trgm fuzzy matching for typos
-- ✅ ts_headline snippet generation with highlights
-- ✅ Legal synonyms integration
-- ✅ Enhanced metadata queries
+### Docker Production Deployment
+- ✅ Multi-stage frontend build (Node → nginx)
+- ✅ Production-ready nginx configuration with security headers
+- ✅ docker-compose.prod.yml for production deployment
+- ✅ Health checks and resource limits
+- ✅ Optimized build contexts with .dockerignore
 
-### Neo4j Graph Service  
-- ✅ similarity_search() for fuzzy matching
-- ✅ Snippet extraction with `<mark>` highlights
-- ✅ Score boosting (1.2x) for matched terms
-- ✅ Regulation + Section node support
-- ✅ Enhanced health check with index stats
+### Intelligent Data Initialization
+- ✅ Interactive wizard for data loading (laws/regulations/both)
+- ✅ Flexible limits (10, 50, 100, or all documents)
+- ✅ Auto-download from Justice Canada if missing
+- ✅ Bilingual support (English/French)
+- ✅ Multi-database ingestion (PostgreSQL + Neo4j + Elasticsearch)
+- ✅ Progress tracking and statistics
 
-### Chain-of-Thought RAG
+### Documentation & Cleanup
+- ✅ Comprehensive deployment guide (DOCKER_DEPLOYMENT.md)
+- ✅ Updated Quick Start and development guides
+- ✅ Deprecated old scripts (create_tables.py, seed_data.py)
+- ✅ New scripts/README.md with current utilities
 - ✅ 5-step reasoning process
 - ✅ +3-5% accuracy improvement
 - ✅ Better confidence calibration
