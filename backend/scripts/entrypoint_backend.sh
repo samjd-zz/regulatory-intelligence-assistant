@@ -3,6 +3,13 @@ set -e
 
 echo "🚀 Starting Regulatory Intelligence Assistant Backend..."
 
+# Run database migrations
+echo "🔧 Running database migrations..."
+alembic upgrade head || {
+    echo "⚠️ Migrations failed, continuing anyway..."
+}
+echo "✓ Database migrations complete"
+
 # Wait for Neo4j to be ready
 echo "⏳ Waiting for Neo4j to be ready..."
 while ! nc -z neo4j 7687; do
