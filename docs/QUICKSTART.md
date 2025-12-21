@@ -41,15 +41,42 @@ docker compose up -d
 docker compose ps
 ```
 
-### 4. Initialize Database
+### 4. Initialize Database & Load Data
+
+The intelligent data loader makes it easy to get started:
 
 ```bash
-# Run migrations and create tables
-docker compose exec backend python create_tables.py
-
-# Load sample data (10 Canadian federal acts)
-docker compose exec backend python seed_data.py
+# Interactive mode - recommended for first time
+docker compose exec backend python scripts/init_data.py
 ```
+
+The wizard will ask you to choose:
+1. **Canadian Laws** (Acts/Lois) - ~800 documents
+2. **Regulations** - ~1,000 documents  
+3. **Both** (Full Dataset) - ~1,827 documents
+4. **Custom limit** - Specify number for testing (e.g., 10, 50, 100)
+
+**Quick Test (Non-Interactive):**
+```bash
+# Load 10 laws for quick testing
+docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive
+
+# Load 50 regulations
+docker compose exec backend python scripts/init_data.py --type regulations --limit 50 --non-interactive
+
+# Load all Canadian laws
+docker compose exec backend python scripts/init_data.py --type laws --non-interactive
+
+# Load everything (production)
+docker compose exec backend python scripts/init_data.py --type both --non-interactive
+```
+
+**What it does:**
+- ✅ Checks if data files exist (downloads if missing)
+- ✅ Filters by type (laws vs regulations)
+- ✅ Applies your limit for testing
+- ✅ Loads into PostgreSQL, Neo4j, and Elasticsearch
+- ✅ Shows progress and statistics
 
 ### 5. Access the Application
 
@@ -89,6 +116,18 @@ curl -X POST http://localhost:8000/api/compliance/check \
 ```
 
 ## Common Issues
+
+### No Data Loaded
+
+If you see empty search results:
+
+```bash
+# Check database status
+bash backend/scripts/data_summary.sh
+
+# Or re-run initialization
+docker compose exec backend python scripts/init_data.py --force
+```
 
 ### Services Not Starting
 
