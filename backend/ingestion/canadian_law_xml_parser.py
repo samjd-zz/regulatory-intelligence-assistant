@@ -397,9 +397,8 @@ class CanadianLawXMLParser:
         if body is not None:
             # Find all direct Section elements
             section_elements = self._findall(body, 'Section')
-            
             for section_elem in section_elements:
-                section, text = self._parse_statute_section(section_elem)
+                section, text = self._parse_statute_section(section_elem, regulation_title=title)
                 if section:
                     sections.append(section)
                     full_text_parts.append(text)
@@ -516,7 +515,7 @@ class CanadianLawXMLParser:
         
         if body is not None:
             for section_elem in self._findall(body, './/Section'):
-                section, text = self._parse_statute_section(section_elem)
+                section, text = self._parse_statute_section(section_elem, regulation_title=title)
                 if section:
                     sections.append(section)
                     full_text_parts.append(text)
@@ -682,7 +681,8 @@ class CanadianLawXMLParser:
         self,
         section_elem: ET.Element,
         level: int = 1,
-        parent_id: Optional[str] = None
+        parent_id: Optional[str] = None,
+        regulation_title: Optional[str] = None
     ) -> Tuple[Optional[ParsedSection], str]:
         """
         Parse a Section element in Statute format.
@@ -710,15 +710,15 @@ class CanadianLawXMLParser:
                 if key.endswith('id'):
                     section_id = section_elem.attrib[key]
                     break
-        
         # Get section number from Label
         label_elem = self._find(section_elem, 'Label')
         number = self._get_text(label_elem) if label_elem is not None else ""
-        
         # Get title from MarginalNote
         margin_note_elem = self._find(section_elem, 'MarginalNote')
         title = self._get_text(margin_note_elem) if margin_note_elem is not None else None
-        
+        # Fallback: if title is missing or empty, use regulation_title if provided
+        if (not title or not title.strip()) and regulation_title:
+            title = regulation_title
         # Improved fallback: If no Label found, use section_id or generate a unique number
         # instead of using the full title which can be too long
         if not number:
@@ -730,11 +730,9 @@ class CanadianLawXMLParser:
                 # Last resort: skip this section
                 logger.warning(f"Section missing both Label and ID, skipping")
                 return None, ""
-        
         # Build content and full text
         content_parts = []
         full_text_parts = [f"Section {number}"]
-        
         if title:
             full_text_parts.append(f"{title}")
             content_parts.append(title)
@@ -742,16 +740,13 @@ class CanadianLawXMLParser:
         # Parse subsections
         subsections = []
         subsection_elements = self._findall(section_elem, 'Subsection')
-        
         for subsection_elem in subsection_elements:
             # Get subsection label
             sub_label_elem = self._find(subsection_elem, 'Label')
             sub_label = self._get_text(sub_label_elem) if sub_label_elem is not None else ""
-            
             # Get subsection text
             text_elem = self._find(subsection_elem, 'Text')
             sub_text = self._get_text(text_elem) if text_elem is not None else ""
-            
             # Get subsection ID
             sub_id = subsection_elem.get('id', '')
             if not sub_id:
@@ -759,11 +754,11 @@ class CanadianLawXMLParser:
                     if key.endswith('id'):
                         sub_id = subsection_elem.attrib[key]
                         break
-            
-            # Get subsection title (if any)
+            # Get subsection title (if any), fallback to regulation_title if missing
             sub_margin_elem = self._find(subsection_elem, 'MarginalNote')
             sub_title = self._get_text(sub_margin_elem) if sub_margin_elem is not None else None
-            
+            if (not sub_title or not sub_title.strip()) and regulation_title:
+                sub_title = regulation_title
             if sub_text:
                 # Create subsection
                 subsection = ParsedSection(
@@ -775,7 +770,6 @@ class CanadianLawXMLParser:
                     parent_id=section_id
                 )
                 subsections.append(subsection)
-                
                 content_parts.append(f"{sub_label} {sub_text}")
                 full_text_parts.append(f"  {sub_label} {sub_text}")
         
