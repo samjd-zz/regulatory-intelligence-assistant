@@ -44,8 +44,8 @@ docker compose exec backend python scripts/init_data.py
 
 Prompts you to choose:
 1. **Canadian Laws** (Acts/Lois) - ~800 documents  
-2. **Regulations** - ~1,000 documents  
-3. **Both** (Full Dataset) - ~1,827 documents  
+2. **Regulations** - ~4,240 documents  
+3. **Both** (Full Dataset) - ~5,040 documents  
 4. **Custom limit** - Specify number of documents for testing
 
 **Non-Interactive Mode:**

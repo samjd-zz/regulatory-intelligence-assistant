@@ -79,9 +79,9 @@ def prompt_user_choice(existing_stats: dict) -> tuple:
     print("\nWhat data would you like to load?")
     print("\n1. Canadian Laws (Acts/Lois) - ~800 documents")
     print("   Examples: Employment Insurance Act, Canada Pension Plan")
-    print("\n2. Regulations - ~1,000 documents")
+    print("\n2. Regulations - ~4,240 documents")
     print("   Examples: Employment Insurance Regulations")
-    print("\n3. Both Laws and Regulations (Full Dataset) - ~1,827 documents")
+    print("\n3. Both Laws and Regulations (Full Dataset) - ~5,040 documents")
     print("   Includes all Canadian federal legislation")
     print("\n0. Skip data loading (for manual ingestion later)")
     

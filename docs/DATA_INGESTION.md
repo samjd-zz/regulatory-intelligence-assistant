@@ -15,8 +15,8 @@ docker compose exec backend python scripts/init_data.py --type laws --limit 10 -
 The init_data.py script offers:
 - **Interactive Mode**: Guides you through choosing data type and limits
 - **Canadian Laws**: ~800 Acts (Employment Insurance, Canada Pension Plan, etc.)
-- **Regulations**: ~1,000 regulations (SOR/DORS documents)
-- **Both**: Full dataset (~1,827 documents)
+- **Regulations**: ~4,240 regulations (SOR/DORS documents)
+- **Both**: Full dataset (~5,040 documents)
 - **Flexible Limits**: Test with 10, 50, 100, or load everything
 
 ## Full Data Ingestion

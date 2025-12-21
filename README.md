@@ -22,9 +22,9 @@ docker compose up -d
 docker compose exec backend python scripts/init_data.py
 
 # The wizard guides you through:
-#   1. Canadian Laws (Acts) - ~800 documents
-#   2. Regulations - ~1,000 documents  
-#   3. Both (Full Dataset) - ~1,827 documents
+#   1. Canadian Laws (Acts/Lois) - ~800 documents
+#   2. Regulations - ~4,240 documents  
+#   3. Both (Full Dataset) - ~5,040 documents total
 #   Plus optional limits for testing (e.g., 10, 50, 100)
 
 # 5. Access the application
@@ -43,7 +43,7 @@ docker compose exec backend python scripts/init_data.py
 - **5-tier fallback architecture**: Elasticsearch → ES Sections → Neo4j Graph → PostgreSQL FTS → Metadata
 - **Enhanced Performance**: PostgreSQL <50ms, Neo4j <200ms, Elasticsearch <500ms
 - **Smart Search**: Legal synonyms expansion, fuzzy matching, highlighted snippets
-- **398K+ documents** searchable with relevance ranking
+- **399K+ documents** searchable with relevance ranking
 
 ### 💬 AI-Powered Q&A
 - **Chain-of-Thought reasoning**: 5-step systematic analysis (3-5% accuracy boost)
@@ -68,9 +68,9 @@ docker compose exec backend python scripts/init_data.py
 **Current Version**: v1.4.3 (Docker Deployment & Intelligent Data Initialization)
 
 ### Data Loaded
-- **PostgreSQL**: 1,827 regulations + 277,031 sections (278,858 total)
-- **Elasticsearch**: 277,812 documents indexed
-- **Neo4j**: 278,858 nodes + 470,353 relationships
+- **PostgreSQL**: 4,240 regulations + 395,465 sections (399,705 total)
+- **Elasticsearch**: 399,705 documents indexed
+- **Neo4j**: 399,705 nodes + 470,353 relationships
 
 ### Test Coverage
 - **397 tests passing** (100% pass rate)
@@ -285,7 +285,7 @@ docker compose exec backend python scripts/init_data.py --type regulations --lim
 # Production - all laws (~800 documents)
 docker compose exec backend python scripts/init_data.py --type laws --non-interactive
 
-# Production - everything (~1,827 documents)
+# Production - everything (~5,040 documents)
 docker compose exec backend python scripts/init_data.py --type both --non-interactive
 ```
 
