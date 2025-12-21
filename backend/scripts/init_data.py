@@ -13,6 +13,7 @@ import sys
 import os
 import argparse
 from pathlib import Path
+from typing import Optional
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -238,9 +239,33 @@ def run_ingestion(data_type: str, limit: Optional[int] = None):
         
         print("\n⏳ Processing files... (this may take several minutes)")
         
-        # Process files
+        # Process files directly since we've already filtered them
         import asyncio
-        asyncio.run(pipeline.ingest_directory(data_dir, limit=limit))
+        
+        async def process_files():
+            """Process the filtered XML files."""
+            for i, xml_file in enumerate(xml_files, 1):
+                print(f"[{i}/{len(xml_files)}] Processing {xml_file.name}...")
+                try:
+                    await pipeline.ingest_xml_file(str(xml_file))
+                    pipeline.stats['successful'] += 1
+                except Exception as e:
+                    print(f"  ✗ Failed: {e}")
+                    pipeline.stats['failed'] += 1
+                
+                if i % 10 == 0:
+                    print(f"  Progress: {i}/{len(xml_files)} files processed")
+        
+        # Update total files stat and run processing
+        pipeline.stats['total_files'] = len(xml_files)
+        asyncio.run(process_files())
+        
+        # Commit final changes
+        try:
+            db.commit()
+        except Exception as e:
+            print(f"Warning: Final commit failed: {e}")
+            db.rollback()
         
         # Print statistics
         print("\n" + "="*60)
