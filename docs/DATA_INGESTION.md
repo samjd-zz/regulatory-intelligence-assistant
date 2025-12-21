@@ -5,16 +5,19 @@ Complete guide to loading regulatory data into the system.
 ## Quick Load Sample Data
 
 ```bash
-# Load 10 Canadian federal acts (5-10 minutes)
-docker compose exec backend python seed_data.py
+# Interactive wizard (recommended for first-time users)
+docker compose exec backend python scripts/init_data.py
+
+# Or load 10 laws for quick testing (2-5 minutes)
+docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive
 ```
 
-This loads sample data including:
-- Employment Insurance Act
-- Canada Pension Plan
-- Income Tax Act
-- Immigration and Refugee Protection Act
-- And 6 more acts
+The init_data.py script offers:
+- **Interactive Mode**: Guides you through choosing data type and limits
+- **Canadian Laws**: ~800 Acts (Employment Insurance, Canada Pension Plan, etc.)
+- **Regulations**: ~1,000 regulations (SOR/DORS documents)
+- **Both**: Full dataset (~1,827 documents)
+- **Flexible Limits**: Test with 10, 50, 100, or load everything
 
 ## Full Data Ingestion
 
@@ -27,23 +30,35 @@ For production use with complete regulatory datasets.
 - 4GB RAM available
 - Stable internet connection
 
-### Step 1: Download Canadian Laws
+### Automated Ingestion (Recommended)
 
 ```bash
-# Download XML files from Justice Canada
-docker compose exec backend python ingestion/download_canadian_laws.py
+# Interactive wizard handles download + ingestion
+docker compose exec backend python scripts/init_data.py
 
-# Progress will be shown:
-# Downloading: 1/1827 acts...
-# Saved: regulations/S-1.xml
+# Non-interactive for automation
+docker compose exec backend python scripts/init_data.py --type both --non-interactive
 ```
 
-### Step 2: Parse and Ingest
+The init_data.py script automatically:
+1. ✅ Checks for existing data
+2. ✅ Downloads from Justice Canada if missing
+3. ✅ Filters by type (laws/regulations)
+4. ✅ Applies user-specified limits
+5. ✅ Ingests into PostgreSQL, Neo4j, and Elasticsearch
+6. ✅ Shows progress and statistics
+
+### Manual Step-by-Step (Advanced)
+
+If you need manual control:
 
 ```bash
-# Run the complete ingestion pipeline
+# Step 1: Download XML files from Justice Canada
+docker compose exec backend python ingestion/download_canadian_laws.py
+
+# Step 2: Run the complete ingestion pipeline
 docker compose exec backend python ingestion/data_pipeline.py \
-  --source regulations/ \
+  --source data/regulations/canadian_laws/ \
   --jurisdiction CA \
   --batch-size 100
 ```

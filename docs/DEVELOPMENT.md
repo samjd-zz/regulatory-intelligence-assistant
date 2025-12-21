@@ -102,8 +102,11 @@ npm run format
 backend/
 ├── main.py                     # FastAPI app entry
 ├── database.py                 # SQLAlchemy setup
-├── create_tables.py           # DB initialization
-├── seed_data.py               # Sample data loader
+│
+├── scripts/                    # Utility scripts
+│   ├── init_data.py           # Intelligent data loader (NEW)
+│   ├── data_summary.sh        # Database statistics
+│   ├── deprecated/            # Old scripts (archived)
 │
 ├── services/                   # Business logic
 │   ├── compliance_checker.py  # Compliance validation
@@ -378,13 +381,13 @@ npm run test:coverage
 ### Test Data
 
 ```bash
-# Load test data
-docker compose exec backend python seed_data.py
+# Load test data (10 documents for quick testing)
+docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive
 
-# Clear test data
-docker compose exec backend python scripts/clear_test_data.py
+# Check data status
+bash backend/scripts/data_summary.sh
 
-# Generate fixtures
+# Generate test fixtures
 docker compose exec backend python tests/generate_fixtures.py
 ```
 
