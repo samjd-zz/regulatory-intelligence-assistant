@@ -188,6 +188,7 @@ class RAGService:
                 start_time=start_time
             )
         # Regular questions use RAG
+        logger.info("Detected RAG intent - routing to RAG")
         return self._answer_with_rag(
             question=question,
             filters=filters,
