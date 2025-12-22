@@ -165,6 +165,11 @@ class RAGService:
         start_time = datetime.now()
         parsed_query = self.query_parser.parse_query(question)
         combined_filters = filters or {}
+        if 'language' not in combined_filters:
+            detected_lang = self._detect_language(question)
+            combined_filters['language'] = detected_lang
+            logger.info(f"Auto-detected language '{detected_lang}' added to filters")
+
         # Route graph relationship questions to Neo4j
         if parsed_query.intent == QueryIntent.GRAPH_RELATIONSHIP:
             logger.info("Detected GRAPH_RELATIONSHIP intent - routing to Neo4j")
@@ -183,7 +188,7 @@ class RAGService:
                 start_time=start_time
             )
         # Regular questions use RAG
-        return self._answer_with_rag(
+        return self.answer_question(
             question=question,
             filters=filters,
             num_context_docs=num_context_docs,
