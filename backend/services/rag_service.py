@@ -150,7 +150,7 @@ class RAGService:
                 raise ValueError("Could not initialize Neo4j client for GraphRelationshipService: " + str(e))
         self.graph_relationship_service = GraphRelationshipService(neo4j_client)
 
-    def answer_question_enhanced_routing(
+    def answer_question(
         self,
         question: str,
         filters: Optional[Dict] = None,
@@ -188,7 +188,7 @@ class RAGService:
                 start_time=start_time
             )
         # Regular questions use RAG
-        return self.answer_question(
+        return self._answer_with_rag(
             question=question,
             filters=filters,
             num_context_docs=num_context_docs,
@@ -367,7 +367,7 @@ Be precise and cite specific sections when possible."""
             logger.warning(f"Language detection failed: {e}. Defaulting to English")
             return 'en'
 
-    def answer_question(
+    def _answer_with_rag(
         self,
         question: str,
         filters: Optional[Dict] = None,
@@ -407,24 +407,13 @@ Be precise and cite specific sections when possible."""
         # Use only user-provided filters, NOT auto-extracted filters
         # Auto-extracted filters cause issues when documents lack metadata
         combined_filters = filters or {}
-        # Don't merge: combined_filters.update(parsed_query.filters)
-        
-        # AUTOMATIC LANGUAGE DETECTION AND FILTERING
+
         # If no language filter is provided, detect it automatically
         if 'language' not in combined_filters:
             detected_lang = self._detect_language(question)
             combined_filters['language'] = detected_lang
             logger.info(f"Auto-detected language '{detected_lang}' added to filters")
 
-        # STATISTICS ROUTING: Route count/statistics questions to database
-        # instead of RAG which is limited by context window
-        if parsed_query.intent == QueryIntent.STATISTICS:
-            logger.info(f"Detected STATISTICS intent - routing to database query instead of RAG")
-            return self._answer_statistics_question(
-                question=question,
-                filters=combined_filters,
-                start_time=start_time
-            )
 
         # Retrieve relevant documents with MULTI-TIER SEARCH (Phase 4 Enhancement)
         logger.info(f"🔍 Starting multi-tier search for: {question[:50]}...")

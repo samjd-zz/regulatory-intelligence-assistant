@@ -1,124 +1,215 @@
 from typing import Dict, List, Any, Optional
-from neo4j import GraphDatabase
 import logging
 
 logger = logging.getLogger(__name__)
 
+
 class GraphRelationshipService:
     """Service for querying Neo4j graph relationships"""
+    
     def __init__(self, neo4j_client):
         self.client = neo4j_client
-    
-    def find_references(
-        self, 
-        document_id: Optional[str] = None,
-        document_title: Optional[str] = None,
+
+    def find_has_section(
+        self,
+        legislation_id: Optional[str] = None,
+        legislation_title: Optional[str] = None,
         limit: int = 50
     ) -> List[Dict[str, Any]]:
-        """Find what a document references (outgoing CITES relationships)"""
-        
+        """Find sections belonging to a legislation (HAS_SECTION)"""
         query = """
-        MATCH (source:Document)-[r:CITES]->(target:Document)
-        WHERE $document_id IS NULL OR source.id = $document_id
-        OR ($document_title IS NOT NULL AND source.title CONTAINS $document_title)
-        RETURN 
-            source.title AS source_title,
-            source.id AS source_id,
-            target.title AS target_title,
-            target.id AS target_id,
-            r.section AS cited_section,
-            type(r) AS relationship_type
+        MATCH (l:Legislation)-[r:HAS_SECTION]->(s:Section)
+        WHERE ($legislation_id IS NULL OR l.id = $legislation_id)
+          AND ($legislation_title IS NULL OR l.title CONTAINS $legislation_title)
+        RETURN l.title AS legislation_title,
+               l.id AS legislation_id,
+               s.title AS section_title,
+               s.id AS section_id,
+               s.section_number AS section_number,
+               r.order AS section_order,
+               r.created_at AS created_at
+        ORDER BY r.order
         LIMIT $limit
         """
-        
         return self.client.execute_query(
             query,
             {
-                "document_id": document_id,
-                "document_title": document_title,
+                "legislation_id": legislation_id,
+                "legislation_title": legislation_title,
+                "limit": limit
+            }
+        )
+
+    def find_part_of(
+        self,
+        section_id: Optional[str] = None,
+        section_title: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Find parent-child section hierarchy (PART_OF)"""
+        query = """
+        MATCH (child:Section)-[r:PART_OF]->(parent:Section)
+        WHERE ($section_id IS NULL OR child.id = $section_id)
+          AND ($section_title IS NULL OR child.title CONTAINS $section_title)
+        RETURN child.title AS child_title,
+               child.id AS child_id,
+               parent.title AS parent_title,
+               parent.id AS parent_id,
+               r.created_at AS created_at
+        LIMIT $limit
+        """
+        return self.client.execute_query(
+            query,
+            {
+                "section_id": section_id,
+                "section_title": section_title,
+                "limit": limit
+            }
+        )
+
+    def find_relevant_for(
+        self,
+        section_title: Optional[str] = None,
+        situation_description: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Find sections relevant for a situation (RELEVANT_FOR)"""
+        query = """
+        MATCH (s:Section)-[r:RELEVANT_FOR]->(sit:Situation)
+        WHERE ($section_title IS NULL OR s.title CONTAINS $section_title)
+          AND ($situation_description IS NULL OR sit.description CONTAINS $situation_description)
+        RETURN s.title AS section_title,
+               s.id AS section_id,
+               sit.description AS situation_description,
+               sit.id AS situation_id,
+               r.relevance_score AS relevance_score,
+               r.created_at AS created_at
+        ORDER BY r.relevance_score DESC
+        LIMIT $limit
+        """
+        return self.client.execute_query(
+            query,
+            {
+                "section_title": section_title,
+                "situation_description": situation_description,
+                "limit": limit
+            }
+        )
+
+    def find_applies_to(
+        self,
+        regulation_title: Optional[str] = None,
+        program_name: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Find regulations that apply to a program (APPLIES_TO)"""
+        query = """
+        MATCH (reg:Regulation)-[r:APPLIES_TO]->(p:Program)
+        WHERE ($regulation_title IS NULL OR reg.title CONTAINS $regulation_title)
+          AND ($program_name IS NULL OR p.name CONTAINS $program_name)
+        RETURN reg.title AS regulation_title,
+               reg.id AS regulation_id,
+               p.name AS program_name,
+               p.id AS program_id,
+               r.created_at AS created_at
+        LIMIT $limit
+        """
+        return self.client.execute_query(
+            query,
+            {
+                "regulation_title": regulation_title,
+                "program_name": program_name,
+                "limit": limit
+            }
+        )
+    
+    def find_references(
+        self, 
+        source_id: Optional[str] = None,
+        source_title: Optional[str] = None,
+        limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """Find what a legislation/regulation references (outgoing REFERENCES relationships)"""
+        query = """
+        MATCH (source)-[r:REFERENCES]->(target)
+        WHERE (source:Legislation OR source:Regulation OR source:Policy)
+          AND (target:Legislation OR target:Regulation OR target:Policy)
+          AND ($source_id IS NULL OR source.id = $source_id)
+          AND ($source_title IS NULL OR source.title CONTAINS $source_title)
+        RETURN 
+            source.title AS source_title,
+            source.id AS source_id,
+            labels(source)[0] AS source_type,
+            target.title AS target_title,
+            target.id AS target_id,
+            labels(target)[0] AS target_type,
+            r.citation_text AS citation_text,
+            r.created_at AS created_at
+        LIMIT $limit
+        """
+        return self.client.execute_query(
+            query,
+            {
+                "source_id": source_id,
+                "source_title": source_title,
                 "limit": limit
             }
         )
     
     def find_referenced_by(
         self,
-        document_id: Optional[str] = None,
-        document_title: Optional[str] = None,
+        target_id: Optional[str] = None,
+        target_title: Optional[str] = None,
         limit: int = 50
     ) -> List[Dict[str, Any]]:
-        """Find what references a document (incoming CITES relationships)"""
-        
+        """Find what references a legislation/regulation (incoming REFERENCES relationships)"""
         query = """
-        MATCH (source:Document)-[r:CITES]->(target:Document)
-        WHERE $document_id IS NULL OR target.id = $document_id
-        OR ($document_title IS NOT NULL AND target.title CONTAINS $document_title)
+        MATCH (source)-[r:REFERENCES]->(target)
+        WHERE (source:Legislation OR source:Regulation OR source:Policy)
+          AND (target:Legislation OR target:Regulation OR target:Policy)
+          AND ($target_id IS NULL OR target.id = $target_id)
+          AND ($target_title IS NULL OR target.title CONTAINS $target_title)
         RETURN 
             source.title AS referencing_document,
             source.id AS source_id,
+            labels(source)[0] AS source_type,
             target.title AS referenced_document,
             target.id AS target_id,
-            r.section AS cited_section,
-            type(r) AS relationship_type
+            labels(target)[0] AS target_type,
+            r.citation_text AS citation_text,
+            r.created_at AS created_at
         LIMIT $limit
         """
-        
         return self.client.execute_query(
             query,
             {
-                "document_id": document_id,
-                "document_title": document_title,
+                "target_id": target_id,
+                "target_title": target_title,
                 "limit": limit
-            }
-        )
-    
-    def find_amendments(
-        self,
-        document_id: Optional[str] = None,
-        document_title: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
-        """Find amendments to a document"""
-        
-        query = """
-        MATCH (source:Document)-[r:AMENDS]->(target:Document)
-        WHERE $document_id IS NULL OR target.id = $document_id
-        OR ($document_title IS NOT NULL AND target.title CONTAINS $document_title)
-        RETURN 
-            source.title AS amending_document,
-            source.id AS source_id,
-            target.title AS amended_document,
-            target.id AS target_id,
-            r.effective_date AS effective_date,
-            type(r) AS relationship_type
-        """
-        
-        return self.client.execute_query(
-            query,
-            {
-                "document_id": document_id,
-                "document_title": document_title
             }
         )
     
     def find_implementations(
         self,
-        act_title: Optional[str] = None
+        legislation_title: Optional[str] = None,
+        limit: int = 50
     ) -> List[Dict[str, Any]]:
-        """Find regulations that implement an act"""
-        
+        """Find regulations that implement legislation (IMPLEMENTS)"""
         query = """
-        MATCH (reg:Document)-[r:IMPLEMENTS]->(act:Document)
-        WHERE $act_title IS NULL OR act.title CONTAINS $act_title
+        MATCH (reg:Regulation)-[r:IMPLEMENTS]->(leg:Legislation)
+        WHERE $legislation_title IS NULL OR leg.title CONTAINS $legislation_title
         RETURN 
             reg.title AS regulation_title,
             reg.id AS regulation_id,
-            act.title AS act_title,
-            act.id AS act_id,
-            type(r) AS relationship_type
+            leg.title AS legislation_title,
+            leg.id AS legislation_id,
+            r.description AS description,
+            r.created_at AS created_at
+        LIMIT $limit
         """
-        
         return self.client.execute_query(
             query,
-            {"act_title": act_title}
+            {"legislation_title": legislation_title, "limit": limit}
         )
     
     def format_relationship_answer(
@@ -140,24 +231,36 @@ class GraphRelationshipService:
         for i, rel in enumerate(relationships[:10], 1):  # Limit to top 10 for readability
             if relationship_type == "references":
                 answer += f"{i}. **{rel['source_title']}** references **{rel['target_title']}**"
-                if rel.get('cited_section'):
-                    answer += f" (Section {rel['cited_section']})"
+                if rel.get('citation_text'):
+                    answer += f" ({rel['citation_text']})"
                 answer += "\n"
             
             elif relationship_type == "referenced_by":
                 answer += f"{i}. **{rel['referencing_document']}** references this document"
-                if rel.get('cited_section'):
-                    answer += f" (citing Section {rel['cited_section']})"
-                answer += "\n"
-            
-            elif relationship_type == "amendments":
-                answer += f"{i}. **{rel['amending_document']}** amends this document"
-                if rel.get('effective_date'):
-                    answer += f" (effective {rel['effective_date']})"
+                if rel.get('citation_text'):
+                    answer += f" ({rel['citation_text']})"
                 answer += "\n"
             
             elif relationship_type == "implementations":
-                answer += f"{i}. **{rel['regulation_title']}** implements this act\n"
+                answer += f"{i}. **{rel['regulation_title']}** implements **{rel['legislation_title']}**"
+                if rel.get('description'):
+                    answer += f" - {rel['description']}"
+                answer += "\n"
+            
+            elif relationship_type == "has_section":
+                answer += f"{i}. **{rel['legislation_title']}** has section **{rel['section_title']}**"
+                if rel.get('section_number'):
+                    answer += f" (Section {rel['section_number']})"
+                answer += "\n"
+            
+            elif relationship_type == "applies_to":
+                answer += f"{i}. **{rel['regulation_title']}** applies to **{rel['program_name']}**\n"
+            
+            elif relationship_type == "relevant_for":
+                answer += f"{i}. **{rel['section_title']}** is relevant for: {rel['situation_description']}"
+                if rel.get('relevance_score'):
+                    answer += f" (relevance: {rel['relevance_score']:.2f})"
+                answer += "\n"
         
         if count > 10:
             answer += f"\n... and {count - 10} more {relationship_type}."
