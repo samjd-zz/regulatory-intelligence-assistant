@@ -40,6 +40,7 @@ class QueryIntent(str, Enum):
     DEFINITION = "definition"  # What does a term mean
     COMPARISON = "comparison"  # Comparing regulations or options
     STATISTICS = "statistics"  # Asking about counts, totals, numbers, statistics
+    GRAPH_RELATIONSHIP = "graph_relationship"  # Relationship/citation queries
     UNKNOWN = "unknown"  # Cannot determine intent
 
 
@@ -89,6 +90,11 @@ class LegalQueryParser:
 
     # Intent classification patterns
     INTENT_PATTERNS = {
+        QueryIntent.GRAPH_RELATIONSHIP: [
+            r'\b(references?|cites?|cited by|referenced by|mentions?|mentioned by|refers? to|implements?|enforces?|amends?|amended by|modifies?|modified by)\b',
+            r'\b(what (laws|regulations|acts|sections|amendments) (reference|cite|amend|implement|mention|enforce|modify))\b',
+            r'\b(relationship[s]? between|how is.*related to)\b',
+        ],
         QueryIntent.SEARCH: [
             r'\b(find|search|look for|locate|show me|list)\b',
             r'\b(what are|which|where can i find)\b',

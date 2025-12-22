@@ -34,6 +34,7 @@ from services.query_parser import LegalQueryParser, QueryIntent
 from services.statistics_service import StatisticsService
 from services.postgres_search_service import PostgresSearchService, get_postgres_search_service
 from services.graph_service import GraphService, get_graph_service
+from services.graph_relationship_service import GraphRelationshipService
 from config.legal_synonyms import expand_query_with_synonyms
 
 # Configure logging
@@ -136,6 +137,143 @@ class RAGService:
         self.tier_usage_stats = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
         self.zero_result_count = 0
         self.total_queries = 0
+
+        # Use the same Neo4j driver as graph_service if available, else require explicit driver
+        # Try to get Neo4j client from graph_service, fallback to direct import if needed
+        neo4j_client = None
+        if self.graph_service and hasattr(self.graph_service, 'client'):
+            neo4j_client = getattr(self.graph_service, 'client')
+        if neo4j_client is None:
+            try:
+                neo4j_client = get_graph_service().client
+            except Exception as e:
+                raise ValueError("Could not initialize Neo4j client for GraphRelationshipService: " + str(e))
+        self.graph_relationship_service = GraphRelationshipService(neo4j_client)
+
+    def answer_question_enhanced_routing(
+        self,
+        question: str,
+        filters: Optional[Dict] = None,
+        num_context_docs: int = 10,  # Increased from 5 to 10 for better coverage
+        use_cache: bool = True,
+        temperature: float = 0.3,
+        max_tokens: int = 8192
+    ) -> 'RAGAnswer':
+        """
+        Answer a question using RAG or relationship/statistics routing.
+        """
+        start_time = datetime.now()
+        parsed_query = self.query_parser.parse_query(question)
+        combined_filters = filters or {}
+        # Route graph relationship questions to Neo4j
+        if parsed_query.intent == QueryIntent.GRAPH_RELATIONSHIP:
+            logger.info("Detected GRAPH_RELATIONSHIP intent - routing to Neo4j")
+            return self._answer_graph_relationship_question(
+                question=question,
+                parsed_query=parsed_query,
+                filters=combined_filters,
+                start_time=start_time.timestamp()
+            )
+        # Route statistics questions to database
+        if parsed_query.intent == QueryIntent.STATISTICS:
+            logger.info("Detected STATISTICS intent - routing to database")
+            return self._answer_statistics_question(
+                question=question,
+                filters=combined_filters,
+                start_time=start_time
+            )
+        # Regular questions use RAG
+        return self._answer_with_rag(
+            question=question,
+            filters=filters,
+            num_context_docs=num_context_docs,
+            use_cache=use_cache,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+    
+    def _answer_graph_relationship_question(
+        self,
+        question: str,
+        parsed_query: Any,
+        filters: Dict[str, Any],
+        start_time: float
+    ) -> 'RAGAnswer':
+        """Answer questions about graph relationships using Neo4j and return a RAGAnswer."""
+        import time
+        relationship_type = self._detect_relationship_type(question)
+        # Extract document title from entities
+        document_title = None
+        for entity in parsed_query.entities:
+            if hasattr(entity, 'entity_type') and entity.entity_type.name.lower() == 'document':
+                document_title = getattr(entity, 'normalized', None) or getattr(entity, 'text', None)
+                break
+
+        # Query Neo4j based on relationship type
+        if relationship_type == "references":
+            relationships = self.graph_relationship_service.find_references(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "referenced_by":
+            relationships = self.graph_relationship_service.find_referenced_by(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "amendments":
+            relationships = self.graph_relationship_service.find_amendments(
+                document_title=document_title
+            )
+        elif relationship_type == "implementations":
+            relationships = self.graph_relationship_service.find_implementations(
+                act_title=document_title
+            )
+        else:
+            relationships = self.graph_relationship_service.find_references(
+                document_title=document_title,
+                limit=50
+            )
+
+        answer = self.graph_relationship_service.format_relationship_answer(
+            relationships=relationships,
+            question=question,
+            relationship_type=relationship_type
+        )
+        response_time_ms = int((time.time() - start_time) * 1000)
+        # For relationship queries, we don't have document citations, but we can optionally build pseudo-citations if needed
+        # For now, leave citations empty
+        return RAGAnswer(
+            question=question,
+            answer=answer,
+            citations=[],
+            confidence_score=0.90,
+            source_documents=[],
+            intent="graph_relationship",
+            processing_time_ms=response_time_ms,
+            metadata={
+                "relationship_type": relationship_type,
+                "query_type": "neo4j_graph_query",
+                "relationship_count": len(relationships),
+                "entities": parsed_query.entities
+            }
+        )
+    
+    def _detect_relationship_type(self, question: str) -> str:
+        """Detect the type of relationship query"""
+        question_lower = question.lower()
+        
+        if any(word in question_lower for word in ["references", "cites", "mentions", "refers to"]):
+            if any(word in question_lower for word in ["referenced by", "cited by", "mentioned by"]):
+                return "referenced_by"
+            return "references"
+        
+        if any(word in question_lower for word in ["amends", "amended", "modified"]):
+            return "amendments"
+        
+        if any(word in question_lower for word in ["implements", "enforces"]):
+            return "implementations"
+        
+        return "references"  # Default
 
     def _load_system_prompt(self) -> str:
         """Load the appropriate system prompt based on LLM provider."""
