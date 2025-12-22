@@ -91,8 +91,14 @@ class LegalQueryParser:
     # Intent classification patterns
     INTENT_PATTERNS = {
         QueryIntent.GRAPH_RELATIONSHIP: [
-            r'\b(references?|cites?|cited by|referenced by|mentions?|mentioned by|refers? to|implements?|enforces?|amends?|amended by|modifies?|modified by)\b',
-            r'\b(what (laws|regulations|acts|sections|amendments) (reference|cite|amend|implement|mention|enforce|modify))\b',
+            r'\b(has section|contains section|section)\b',
+            r'\b(part of|belongs to|included in)\b',
+            r'\b(references?|cites?|cited by|referenced by|mentions?|mentioned by|refers? to)\b',
+            r'\b(relevant for|relevant to|pertains to)\b',
+            r'\b(applies to|applicable to)\b',
+            r'\b(implements?|enforces?)\b',
+            r'\b(amends?|amended by|modifies?|modified by)\b',
+            r'\b(what (laws|regulations|acts|sections|amendments) (reference|cite|amend|implement|mention|enforce|modify|apply|relate|contain|belong|implement|pertain|enforce|modify))\b',
             r'\b(relationship[s]? between|how is.*related to)\b',
         ],
         QueryIntent.SEARCH: [

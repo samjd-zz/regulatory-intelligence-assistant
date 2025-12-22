@@ -210,7 +210,31 @@ class RAGService:
                 break
 
         # Query Neo4j based on relationship type
-        if relationship_type == "references":
+        if relationship_type == "has_section":
+            relationships = self.graph_relationship_service.find_has_section(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "part_of":
+            relationships = self.graph_relationship_service.find_part_of(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "relevant_for":
+            relationships = self.graph_relationship_service.find_relevant_for(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "applies_to":
+            relationships = self.graph_relationship_service.find_applies_to(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "implements":
+            relationships = self.graph_relationship_service.find_implementations(
+                act_title=document_title
+            )
+        elif relationship_type == "references":
             relationships = self.graph_relationship_service.find_references(
                 document_title=document_title,
                 limit=50
@@ -223,10 +247,6 @@ class RAGService:
         elif relationship_type == "amendments":
             relationships = self.graph_relationship_service.find_amendments(
                 document_title=document_title
-            )
-        elif relationship_type == "implementations":
-            relationships = self.graph_relationship_service.find_implementations(
-                act_title=document_title
             )
         else:
             relationships = self.graph_relationship_service.find_references(
@@ -261,18 +281,23 @@ class RAGService:
     def _detect_relationship_type(self, question: str) -> str:
         """Detect the type of relationship query"""
         question_lower = question.lower()
-        
+
+        if any(word in question_lower for word in ["has section", "section", "contains section"]):
+            return "has_section"
+        if any(word in question_lower for word in ["part of", "belongs to", "included in"]):
+            return "part_of"
+        if any(word in question_lower for word in ["relevant for", "relevant to", "pertains to"]):
+            return "relevant_for"
+        if any(word in question_lower for word in ["applies to", "applicable to"]):
+            return "applies_to"
+        if any(word in question_lower for word in ["implements", "enforces"]):
+            return "implements"
         if any(word in question_lower for word in ["references", "cites", "mentions", "refers to"]):
             if any(word in question_lower for word in ["referenced by", "cited by", "mentioned by"]):
                 return "referenced_by"
             return "references"
-        
         if any(word in question_lower for word in ["amends", "amended", "modified"]):
             return "amendments"
-        
-        if any(word in question_lower for word in ["implements", "enforces"]):
-            return "implementations"
-        
         return "references"  # Default
 
     def _load_system_prompt(self) -> str:
