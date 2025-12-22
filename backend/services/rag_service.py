@@ -154,7 +154,7 @@ class RAGService:
         self,
         question: str,
         filters: Optional[Dict] = None,
-        num_context_docs: int = 10,  # Increased from 5 to 10 for better coverage
+        num_context_docs: int = 7,  # Optimized: 7 provides best quality-to-noise ratio
         use_cache: bool = True,
         temperature: float = 0.3,
         max_tokens: int = 8192
@@ -372,7 +372,7 @@ Be precise and cite specific sections when possible."""
         self,
         question: str,
         filters: Optional[Dict] = None,
-        num_context_docs: int = 10,  # Increased from 5 to 10 for better coverage
+        num_context_docs: int = 7,  # Optimized: 7 provides best quality-to-noise ratio
         use_cache: bool = True,
         temperature: float = 0.3,
         max_tokens: int = 8192

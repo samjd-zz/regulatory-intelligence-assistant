@@ -5,10 +5,28 @@ echo "🚀 Starting Regulatory Intelligence Assistant Backend..."
 
 # Run database migrations
 echo "🔧 Running database migrations..."
-alembic upgrade head || {
-    echo "⚠️ Migrations failed, continuing anyway..."
+echo "Current migration status:"
+alembic current || {
+    echo "⚠️ Could not determine current migration version"
 }
+echo ""
+echo "Upgrading to latest revision..."
+if ! alembic upgrade head; then
+    echo ""
+    echo "❌ ERROR: Database migrations failed!"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Cannot start application with incorrect schema."
+    echo "Please check the migration files and database connection."
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    exit 1
+fi
+
+# Verify migration success
+echo ""
+echo "🔍 Verifying migration status..."
+CURRENT_REV=$(alembic current 2>&1 | grep -v "INFO" | tail -1)
 echo "✓ Database migrations complete"
+echo "  Current revision: $CURRENT_REV"
 
 # Wait for Neo4j to be ready
 echo "⏳ Waiting for Neo4j to be ready..."
@@ -20,9 +38,11 @@ echo "✓ Neo4j is ready"
 
 # Initialize Neo4j schema and indexes
 echo "🔧 Initializing Neo4j schema and fulltext indexes..."
-python scripts/init_neo4j.py || {
-    echo "⚠️ Schema initialization failed, continuing anyway..."
-}
+if ! python scripts/init_neo4j.py; then
+    echo "⚠️ WARNING: Neo4j schema initialization failed"
+    echo "This may affect graph database functionality."
+    echo "Continuing anyway as this is not critical for basic operation..."
+fi
 echo "✓ Neo4j schema initialization complete"
 
 # Wait for Elasticsearch to be ready
