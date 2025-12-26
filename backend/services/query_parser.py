@@ -97,8 +97,8 @@ class LegalQueryParser:
             r'\b(relevant for|relevant to|pertains to)\b',
             r'\b(applies to|applicable to)\b',
             r'\b(implements?|enforces?)\b',
-            r'\b(amends?|amended by|modifies?|modified by)\b',
-            r'\b(what (laws|regulations|acts|sections|amendments) (reference|cite|amend|implement|mention|enforce|modify|apply|relate|contain|belong|implement|pertain|enforce|modify))\b',
+            r'\b(amends?|amended by|modifies?|modified by|amendment|amendments|supersedes?|superseded by)\b',
+            r'\b(what (laws|regulations|acts|sections|amendments) (reference|cite|amend|implement|mention|enforce|modify|apply|relate|contain|belong|implement|pertain|enforce|modify|supersede|superseded|amend|amendment|amendments))\b',
             r'\b(relationship[s]? between|how is.*related to)\b',
         ],
         QueryIntent.SEARCH: [

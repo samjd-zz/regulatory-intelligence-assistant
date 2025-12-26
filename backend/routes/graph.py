@@ -11,18 +11,12 @@ import logging
 from database import get_db
 from utils.neo4j_client import get_neo4j_client, Neo4jClient
 from services.graph_builder import GraphBuilder
-from models.document_models import Document, DocumentType
+
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/graph", tags=["Knowledge Graph"])
 
-
-class GraphBuildRequest(BaseModel):
-    """Request to build graph for specific documents."""
-    document_ids: Optional[List[UUID]] = Field(None, description="Specific document IDs to process")
-    document_types: Optional[List[DocumentType]] = Field(None, description="Document types to process")
-    limit: Optional[int] = Field(None, description="Maximum number of documents to process", ge=1, le=1000)
 
 
 class GraphBuildResponse(BaseModel):
@@ -39,98 +33,6 @@ class GraphStatsResponse(BaseModel):
     summary: Dict[str, int]
 
 
-@router.post("/build", response_model=GraphBuildResponse)
-async def build_graph(
-    request: GraphBuildRequest,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    neo4j: Neo4jClient = Depends(get_neo4j_client)
-):
-    """
-    Build knowledge graph from processed documents.
-    
-    This operation runs in the background and processes documents asynchronously.
-    """
-    try:
-        builder = GraphBuilder(db, neo4j)
-        
-        # Build query
-        query = db.query(Document).filter_by(is_processed=True)
-        
-        if request.document_ids:
-            query = query.filter(Document.id.in_(request.document_ids))
-        
-        if request.document_types:
-            query = query.filter(Document.document_type.in_(request.document_types))
-        
-        if request.limit:
-            query = query.limit(request.limit)
-        
-        document_count = query.count()
-        
-        if document_count == 0:
-            raise HTTPException(
-                status_code=404,
-                detail="No processed documents found matching criteria"
-            )
-        
-        # Start background task
-        background_tasks.add_task(
-            _build_graph_background,
-            db,
-            neo4j,
-            request
-        )
-        
-        return GraphBuildResponse(
-            status="started",
-            message=f"Graph building started for {document_count} documents",
-            stats={"documents_queued": document_count}
-        )
-        
-    except Exception as e:
-        logger.error(f"Error starting graph build: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/build/{document_id}", response_model=GraphBuildResponse)
-async def build_document_graph(
-    document_id: UUID,
-    db: Session = Depends(get_db),
-    neo4j: Neo4jClient = Depends(get_neo4j_client)
-):
-    """
-    Build knowledge graph for a single document.
-    
-    This operation runs synchronously and returns immediately.
-    """
-    try:
-        # Check document exists
-        document = db.query(Document).filter_by(id=document_id).first()
-        if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
-        
-        if not document.is_processed:
-            raise HTTPException(
-                status_code=400,
-                detail="Document has not been processed yet"
-            )
-        
-        # Build graph
-        builder = GraphBuilder(db, neo4j)
-        stats = builder.build_document_graph(document_id)
-        
-        return GraphBuildResponse(
-            status="completed",
-            message=f"Graph built successfully for {document.title}",
-            stats=stats
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error building graph for document {document_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stats", response_model=GraphStatsResponse)
@@ -297,49 +199,3 @@ async def clear_graph(
     except Exception as e:
         logger.error(f"Error clearing graph: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-def _build_graph_background(
-    db: Session,
-    neo4j: Neo4jClient,
-    request: GraphBuildRequest
-):
-    """
-    Background task to build graph.
-    
-    This runs asynchronously and doesn't return results to the caller.
-    """
-    try:
-        logger.info("Starting background graph building...")
-        
-        builder = GraphBuilder(db, neo4j)
-        
-        # Build query
-        query = db.query(Document).filter_by(is_processed=True)
-        
-        if request.document_ids:
-            query = query.filter(Document.id.in_(request.document_ids))
-        
-        if request.document_types:
-            query = query.filter(Document.document_type.in_(request.document_types))
-        
-        if request.limit:
-            query = query.limit(request.limit)
-        
-        documents = query.all()
-        
-        # Process each document
-        for doc in documents:
-            try:
-                builder.build_document_graph(doc.id)
-                logger.info(f"Built graph for: {doc.title}")
-            except Exception as e:
-                logger.error(f"Failed to build graph for {doc.title}: {e}")
-        
-        # Create inter-document relationships
-        builder.create_inter_document_relationships()
-        
-        logger.info("Background graph building completed")
-        
-    except Exception as e:
-        logger.error(f"Background graph building failed: {e}")

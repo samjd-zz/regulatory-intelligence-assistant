@@ -90,7 +90,7 @@ export async function askQuestion(request: QARequest): Promise<QAResponse> {
 // ============================================================================
 
 export async function getRegulation(id: string): Promise<Regulation> {
-  const { data } = await api.get(`/documents/${id}`)
+  const { data } = await api.get(`/regulation/${id}`)
   return data
 }
 

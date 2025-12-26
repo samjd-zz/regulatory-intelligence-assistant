@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from utils.neo4j_client import Neo4jClient
+from utils.neo4j_indexes import setup_neo4j_constraints
 from services.graph_builder import GraphBuilder
 from models import Regulation
 
@@ -23,56 +24,6 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
-
-
-def setup_neo4j_constraints(neo4j: Neo4jClient):
-    """
-    Create Neo4j constraints and indexes.
-    
-    Args:
-        neo4j: Neo4j client instance
-    """
-    logger.info("Setting up Neo4j constraints and indexes...")
-    
-    constraints = [
-        "CREATE CONSTRAINT legislation_id IF NOT EXISTS FOR (l:Legislation) REQUIRE l.id IS UNIQUE",
-        "CREATE CONSTRAINT section_id IF NOT EXISTS FOR (s:Section) REQUIRE s.id IS UNIQUE",
-        "CREATE CONSTRAINT regulation_id IF NOT EXISTS FOR (r:Regulation) REQUIRE r.id IS UNIQUE",
-        "CREATE CONSTRAINT policy_id IF NOT EXISTS FOR (p:Policy) REQUIRE p.id IS UNIQUE",
-        "CREATE CONSTRAINT program_id IF NOT EXISTS FOR (prog:Program) REQUIRE prog.id IS UNIQUE",
-        "CREATE CONSTRAINT situation_id IF NOT EXISTS FOR (sit:Situation) REQUIRE sit.id IS UNIQUE",
-    ]
-    
-    indexes = [
-        "CREATE INDEX legislation_title IF NOT EXISTS FOR (l:Legislation) ON (l.title)",
-        "CREATE INDEX legislation_jurisdiction IF NOT EXISTS FOR (l:Legislation) ON (l.jurisdiction)",
-        "CREATE INDEX legislation_status IF NOT EXISTS FOR (l:Legislation) ON (l.status)",
-        "CREATE INDEX section_number IF NOT EXISTS FOR (s:Section) ON (s.section_number)",
-        "CREATE INDEX program_name IF NOT EXISTS FOR (p:Program) ON (p.name)",
-    ]
-    
-    # Full-text indexes  
-    fulltext_indexes = [
-        """
-        CREATE FULLTEXT INDEX legislation_fulltext IF NOT EXISTS
-        FOR (l:Legislation) ON EACH [l.title, l.full_text, l.act_number]
-        """,
-        """
-        CREATE FULLTEXT INDEX regulation_fulltext IF NOT EXISTS
-        FOR (r:Regulation) ON EACH [r.title, r.full_text]
-        """,
-        """
-        CREATE FULLTEXT INDEX section_fulltext IF NOT EXISTS
-        FOR (s:Section) ON EACH [s.title, s.content, s.section_number]
-        """
-    ]
-    
-    for query in constraints + indexes + fulltext_indexes:
-        try:
-            neo4j.execute_write(query)
-            logger.info(f"Executed: {query[:50]}...")
-        except Exception as e:
-            logger.warning(f"Constraint/index may already exist: {e}")
 
 
 def clear_graph(neo4j: Neo4jClient, confirm: bool = False):
@@ -117,18 +68,26 @@ def populate_from_postgresql(
     db: Session,
     neo4j: Neo4jClient,
     limit: int = None,
-    batch_size: int = 100
+    batch_size: int = 2500,
+    neo4j_batch_size: int = 2500
 ):
     """
-    Populate Neo4j graph from PostgreSQL regulations.
+    Populate Neo4j graph from PostgreSQL regulations using two-pass processing with batching.
+    
+    Pass 1: Create all nodes (Regulation + Section nodes) using batch operations
+    Pass 2: Create all relationships (HAS_SECTION, REFERENCES, ENACTED_UNDER, etc.)
+    
+    This ensures all section nodes exist before creating citation relationships,
+    which prevents errors when creating cross-regulation REFERENCES relationships.
     
     Args:
         db: SQLAlchemy database session
         neo4j: Neo4j client instance
         limit: Maximum number of regulations to process
         batch_size: Number of regulations to process before logging progress
+        neo4j_batch_size: Number of nodes/relationships to batch before flushing to Neo4j
     """
-    logger.info("Starting graph population from PostgreSQL...")
+    logger.info(f"Starting TWO-PASS graph population with Neo4j batching (batch_size={neo4j_batch_size})...")
     
     # Build query
     query = db.query(Regulation)
@@ -139,10 +98,10 @@ def populate_from_postgresql(
     regulations = query.all()
     logger.info(f"Found {len(regulations)} regulations to process")
     
-    # Initialize graph builder
-    builder = GraphBuilder(db, neo4j)
+    # Initialize graph builder with batching enabled
+    builder = GraphBuilder(db, neo4j, batch_size=neo4j_batch_size)
     
-    # Process each regulation
+    # Process statistics
     stats = {
         "total": len(regulations),
         "successful": 0,
@@ -152,34 +111,94 @@ def populate_from_postgresql(
         "errors": []
     }
     
+    # PASS 1: Create all nodes
+    logger.info("\n" + "="*60)
+    logger.info("PASS 1: Creating all nodes (Regulation + Section nodes)")
+    logger.info("="*60)
+    
     for i, regulation in enumerate(regulations, 1):
-        logger.info(f"Processing regulation {i}/{len(regulations)}: {regulation.title[:60]}...")
+        logger.info(f"[PASS 1] Creating nodes {i}/{len(regulations)}: {regulation.title[:60]}...")
         
         try:
-            result = builder.build_document_graph(regulation.id)
+            # Reset builder stats for this regulation
+            builder.stats = {
+                "nodes_created": 0,
+                "relationships_created": 0,
+                "errors": []
+            }
+            
+            result = builder.create_nodes_for_regulation(regulation)
+            
+            stats["total_nodes"] += result.get("nodes_created", 0)
+            
+            # Log progress every batch_size regulations
+            if i % batch_size == 0:
+                logger.info(
+                    f"  Progress: {i}/{len(regulations)} | "
+                    f"Nodes created: {stats['total_nodes']}"
+                )
+            
+        except Exception as e:
+            logger.error(f"  ✗ Failed to create nodes for {regulation.title[:60]}: {e}")
+            stats["errors"].append({
+                "regulation": regulation.title,
+                "pass": 1,
+                "error": str(e)
+            })
+    
+    # Flush any remaining node batches from Pass 1
+    logger.info("\nFlushing remaining node batches from Pass 1...")
+    builder.flush_all_batches()
+    
+    logger.info(f"\n✓ PASS 1 Complete: Created {stats['total_nodes']} nodes")
+    
+    # PASS 2: Create all relationships
+    logger.info("\n" + "="*60)
+    logger.info("PASS 2: Creating all relationships")
+    logger.info("="*60)
+    
+    for i, regulation in enumerate(regulations, 1):
+        logger.info(f"[PASS 2] Creating relationships {i}/{len(regulations)}: {regulation.title[:60]}...")
+        
+        try:
+            # Reset builder stats for this regulation
+            builder.stats = {
+                "nodes_created": 0,
+                "relationships_created": 0,
+                "errors": []
+            }
+            
+            result = builder.create_relationships_for_regulation(regulation)
             
             stats["successful"] += 1
-            stats["total_nodes"] += result.get("nodes_created", 0)
             stats["total_relationships"] += result.get("relationships_created", 0)
             
             # Log progress every batch_size regulations
             if i % batch_size == 0:
                 logger.info(
                     f"  Progress: {i}/{len(regulations)} | "
-                    f"Nodes: {stats['total_nodes']} | "
-                    f"Relationships: {stats['total_relationships']}"
+                    f"Relationships created: {stats['total_relationships']}"
                 )
             
         except Exception as e:
-            logger.error(f"  ✗ Failed to process {regulation.title[:60]}: {e}")
+            logger.error(f"  ✗ Failed to create relationships for {regulation.title[:60]}: {e}")
             stats["failed"] += 1
             stats["errors"].append({
                 "regulation": regulation.title,
+                "pass": 2,
                 "error": str(e)
             })
     
+    # Flush any remaining relationship batches from Pass 2
+    logger.info("\nFlushing remaining relationship batches from Pass 2...")
+    builder.flush_all_batches()
+    
+    logger.info(f"\n✓ PASS 2 Complete: Created {stats['total_relationships']} relationships")
+    
     # Create inter-document relationships
-    logger.info("\nCreating inter-document relationships...")
+    logger.info("\n" + "="*60)
+    logger.info("Creating inter-document relationships...")
+    logger.info("="*60)
     try:
         builder.create_inter_document_relationships()
         logger.info("✓ Inter-document relationships created")
@@ -226,7 +245,7 @@ def main():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=100,
+        default=500,
         help="Number of regulations to process before logging progress (default: 100)"
     )
     
@@ -273,7 +292,8 @@ def main():
             db,
             neo4j,
             limit=args.limit,
-            batch_size=args.batch_size
+            batch_size=args.batch_size,
+            neo4j_batch_size=args.batch_size
         )
         
         # Print Neo4j graph stats

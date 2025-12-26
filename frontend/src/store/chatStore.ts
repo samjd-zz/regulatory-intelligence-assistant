@@ -20,7 +20,7 @@ interface ChatState {
 	setError: (error: string | null) => void;
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>((set, _get) => ({
 	messages: [],
 	currentQuestion: "",
 	loading: false,

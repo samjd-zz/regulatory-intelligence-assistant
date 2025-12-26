@@ -24,6 +24,7 @@ from models.models import Regulation, Section, Amendment, Citation
 from services.graph_builder import GraphBuilder
 from services.graph_service import GraphService
 from services.search_service import SearchService
+from utils.neo4j_indexes import setup_neo4j_constraints
 from ingestion.canadian_law_xml_parser import CanadianLawXMLParser, ParsedRegulation
 from config.program_mappings import get_program_detector
 
@@ -216,6 +217,19 @@ class DataIngestionPipeline:
             self.db.rollback()
             raise
         
+        logger.info("Running global inter-document linking...")
+        try:
+            from utils.neo4j_client import get_neo4j_client
+            from services.graph_builder import GraphBuilder
+            
+            # We need a temporary builder instance for this global operation
+            neo4j_client = get_neo4j_client()
+            linker = GraphBuilder(self.db, neo4j_client)
+            linker.create_inter_document_relationships()
+            logger.info("Global linking complete.")
+        except Exception as e:
+            logger.error(f"Global linking failed: {e}")
+
         # Final statistics
         logger.info("=" * 60)
         logger.info("INGESTION COMPLETE")
@@ -516,7 +530,10 @@ class DataIngestionPipeline:
         parsed_reg: ParsedRegulation
     ) -> Dict[str, int]:
         """
-        Build knowledge graph in Neo4j.
+        Build knowledge graph in Neo4j using optimized two-pass processing.
+        
+        Pass 1: Create all nodes (Regulation, Sections, Programs, Situations)
+        Pass 2: Create all relationships (HAS_SECTION, REFERENCES, APPLIES_TO, etc.)
         
         Args:
             regulation: Regulation DB object
@@ -534,16 +551,45 @@ class DataIngestionPipeline:
         # Get Neo4j client (GraphBuilder expects neo4j_client, not graph_service)
         neo4j_client = get_neo4j_client()
         
-        # Fix: GraphBuilder expects (db, neo4j_client), not (graph_service, db)
-        graph_builder = GraphBuilder(self.db, neo4j_client)
+        # Initialize GraphBuilder with batching (default batch_size=2500)
+        graph_builder = GraphBuilder(self.db, neo4j_client, batch_size=2500)
         
-        # Build regulation subgraph (this is a synchronous method)
-        result = graph_builder.build_regulation_subgraph(str(regulation.id))
-        
-        logger.info(f"Created {result.get('nodes_created', 0)} nodes, "
-                   f"{result.get('relationships_created', 0)} relationships")
-        
-        return result
+        try:
+            # Verify Neo4j connectivity
+            if not neo4j_client.verify_connectivity():
+                logger.error("Failed to connect to Neo4j")
+                return 1
+            
+            logger.info("✓ Connected to Neo4j")
+            
+            # Setup constraints and indexes
+            setup_neo4j_constraints(neo4j_client)
+
+            # PASS 1: Create all nodes using optimized batching
+            logger.debug(f"[Pass 1] Creating nodes for {parsed_reg.title[:60]}...")
+            graph_builder.create_nodes_for_regulation(regulation)
+            
+            # Flush all node batches from Pass 1
+            graph_builder.flush_all_batches()
+            
+            # PASS 2: Create all relationships using optimized batching
+            logger.debug(f"[Pass 2] Creating relationships for {parsed_reg.title[:60]}...")
+            graph_builder.create_relationships_for_regulation(regulation)
+            
+            # Flush all relationship batches from Pass 2
+            graph_builder.flush_all_batches()
+            
+            # Get statistics
+            result = graph_builder.get_stats()
+            
+            logger.info(f"Created {result.get('nodes_created', 0)} nodes, "
+                       f"{result.get('relationships_created', 0)} relationships")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Graph building failed for {parsed_reg.title}: {e}")
+            raise
     
     async def _index_in_elasticsearch(
         self,
@@ -825,6 +871,12 @@ async def main():
         from utils.neo4j_client import Neo4jClient
         
         neo4j_client = Neo4jClient()
+        
+        # Setup Neo4j constraints and indexes before ingestion
+        logger.info("Setting up Neo4j constraints and indexes...")
+        setup_neo4j_constraints(neo4j_client)
+        logger.info("✓ Neo4j indexes configured")
+        
         graph_service = GraphService(neo4j_client)
         
         # Initialize SearchService

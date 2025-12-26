@@ -15,14 +15,20 @@ from fastapi import APIRouter, HTTPException, status, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime
+import logging
 
+from database import SessionLocal
 from services.rag_service import RAGService, RAGAnswer
+from services.query_history_service import QueryHistoryService
+
+logger = logging.getLogger(__name__)
 
 # Create router
 router = APIRouter(prefix="/api/rag", tags=["RAG"])
 
-# Initialize RAG service (singleton pattern)
+# Initialize services (singleton pattern)
 rag_service = RAGService()
+query_history_service = QueryHistoryService()
 
 
 # Pydantic models for request/response
@@ -119,6 +125,7 @@ async def ask_question(request: QuestionRequest):
 
     Returns answer with citations, confidence score, and source documents.
     """
+    db = SessionLocal()
     try:
         start_time = datetime.now()
 
@@ -157,6 +164,23 @@ async def ask_question(request: QuestionRequest):
             for doc in rag_answer.source_documents
         ]
 
+        # Log query history (non-blocking)
+        try:
+            user = query_history_service.get_default_citizen_user(db)
+            if user:
+                formatted_results = query_history_service.format_rag_results(rag_answer)
+                
+                query_history_service.log_query(
+                    db=db,
+                    user_id=user.id,
+                    query=request.question,
+                    entities={},  # RAG doesn't extract entities separately
+                    intent=rag_answer.intent,
+                    results=formatted_results
+                )
+        except Exception as e:
+            logger.error(f"Failed to log query history: {e}")
+
         # Build response
         return AnswerResponse(
             question=rag_answer.question,
@@ -170,11 +194,15 @@ async def ask_question(request: QuestionRequest):
             metadata=rag_answer.metadata
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Question answering failed: {str(e)}"
         )
+    finally:
+        db.close()
 
 
 @router.post("/ask/batch", response_model=BatchAnswerResponse)
@@ -192,6 +220,7 @@ async def ask_questions_batch(request: BatchQuestionRequest):
 
     Returns list of answers with individual citations and confidence scores.
     """
+    db = SessionLocal()
     try:
         start_time = datetime.now()
 
@@ -229,6 +258,23 @@ async def ask_questions_batch(request: BatchQuestionRequest):
                 for doc in rag_answer.source_documents
             ]
 
+            # Log query history for each question (non-blocking)
+            try:
+                user = query_history_service.get_default_citizen_user(db)
+                if user:
+                    formatted_results = query_history_service.format_rag_results(rag_answer)
+                    
+                    query_history_service.log_query(
+                        db=db,
+                        user_id=user.id,
+                        query=question,
+                        entities={},  # RAG doesn't extract entities separately
+                        intent=rag_answer.intent,
+                        results=formatted_results
+                    )
+            except Exception as e:
+                logger.error(f"Failed to log query history: {e}")
+
             answers.append(AnswerResponse(
                 question=rag_answer.question,
                 answer=rag_answer.answer,
@@ -249,11 +295,15 @@ async def ask_questions_batch(request: BatchQuestionRequest):
             total_processing_time_ms=total_time
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Batch question answering failed: {str(e)}"
         )
+    finally:
+        db.close()
 
 
 @router.post("/cache/clear")

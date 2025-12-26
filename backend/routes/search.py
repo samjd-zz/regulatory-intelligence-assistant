@@ -18,9 +18,11 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 import logging
 
+from database import SessionLocal
 from services.search_service import SearchService
 from services.query_parser import LegalQueryParser
 from services.legal_nlp import EntityType
+from services.query_history_service import QueryHistoryService
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ router = APIRouter(prefix="/api/search", tags=["Search"])
 # Initialize services (singleton pattern)
 search_service = SearchService()
 query_parser = LegalQueryParser(use_spacy=False)
+query_history_service = QueryHistoryService()
 
 
 # Pydantic models for request/response
@@ -172,12 +175,14 @@ async def keyword_search(request: SearchRequest):
     - **from**: Pagination offset
     - **parse_query**: Use NLP to extract filters from query
     """
+    db = SessionLocal()
     try:
         start_time = datetime.now()
 
         # Parse query with NLP if requested
         filters = request.filters or {}
         query_info = None
+        parsed = None
 
         if request.parse_query:
             parsed = query_parser.parse_query(request.query)
@@ -215,6 +220,25 @@ async def keyword_search(request: SearchRequest):
         # Format response
         processing_time = (datetime.now() - start_time).total_seconds() * 1000
 
+        # Log query history (non-blocking)
+        try:
+            user = query_history_service.get_default_citizen_user(db)
+            if user:
+                entities = query_history_service.extract_entities_from_parsed_query(parsed) if parsed else {}
+                intent = query_info.get('intent') if query_info else None
+                formatted_results = query_history_service.format_search_results(results)
+                
+                query_history_service.log_query(
+                    db=db,
+                    user_id=user.id,
+                    query=request.query,
+                    entities=entities,
+                    intent=intent,
+                    results=formatted_results
+                )
+        except Exception as e:
+            logger.error(f"Failed to log query history: {e}")
+
         return SearchResponse(
             hits=[SearchResultHit(**hit) for hit in results['hits']],
             total=results['total'],
@@ -229,6 +253,8 @@ async def keyword_search(request: SearchRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Keyword search failed: {str(e)}"
         )
+    finally:
+        db.close()
 
 
 @router.post("/vector", response_model=SearchResponse)
@@ -245,12 +271,14 @@ async def vector_search(request: SearchRequest):
     - **from**: Pagination offset
     - **parse_query**: Use NLP to extract filters from query
     """
+    db = SessionLocal()
     try:
         start_time = datetime.now()
 
         # Parse query with NLP if requested
         filters = request.filters or {}
         query_info = None
+        parsed = None
 
         if request.parse_query:
             parsed = query_parser.parse_query(request.query)
@@ -282,6 +310,25 @@ async def vector_search(request: SearchRequest):
 
         processing_time = (datetime.now() - start_time).total_seconds() * 1000
 
+        # Log query history (non-blocking)
+        try:
+            user = query_history_service.get_default_citizen_user(db)
+            if user:
+                entities = query_history_service.extract_entities_from_parsed_query(parsed) if parsed else {}
+                intent = query_info.get('intent') if query_info else None
+                formatted_results = query_history_service.format_search_results(results)
+                
+                query_history_service.log_query(
+                    db=db,
+                    user_id=user.id,
+                    query=request.query,
+                    entities=entities,
+                    intent=intent,
+                    results=formatted_results
+                )
+        except Exception as e:
+            logger.error(f"Failed to log query history: {e}")
+
         return SearchResponse(
             hits=[SearchResultHit(**hit) for hit in results['hits']],
             total=results['total'],
@@ -296,6 +343,8 @@ async def vector_search(request: SearchRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Vector search failed: {str(e)}"
         )
+    finally:
+        db.close()
 
 
 @router.post("/hybrid", response_model=SearchResponse)
@@ -313,12 +362,14 @@ async def hybrid_search(request: HybridSearchRequest):
     - **size**: Number of results (1-100)
     - **parse_query**: Use NLP to extract filters from query
     """
+    db = SessionLocal()
     try:
         start_time = datetime.now()
 
         # Parse query with NLP if requested
         filters = request.filters or {}
         query_info = None
+        parsed = None
 
         if request.parse_query:
             parsed = query_parser.parse_query(request.query)
@@ -353,6 +404,25 @@ async def hybrid_search(request: HybridSearchRequest):
 
         processing_time = (datetime.now() - start_time).total_seconds() * 1000
 
+        # Log query history (non-blocking)
+        try:
+            user = query_history_service.get_default_citizen_user(db)
+            if user:
+                entities = query_history_service.extract_entities_from_parsed_query(parsed) if parsed else {}
+                intent = query_info.get('intent') if query_info else None
+                formatted_results = query_history_service.format_search_results(results)
+                
+                query_history_service.log_query(
+                    db=db,
+                    user_id=user.id,
+                    query=request.query,
+                    entities=entities,
+                    intent=intent,
+                    results=formatted_results
+                )
+        except Exception as e:
+            logger.error(f"Failed to log query history: {e}")
+
         return SearchResponse(
             hits=[SearchResultHit(**hit) for hit in results['hits']],
             total=results['total'],
@@ -366,6 +436,8 @@ async def hybrid_search(request: HybridSearchRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Hybrid search failed: {str(e)}"
         )
+    finally:
+        db.close()
 
 
 @router.get("/document/{doc_id}")

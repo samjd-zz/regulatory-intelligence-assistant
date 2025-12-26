@@ -10,12 +10,6 @@ export function FilterPanel() {
     { value: 'municipal', label: 'Municipal' },
   ]
 
-  const documentTypes = [
-    { value: 'act', label: 'Act' },
-    { value: 'regulation', label: 'Regulation' },
-    { value: 'policy', label: 'Policy' },
-  ]
-
   const handleJurisdictionChange = (value: string, checked: boolean) => {
     const currentJurisdictions = filters.jurisdiction || []
     const newJurisdictions = checked
@@ -30,19 +24,6 @@ export function FilterPanel() {
     }
   }
 
-  const handleDocumentTypeChange = (value: string, checked: boolean) => {
-    const currentTypes = filters.document_type || []
-    const newTypes = checked
-      ? [...currentTypes, value]
-      : currentTypes.filter((t) => t !== value)
-
-    updateFilters({ document_type: newTypes })
-    
-    // Re-search with new filters if there's an active query
-    if (query) {
-      search(query)
-    }
-  }
 
   const handleClearFilters = () => {
     clearFilters()
@@ -95,28 +76,6 @@ export function FilterPanel() {
         </div>
       </div>
 
-      {/* Document Type Filters */}
-      <div>
-        <h3 className="text-sm font-medium text-gray-900 mb-3">Document Type</h3>
-        <div className="space-y-2">
-          {documentTypes.map((docType) => (
-            <label
-              key={docType.value}
-              className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-2 rounded"
-            >
-              <input
-                type="checkbox"
-                checked={filters.document_type?.includes(docType.value) || false}
-                onChange={(e) =>
-                  handleDocumentTypeChange(docType.value, e.target.checked)
-                }
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">{docType.label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }
