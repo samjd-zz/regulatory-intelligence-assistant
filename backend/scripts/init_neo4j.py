@@ -4,15 +4,15 @@ Run this script to set up the graph database.
 """
 import sys
 import os
-from pathlib import Path
 
 # Add backend directory to Python path
 # In Docker: /app/scripts -> /app
 # Locally: /path/to/backend/scripts -> /path/to/backend
-backend_dir = Path(__file__).parent.parent
-sys.path.insert(0, str(backend_dir))
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, backend_dir)
 
 from utils.neo4j_client import get_neo4j_client
+from utils.neo4j_indexes import setup_neo4j_constraints
 from services.graph_service import get_graph_service
 from datetime import date
 import logging
@@ -24,37 +24,12 @@ logger = logging.getLogger(__name__)
 def init_schema():
     """Initialize Neo4j schema with constraints and indexes."""
     logger.info("Initializing Neo4j schema...")
-    
+
     client = get_neo4j_client()
-    
-    # Read Cypher script
-    script_path = Path(__file__).parent / 'init_graph.cypher'
-    with open(script_path, 'r') as f:
-        cypher_script = f.read()
-    
-    # Execute each statement separately
-    statements = [s.strip() for s in cypher_script.split(';') if s.strip() and not s.strip().startswith('//')]
-    
-    for statement in statements:
-        # Skip empty statements and comments
-        if not statement or statement.startswith('//'):
-            continue
-            
-        # Skip verification queries (but allow fulltext index creation)
-        if statement.startswith('CALL db.') and 'CREATE FULLTEXT' not in statement:
-            continue
-            
-        try:
-            # Clean up the statement (remove comments and extra whitespace)
-            clean_statement = ' '.join(line.strip() for line in statement.split('\n') 
-                                     if line.strip() and not line.strip().startswith('//'))
-            if clean_statement:
-                client.execute_write(clean_statement)
-                logger.info(f"Executed: {clean_statement[:50]}...")
-        except Exception as e:
-            logger.warning(f"Statement may have failed (might already exist): {e}")
-            logger.debug(f"Failed statement: {statement[:100]}...")
-    
+
+    # Use the centralized constraint and index setup
+    setup_neo4j_constraints(client)
+
     logger.info("✓ Schema initialization complete")
 
 

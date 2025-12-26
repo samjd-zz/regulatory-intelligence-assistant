@@ -55,13 +55,10 @@ echo "✓ Elasticsearch is ready"
 
 # Check if database has data, offer interactive setup if empty
 echo "🔍 Checking database status..."
-#  docker exec -i regulatory-postgres psql -U postgres -d regulatory_db  -c "SELECT COUNT(*) FROM regulations;" | grep -Eo '[0-9]+' | head -n1"
-REG_COUNT=$(docker exec -i regulatory-postgres psql -U postgres -d regulatory_db -t -c "SELECT COUNT(*) FROM regulations;" 2>/dev/null | tr -d '[:space:]' || echo "0")
-# Ensure REG_COUNT is a valid number, default to 0 if empty or invalid
-REG_COUNT=${REG_COUNT:-0}
-# Extract only digits (use [0-9]\+ to match one or more digits, not zero or more)
-REG_COUNT=$(echo "$REG_COUNT" | grep -o '[0-9]\+' | head -1 || echo "0")
-[ -z "$REG_COUNT" ] && REG_COUNT=0
+# Use dedicated Python script to check database count
+REG_COUNT=$(python3 scripts/check_db_status.py 2>/dev/null || echo "0")
+# Ensure REG_COUNT is a valid number
+REG_COUNT=$(echo "$REG_COUNT" | grep -o '^[0-9]\+$' || echo "0")
 if [ "$REG_COUNT" -lt 100 ]; then
     echo "⚠️ Database appears empty ($REG_COUNT regulations)"
     
