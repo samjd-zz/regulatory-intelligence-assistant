@@ -835,7 +835,7 @@ Be precise and cite specific sections when possible."""
         
         This orchestrator tries each tier sequentially until sufficient documents
         are found. After a successful tier, it checks if graph enhancement should be
-        applied (Option C: Selective Enhancement).
+        applied (Selective Enhancement).
         
         Graph Enhancement Conditions:
         - Query mentions specific sections/acts
@@ -901,7 +901,7 @@ Be precise and cite specific sections when possible."""
             if is_quality_ok:
                 logger.info(f"✅ Tier 1 SUCCESS: Found {len(tier1_results)} high-quality documents")
                 
-                # Check if we should apply graph enhancement (Option C)
+                # Check if we should apply graph enhancement
                 should_enhance = self._should_apply_graph_enhancement(
                     question=question,
                     parsed_query=parsed_query,
@@ -958,7 +958,7 @@ Be precise and cite specific sections when possible."""
             if is_quality_ok:
                 logger.info(f"✅ Tier 2 SUCCESS: Found {len(tier2_results)} quality documents")
                 
-                # Check if we should apply graph enhancement (Option C)
+                # Check if we should apply graph enhancement
                 should_enhance = self._should_apply_graph_enhancement(
                     question=question,
                     parsed_query=parsed_query,
@@ -1515,7 +1515,7 @@ Be precise and cite specific sections when possible."""
         tier_num: int
     ) -> Dict[str, Any]:
         """
-        Determine if graph enhancement should be applied (Option C criteria).
+        Determine if graph enhancement should be applied.
         
         Enhancement is applied when ALL conditions are met:
         1. Query mentions specific sections/acts
