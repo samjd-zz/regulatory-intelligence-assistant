@@ -831,10 +831,16 @@ Be precise and cite specific sections when possible."""
         num_context_docs: int = 10
     ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         """
-        Progressive fallback search across all 5 tiers.
+        Progressive fallback search across all 5 tiers with SELECTIVE graph enhancement.
         
         This orchestrator tries each tier sequentially until sufficient documents
-        are found. It tracks timing, tier usage, and provides comprehensive metadata.
+        are found. After a successful tier, it checks if graph enhancement should be
+        applied (Option C: Selective Enhancement).
+        
+        Graph Enhancement Conditions:
+        - Query mentions specific sections/acts
+        - Intent is INTERPRETATION or COMPLIANCE
+        - Tier 1/2 results have low relationship diversity
         
         Tiers:
         1. Optimized Elasticsearch (current behavior, 85%+ success target)
@@ -850,7 +856,7 @@ Be precise and cite specific sections when possible."""
         
         Returns:
             Tuple of (documents, metadata)
-            metadata includes: tier_used, tiers_attempted, tier_timings
+            metadata includes: tier_used, tiers_attempted, tier_timings, graph_enhanced
         """
         import time
         
@@ -858,7 +864,9 @@ Be precise and cite specific sections when possible."""
             'tiers_attempted': [],
             'tier_used': None,
             'tier_timings': {},
-            'total_time_ms': 0
+            'total_time_ms': 0,
+            'graph_enhanced': False,
+            'enhancement_reason': None
         }
         
         total_start = time.time()
@@ -866,14 +874,17 @@ Be precise and cite specific sections when possible."""
         # Update total queries counter
         self.total_queries += 1
 
+        # Parse query once for reuse
+        parsed_query = self.query_parser.parse_query(question)
+
         # Enhance the query for better search
-        question = self._enhance_query_for_search(question, self.query_parser.parse_query(question))
+        enhanced_question = self._enhance_query_for_search(question, parsed_query)
 
         # Tier 1: Optimized Elasticsearch
         logger.info("🔍 Tier 1: Trying optimized Elasticsearch search...")
         tier1_start = time.time()
 
-        tier1_results = self._tier1_elasticsearch_optimized(question, filters, num_context_docs)
+        tier1_results = self._tier1_elasticsearch_optimized(enhanced_question, filters, num_context_docs)
         tier1_time = (time.time() - tier1_start) * 1000
         metadata['tier_timings']['tier_1_ms'] = tier1_time
         metadata['tiers_attempted'].append(1)
@@ -889,6 +900,29 @@ Be precise and cite specific sections when possible."""
             
             if is_quality_ok:
                 logger.info(f"✅ Tier 1 SUCCESS: Found {len(tier1_results)} high-quality documents")
+                
+                # Check if we should apply graph enhancement (Option C)
+                should_enhance = self._should_apply_graph_enhancement(
+                    question=question,
+                    parsed_query=parsed_query,
+                    tier_results=tier1_results,
+                    tier_num=1
+                )
+                
+                if should_enhance['should_enhance']:
+                    # Apply graph enhancement
+                    enhanced_results = self._apply_graph_enhancement(
+                        base_results=tier1_results[:num_context_docs],
+                        question=question,
+                        num_additional=3
+                    )
+                    metadata['graph_enhanced'] = True
+                    metadata['enhancement_reason'] = should_enhance['reason']
+                    metadata['docs_added'] = len(enhanced_results) - len(tier1_results[:num_context_docs])
+                    logger.info(f"🔗 Graph enhancement applied: {metadata['enhancement_reason']}")
+                    logger.info(f"   Added {metadata['docs_added']} related documents via graph traversal")
+                    tier1_results = enhanced_results
+                
                 metadata['tier_used'] = 1
                 metadata['total_time_ms'] = (time.time() - total_start) * 1000
                 self.tier_usage_stats[1] += 1
@@ -901,7 +935,7 @@ Be precise and cite specific sections when possible."""
         # Tier 2: Relaxed Elasticsearch 
         logger.info("🔍 Tier 2: Trying relaxed Elasticsearch search...")
         tier2_start = time.time()
-        tier2_results = self._tier2_elasticsearch_relaxed(question, filters, num_context_docs)
+        tier2_results = self._tier2_elasticsearch_relaxed(enhanced_question, filters, num_context_docs)
         tier2_time = (time.time() - tier2_start) * 1000
         metadata['tier_timings']['tier_2_ms'] = tier2_time
         metadata['tiers_attempted'].append(2)
@@ -923,6 +957,29 @@ Be precise and cite specific sections when possible."""
             
             if is_quality_ok:
                 logger.info(f"✅ Tier 2 SUCCESS: Found {len(tier2_results)} quality documents")
+                
+                # Check if we should apply graph enhancement (Option C)
+                should_enhance = self._should_apply_graph_enhancement(
+                    question=question,
+                    parsed_query=parsed_query,
+                    tier_results=tier2_results,
+                    tier_num=2
+                )
+                
+                if should_enhance['should_enhance']:
+                    # Apply graph enhancement
+                    enhanced_results = self._apply_graph_enhancement(
+                        base_results=tier2_results[:num_context_docs],
+                        question=question,
+                        num_additional=3
+                    )
+                    metadata['graph_enhanced'] = True
+                    metadata['enhancement_reason'] = should_enhance['reason']
+                    metadata['docs_added'] = len(enhanced_results) - len(tier2_results[:num_context_docs])
+                    logger.info(f"🔗 Graph enhancement applied: {metadata['enhancement_reason']}")
+                    logger.info(f"   Added {metadata['docs_added']} related documents via graph traversal")
+                    tier2_results = enhanced_results
+                
                 metadata['tier_used'] = 2
                 metadata['total_time_ms'] = (time.time() - total_start) * 1000
                 self.tier_usage_stats[2] += 1
@@ -1350,6 +1407,260 @@ Be precise and cite specific sections when possible."""
             'zero_result_count': self.zero_result_count,
             'zero_result_rate': (self.zero_result_count / self.total_queries) * 100
         }
+    
+    # ============================================
+    # SELECTIVE GRAPH ENHANCEMENT
+    # ============================================
+    
+    def _has_section_or_act_mention(self, question: str) -> bool:
+        """
+        Detect if query mentions specific sections or acts.
+        
+        Patterns detected:
+        - Section X, Section X(Y), s. X, s X
+        - Act names (e.g., "Employment Insurance Act")
+        - Regulation names
+        
+        Args:
+            question: User's query
+            
+        Returns:
+            True if section/act mentions found
+        """
+        question_lower = question.lower()
+        
+        # Pattern 1: Section references
+        section_patterns = [
+            r'section\s+\d+',
+            r's\.\s*\d+',
+            r'subsection\s+\d+',
+            r'paragraph\s+\d+'
+        ]
+        
+        for pattern in section_patterns:
+            if re.search(pattern, question_lower):
+                return True
+        
+        # Pattern 2: Act/Regulation names
+        act_patterns = [
+            r'\w+\s+act\b',
+            r'\w+\s+regulation',
+            r'\w+\s+code\b'
+        ]
+        
+        for pattern in act_patterns:
+            if re.search(pattern, question_lower):
+                return True
+        
+        return False
+    
+    def _calculate_relationship_diversity(
+        self,
+        results: List[Dict[str, Any]]
+    ) -> float:
+        """
+        Calculate relationship diversity score for search results.
+        
+        Low diversity = most results from same document/act
+        High diversity = results span multiple documents/acts
+        
+        This helps identify when graph traversal could add value by
+        discovering related documents from different sources.
+        
+        Args:
+            results: Search result documents
+            
+        Returns:
+            Diversity score (0.0 = low diversity, 1.0 = high diversity)
+        """
+        if not results:
+            return 0.0
+        
+        # Track unique regulation titles and document types
+        regulation_titles = set()
+        document_types = set()
+        
+        for doc in results:
+            reg_title = doc.get('regulation_title', '')
+            if reg_title:
+                regulation_titles.add(reg_title.lower())
+            
+            doc_type = doc.get('document_type', '')
+            if doc_type:
+                document_types.add(doc_type.lower())
+        
+        # Calculate diversity
+        # If all results from 1-2 regulations, diversity is low
+        # If results span 5+ regulations, diversity is high
+        
+        num_regulations = len(regulation_titles)
+        num_doc_types = len(document_types)
+        
+        # Normalize to 0-1 scale
+        # Low diversity: 1-2 unique regulations
+        # High diversity: 5+ unique regulations
+        regulation_diversity = min(num_regulations / 5.0, 1.0)
+        type_diversity = min(num_doc_types / 3.0, 1.0)
+        
+        # Weighted average (regulations more important)
+        diversity_score = (regulation_diversity * 0.7) + (type_diversity * 0.3)
+        
+        return round(diversity_score, 2)
+    
+    def _should_apply_graph_enhancement(
+        self,
+        question: str,
+        parsed_query: Any,
+        tier_results: List[Dict[str, Any]],
+        tier_num: int
+    ) -> Dict[str, Any]:
+        """
+        Determine if graph enhancement should be applied (Option C criteria).
+        
+        Enhancement is applied when ALL conditions are met:
+        1. Query mentions specific sections/acts
+        2. Intent is INTERPRETATION or COMPLIANCE
+        3. Results have low relationship diversity (for Tier 1/2 only)
+        
+        Args:
+            question: User's query
+            parsed_query: Parsed query with intent
+            tier_results: Results from current tier
+            tier_num: Which tier (1-5)
+            
+        Returns:
+            Dict with 'should_enhance' (bool) and 'reason' (str)
+        """
+        result = {
+            'should_enhance': False,
+            'reason': None,
+            'checks': {}
+        }
+        
+        # Condition 1: Section/act mentions
+        has_section_mention = self._has_section_or_act_mention(question)
+        result['checks']['section_or_act_mention'] = has_section_mention
+        
+        if not has_section_mention:
+            result['reason'] = "No section/act mentions in query"
+            return result
+        
+        # Condition 2: Intent is INTERPRETATION or COMPLIANCE
+        intent = parsed_query.intent
+        is_target_intent = intent in [QueryIntent.INTERPRETATION, QueryIntent.COMPLIANCE]
+        result['checks']['intent_match'] = is_target_intent
+        result['checks']['intent'] = intent.value if hasattr(intent, 'value') else str(intent)
+        
+        if not is_target_intent:
+            result['reason'] = f"Intent is {intent.value if hasattr(intent, 'value') else intent}, not INTERPRETATION/COMPLIANCE"
+            return result
+        
+        # Condition 3: Low relationship diversity (for Tier 1/2 only)
+        if tier_num in [1, 2]:
+            diversity_score = self._calculate_relationship_diversity(tier_results)
+            result['checks']['relationship_diversity'] = diversity_score
+            
+            # Low diversity threshold: < 0.4 means mostly same source
+            has_low_diversity = diversity_score < 0.4
+            result['checks']['has_low_diversity'] = has_low_diversity
+            
+            if not has_low_diversity:
+                result['reason'] = f"Diversity score {diversity_score:.2f} is sufficient (>= 0.4)"
+                return result
+        else:
+            # Tiers 3-5 already use graph or alternative methods, skip enhancement
+            result['reason'] = f"Tier {tier_num} doesn't benefit from graph enhancement"
+            return result
+        
+        # All conditions met!
+        result['should_enhance'] = True
+        result['reason'] = (
+            f"Section/act mentioned + {intent.value if hasattr(intent, 'value') else intent} intent + "
+            f"low diversity ({diversity_score:.2f})"
+        )
+        
+        return result
+    
+    def _apply_graph_enhancement(
+        self,
+        base_results: List[Dict[str, Any]],
+        question: str,
+        num_additional: int = 3
+    ) -> List[Dict[str, Any]]:
+        """
+        Enhance search results with graph-discovered related documents.
+        
+        Strategy:
+        1. Extract document IDs from base results
+        2. Query Neo4j for REFERENCES, CITES, IMPLEMENTS relationships
+        3. Fetch 2-3 most relevant related documents
+        4. Merge with base results (deduplicate by ID)
+        5. Return enriched result set
+        
+        Args:
+            base_results: Original search results to enhance
+            question: Original query (for semantic ranking)
+            num_additional: Target number of additional docs to add
+            
+        Returns:
+            Enhanced results list (base + related documents)
+        """
+        try:
+            # Extract document IDs from base results
+            base_doc_ids = [doc['id'] for doc in base_results if 'id' in doc]
+            
+            if not base_doc_ids:
+                logger.warning("No document IDs in base results, cannot apply graph enhancement")
+                return base_results
+            
+            logger.info(f"🔍 Querying graph for relationships from {len(base_doc_ids)} seed documents...")
+            
+            # Query Neo4j for related documents via relationships
+            # Use the first few documents as seeds (top results are most relevant)
+            seed_ids = base_doc_ids[:3]  # Use top 3 as seeds
+            
+            related_docs = []
+            
+            for seed_id in seed_ids:
+                # Find documents connected by REFERENCES, CITES, IMPLEMENTS
+                try:
+                    # Use graph service's traversal method
+                    traversal_results = self.graph_service.find_related_documents_by_traversal(
+                        seed_query=seed_id,
+                        max_depth=1,  # Only direct relationships
+                        limit=num_additional
+                    )
+                    
+                    related_docs.extend(traversal_results)
+                    
+                except Exception as e:
+                    logger.warning(f"Graph traversal failed for seed {seed_id}: {e}")
+                    continue
+            
+            # Deduplicate related docs and filter out docs already in base results
+            seen_ids = set(base_doc_ids)
+            unique_related = []
+            
+            for doc in related_docs:
+                doc_id = doc.get('id')
+                if doc_id and doc_id not in seen_ids:
+                    seen_ids.add(doc_id)
+                    unique_related.append(doc)
+            
+            # Limit to num_additional
+            unique_related = unique_related[:num_additional]
+            
+            logger.info(f"✅ Found {len(unique_related)} unique related documents via graph")
+            
+            # Merge: base results + related documents
+            enhanced_results = base_results + unique_related
+            
+            return enhanced_results
+            
+        except Exception as e:
+            logger.error(f"Graph enhancement failed: {e}")
+            # Return original results on error
+            return base_results
     
     # ============================================
     # HELPER METHODS
