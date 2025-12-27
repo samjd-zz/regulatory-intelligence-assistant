@@ -20,6 +20,7 @@ import logging
 from database import SessionLocal
 from services.rag_service import RAGService, RAGAnswer
 from services.query_history_service import QueryHistoryService
+from services.query_parser import LegalQueryParser
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ router = APIRouter(prefix="/api/rag", tags=["RAG"])
 # Initialize services (singleton pattern)
 rag_service = RAGService()
 query_history_service = QueryHistoryService()
+query_parser = LegalQueryParser(use_spacy=False)
 
 
 # Pydantic models for request/response
@@ -168,14 +170,19 @@ async def ask_question(request: QuestionRequest):
         try:
             user = query_history_service.get_default_citizen_user(db)
             if user:
+                # Parse query to extract NLP details
+                parsed = query_parser.parse_query(request.question)
+                entities = query_history_service.extract_entities_from_parsed_query(parsed)
+                intent = parsed.intent.value if parsed else rag_answer.intent
+                
                 formatted_results = query_history_service.format_rag_results(rag_answer)
                 
                 query_history_service.log_query(
                     db=db,
                     user_id=user.id,
                     query=request.question,
-                    entities={},  # RAG doesn't extract entities separately
-                    intent=rag_answer.intent,
+                    entities=entities,
+                    intent=intent,
                     results=formatted_results
                 )
         except Exception as e:
@@ -262,14 +269,19 @@ async def ask_questions_batch(request: BatchQuestionRequest):
             try:
                 user = query_history_service.get_default_citizen_user(db)
                 if user:
+                    # Parse query to extract NLP details
+                    parsed = query_parser.parse_query(question)
+                    entities = query_history_service.extract_entities_from_parsed_query(parsed)
+                    intent = parsed.intent.value if parsed else rag_answer.intent
+                    
                     formatted_results = query_history_service.format_rag_results(rag_answer)
                     
                     query_history_service.log_query(
                         db=db,
                         user_id=user.id,
                         query=question,
-                        entities={},  # RAG doesn't extract entities separately
-                        intent=rag_answer.intent,
+                        entities=entities,
+                        intent=intent,
                         results=formatted_results
                     )
             except Exception as e:

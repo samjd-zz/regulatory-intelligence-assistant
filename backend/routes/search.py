@@ -225,7 +225,7 @@ async def keyword_search(request: SearchRequest):
             user = query_history_service.get_default_citizen_user(db)
             if user:
                 entities = query_history_service.extract_entities_from_parsed_query(parsed) if parsed else {}
-                intent = query_info.get('intent') if query_info else None
+                intent = parsed.intent.value if parsed else None
                 formatted_results = query_history_service.format_search_results(results)
                 
                 query_history_service.log_query(
@@ -315,7 +315,7 @@ async def vector_search(request: SearchRequest):
             user = query_history_service.get_default_citizen_user(db)
             if user:
                 entities = query_history_service.extract_entities_from_parsed_query(parsed) if parsed else {}
-                intent = query_info.get('intent') if query_info else None
+                intent = parsed.intent.value if parsed else None
                 formatted_results = query_history_service.format_search_results(results)
                 
                 query_history_service.log_query(
@@ -409,7 +409,7 @@ async def hybrid_search(request: HybridSearchRequest):
             user = query_history_service.get_default_citizen_user(db)
             if user:
                 entities = query_history_service.extract_entities_from_parsed_query(parsed) if parsed else {}
-                intent = query_info.get('intent') if query_info else None
+                intent = parsed.intent.value if parsed else None
                 formatted_results = query_history_service.format_search_results(results)
                 
                 query_history_service.log_query(

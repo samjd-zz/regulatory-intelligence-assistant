@@ -187,27 +187,66 @@ class QueryHistoryService:
     
     def extract_entities_from_parsed_query(self, parsed_query) -> dict:
         """
-        Extract entities from LegalQueryParser result.
-        
+        Extract comprehensive NLP details from LegalQueryParser result.
+
+        This method extracts rich entity information including confidence scores,
+        normalized values, keywords, intent details, and more - all stored in
+        the existing JSONB column without schema changes.
+
         Args:
             parsed_query: ParsedQuery object from query parser
-            
+
         Returns:
-            Dictionary of entities grouped by type
+            Dictionary with comprehensive NLP analysis including:
+            - entities: List of entities with type, text, confidence, normalized value
+            - intent: Intent type and confidence score
+            - keywords: Extracted keywords
+            - question_type: Type of question (what, how, etc.)
+            - filters: Extracted filters (jurisdiction, program, etc.)
+            - metadata: Additional parsing metadata
         """
         try:
-            entities_dict = {}
+            if not parsed_query:
+                return {}
             
-            # Group entities by type
+            # Extract detailed entity information
+            entities_list = []
             for entity in parsed_query.entities:
                 entity_type = entity.entity_type.value if hasattr(entity.entity_type, 'value') else str(entity.entity_type)
                 
-                if entity_type not in entities_dict:
-                    entities_dict[entity_type] = []
+                entity_dict = {
+                    "type": entity_type,
+                    "text": entity.text,
+                    "confidence": entity.confidence,
+                    "normalized": entity.normalized
+                }
                 
-                entities_dict[entity_type].append(entity.text)
+                # Add start/end positions if available
+                if hasattr(entity, 'start') and entity.start is not None:
+                    entity_dict["start"] = entity.start
+                if hasattr(entity, 'end') and entity.end is not None:
+                    entity_dict["end"] = entity.end
+                
+                entities_list.append(entity_dict)
             
-            return entities_dict
+            # Build comprehensive NLP analysis
+            nlp_details = {
+                "entities": entities_list,
+                "intent": {
+                    "type": parsed_query.intent.value if hasattr(parsed_query.intent, 'value') else str(parsed_query.intent),
+                    "confidence": parsed_query.intent_confidence
+                },
+                "keywords": parsed_query.keywords,
+                "question_type": parsed_query.question_type,
+                "filters": parsed_query.filters,
+                "normalized_query": parsed_query.normalized_query,
+                "metadata": {
+                    "entity_count": len(parsed_query.entities),
+                    "entity_summary": parsed_query.metadata.get('entity_summary', {}) if parsed_query.metadata else {}
+                }
+            }
+            
+            return nlp_details
             
         except Exception as e:
             logger.error(f"Error extracting entities: {e}")
