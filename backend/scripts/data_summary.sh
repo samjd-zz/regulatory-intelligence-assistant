@@ -91,17 +91,16 @@ echo ""
 echo -e "  ${BOLD}Sections:${NC}          ${GREEN}${TOTAL_SECTIONS}${NC}"
 echo -e "  ${BOLD}Citations:${NC}         ${GREEN}${TOTAL_CITATIONS}${NC}"
 
-# Get top jurisdictions
+# Get all jurisdictions
 echo ""
-echo -e "  ${BOLD}Top Jurisdictions:${NC}"
+echo -e "  ${BOLD}All Jurisdictions:${NC}"
 docker exec $POSTGRES_CONTAINER psql -U postgres -d regulatory_db -t -c "
-SELECT 
-    jurisdiction, 
-    COUNT(*) as count 
-FROM regulations 
-GROUP BY jurisdiction 
-ORDER BY count DESC 
-LIMIT 5;
+SELECT
+    jurisdiction,
+    COUNT(*) as count
+FROM regulations
+GROUP BY jurisdiction
+ORDER BY count DESC;
 " 2>/dev/null | while read -r line; do
     if [[ ! -z "$line" ]]; then
         echo -e "    $line"

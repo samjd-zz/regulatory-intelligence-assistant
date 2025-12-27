@@ -1219,7 +1219,7 @@ class GraphBuilder:
     
     def _create_supersedes_relationships(self):
         """
-        Create SUPERSEDES relationships based on amendment history using batching.
+        Create SUPERSEDES relationships based on amendment history using GraphBuilder's batching system.
         Uses the amendments table to find which Acts supersede others and creates explicit Amendment nodes in Neo4j.
         """
         logger.info("Creating explicit Amendment nodes and SUPERSEDES relationships from amendment history...")
@@ -1231,37 +1231,61 @@ class GraphBuilder:
             joinedload(Amendment.regulation)
         ).all()
 
+        logger.info(f"Found {len(amendments)} amendments in PostgreSQL")
+
         if not amendments:
-            logger.info("No amendments found")
+            logger.warning("No amendments found in PostgreSQL - skipping Amendment node creation")
             return
 
-        amendment_nodes = []
-        amends_rels = []
-        supersedes_rels = []
+        # Track how many we process
+        processed_count = 0
+        skipped_count = 0
 
         for amendment in amendments:
             if not amendment.regulation:
+                skipped_count += 1
+                logger.debug(f"Skipping amendment {amendment.id} - no regulation relationship")
                 continue
 
-            # Queue Amendment node for batching
+            # Create Amendment node using GraphBuilder's batching system
             amendment_properties = {
                 "id": str(amendment.id),
-                "bill_number": amendment.extra_metadata.get('bill_number') if amendment.extra_metadata else None,
+                "amendment_type": amendment.amendment_type,
                 "effective_date": amendment.effective_date.isoformat() if amendment.effective_date else None,
-                "description": amendment.description if hasattr(amendment, 'description') else None,
-                "metadata": amendment.extra_metadata,
+                "description": amendment.description if amendment.description else None,
                 "created_at": datetime.utcnow().isoformat()
             }
-            amendment_nodes.append(amendment_properties)
+            
+            # Add bill_number if available in metadata
+            if amendment.extra_metadata and 'bill_number' in amendment.extra_metadata:
+                amendment_properties["bill_number"] = amendment.extra_metadata.get('bill_number')
+            
+            # Add metadata (will be JSON serialized by _add_node_to_batch)
+            if amendment.extra_metadata:
+                amendment_properties["metadata"] = amendment.extra_metadata
 
-            # Queue AMENDS relationship for batching
-            amends_rels.append({
-                "amendment_id": str(amendment.id),
-                "reg_id": str(amendment.regulation.id),
-                "effective_date": amendment.effective_date.isoformat() if amendment.effective_date else None
+            # Use GraphBuilder's batching system (handles JSON serialization automatically)
+            self._add_node_to_batch("Amendment", amendment_properties)
+
+            # Determine regulation node label for relationship hints
+            node_label = self._determine_node_label(amendment.regulation.title)
+
+            # Create AMENDS relationship using GraphBuilder's batching system
+            self._add_relationship_to_batch({
+                "from_id": str(amendment.id),
+                "to_id": str(amendment.regulation.id),
+                "from_label": "Amendment",
+                "to_label": node_label,
+                "rel_type": "AMENDS",
+                "properties": {
+                    "effective_date": amendment.effective_date.isoformat() if amendment.effective_date else None,
+                    "created_at": datetime.utcnow().isoformat()
+                }
             })
 
-            # Queue SUPERSEDES relationship if applicable
+            processed_count += 1
+
+            # Create SUPERSEDES relationship if applicable
             bill_info = amendment.extra_metadata.get('bill_number') if amendment.extra_metadata else None
             if bill_info and ', c. ' in bill_info:
                 import re
@@ -1269,77 +1293,39 @@ class GraphBuilder:
                 if match:
                     year = match.group(1)
                     chapter_num = match.group(2)
-                    supersedes_rels.append({
-                        "amendment_id": str(amendment.id),
-                        "year": year,
-                        "chapter_num": chapter_num
-                    })
+                    
+                    # Find legislation containing this year
+                    legislation_query = """
+                    MATCH (l:Legislation)
+                    WHERE toLower(l.title) CONTAINS $year
+                    RETURN l.id as id, l.title as title
+                    LIMIT 1
+                    """
+                    result = self.neo4j.execute_query(legislation_query, {"year": year.lower()})
+                    
+                    if result:
+                        matching_leg = result[0]
+                        
+                        # Create SUPERSEDES relationship
+                        self._add_relationship_to_batch({
+                            "from_id": str(amendment.id),
+                            "to_id": matching_leg["id"],
+                            "from_label": "Amendment",
+                            "to_label": "Legislation",
+                            "rel_type": "SUPERSEDES",
+                            "properties": {
+                                "chapter": chapter_num,
+                                "created_at": datetime.utcnow().isoformat()
+                            }
+                        })
+                        logger.debug(f"Queued SUPERSEDES: Amendment {amendment.id} -> {matching_leg['title']}")
 
-        # BATCH CREATE: Amendment nodes
-        if amendment_nodes:
-            nodes_query = """
-            UNWIND $nodes AS nodeProps
-            CREATE (a:Amendment)
-            SET a = nodeProps
-            """
-            self.neo4j.execute_write(nodes_query, {"nodes": amendment_nodes})
-            logger.info(f"Created {len(amendment_nodes)} Amendment nodes in batch")
-
-        # BATCH CREATE: AMENDS relationships
-        if amends_rels:
-            amends_query = """
-            UNWIND $rels AS rel
-            MATCH (a:Amendment {id: rel.amendment_id})
-            MATCH (r:Regulation {id: rel.reg_id})
-            MERGE (a)-[amends:AMENDS]->(r)
-            SET amends.effective_date = rel.effective_date
-            SET amends.created_at = datetime()
-            """
-            self.neo4j.execute_write(amends_query, {"rels": amends_rels})
-            logger.info(f"Created {len(amends_rels)} AMENDS relationships in batch")
-
-        # BATCH CREATE: SUPERSEDES relationships (with legislation lookup)
-        if supersedes_rels:
-            # First, get all legislation for matching
-            legislation_query = """
-            MATCH (l:Legislation)
-            RETURN l.id as id, l.title as title
-            """
-            all_legislation = self.neo4j.execute_query(legislation_query)
-            legislation_map = {leg['title'].lower(): leg for leg in all_legislation}
-
-            # Match supersedes relationships to legislation
-            matched_supersedes = []
-            for rel in supersedes_rels:
-                # Find legislation containing the year
-                year = rel['year']
-                matching_leg = None
-                for leg_title, leg_data in legislation_map.items():
-                    if year in leg_title:
-                        matching_leg = leg_data
-                        break
-
-                if matching_leg:
-                    matched_supersedes.append({
-                        "amendment_id": rel["amendment_id"],
-                        "leg_id": matching_leg["id"],
-                        "chapter_num": rel["chapter_num"]
-                    })
-
-            if matched_supersedes:
-                supersedes_query = """
-                UNWIND $rels AS rel
-                MATCH (a:Amendment {id: rel.amendment_id})
-                MATCH (l:Legislation {id: rel.leg_id})
-                MERGE (a)-[sup:SUPERSEDES]->(l)
-                SET sup.chapter = rel.chapter_num
-                SET sup.created_at = datetime()
-                """
-                self.neo4j.execute_write(supersedes_query, {"rels": matched_supersedes})
-                logger.info(f"Created {len(matched_supersedes)} SUPERSEDES relationships in batch")
-
-        total_count = len(amendment_nodes) + len(amends_rels) + len(matched_supersedes) if 'matched_supersedes' in locals() else 0
-        logger.info(f"Created {len(amendment_nodes)} Amendment nodes and {total_count} relationships using batching")
+        logger.info(f"✓ Queued {processed_count} Amendment nodes for batching (skipped {skipped_count})")
+        
+        # Flush the batches to Neo4j
+        self.flush_all_batches()
+        
+        logger.info(f"✓ Amendment nodes and relationships created successfully")
     
     def _extract_legislation_keywords(self, title: str) -> List[str]:
         """Extract key legislation names from text."""

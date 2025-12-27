@@ -245,7 +245,7 @@ def main():
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=500,
+        default=2500,
         help="Number of regulations to process before logging progress (default: 100)"
     )
     
