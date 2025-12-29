@@ -168,21 +168,56 @@ class CanadianLawXMLParser:
         """Find all elements with namespace support."""
         return element.findall(path, self.namespace_map)
     
-    def _get_text(self, element: Optional[ET.Element], default: str = "") -> str:
+    def _get_subsection_text(self, subsection_elem: ET.Element) -> str:
         """
-        Safely get text from element, including all text from child elements.
+        Get all text content from a subsection, including nested elements like Paragraph, List, etc.
         
-        This handles cases where XML has inline formatting tags like:
-        <Text>The employer shall <Emphasis>prepare</Emphasis> a plan</Text>
-        
-        Using itertext() ensures we get ALL text content, not just the first text node.
+        Args:
+            subsection_elem: The Subsection element
+            
+        Returns:
+            All text content from the subsection
         """
-        if element is not None:
-            # Get all text content, including text from child elements
-            text = ''.join(element.itertext()).strip()
+        text_parts = []
+        
+        # Get direct text content
+        text_elem = self._find(subsection_elem, 'Text')
+        if text_elem is not None:
+            text = self._get_text(text_elem)
             if text:
-                return text
-        return default
+                text_parts.append(text)
+        
+        # Get text from nested Paragraph elements
+        paragraph_elements = self._findall(subsection_elem, 'Paragraph')
+        for para_elem in paragraph_elements:
+            para_text_elem = self._find(para_elem, 'Text')
+            if para_text_elem is not None:
+                para_text = self._get_text(para_text_elem)
+                if para_text:
+                    # Add paragraph label if present
+                    label_elem = self._find(para_elem, 'Label')
+                    if label_elem is not None:
+                        label = self._get_text(label_elem)
+                        text_parts.append(f"{label} {para_text}")
+                    else:
+                        text_parts.append(para_text)
+        
+        # Get text from nested List elements
+        list_elements = self._findall(subsection_elem, 'List')
+        for list_elem in list_elements:
+            list_text = self._get_text(list_elem)
+            if list_text:
+                text_parts.append(list_text)
+        
+        # Get text from any other nested text elements
+        for child in subsection_elem:
+            if child.tag not in ['Number', 'Label', 'Text', 'Paragraph', 'List']:
+                # Recursively get text from other nested elements
+                child_text = self._get_text(child)
+                if child_text:
+                    text_parts.append(child_text)
+        
+        return '\n'.join(text_parts)
     
     def _detect_jurisdiction_from_metadata(self, root: ET.Element, title: str, chapter: str) -> str:
         """
@@ -905,7 +940,7 @@ class CanadianLawXMLParser:
         
         for subsection_elem in subsection_elements:
             subsection_num = self._get_text(self._find(subsection_elem, 'Number'))
-            subsection_text = self._get_text(self._find(subsection_elem, 'Text'))
+            subsection_text = self._get_subsection_text(subsection_elem)
             
             if subsection_text:
                 # Create subsection as nested ParsedSection
@@ -929,6 +964,12 @@ class CanadianLawXMLParser:
                 text = self._get_text(text_elem)
                 content_parts.append(text)
                 full_text_parts.append(f"  {text}")
+            else:
+                # If no direct Text element, check for nested elements like Paragraph, List, etc.
+                nested_text = self._get_subsection_text(section_elem)
+                if nested_text:
+                    content_parts.append(nested_text)
+                    full_text_parts.append(f"  {nested_text}")
         
         content = "\n".join(content_parts)
         full_text = "\n".join(full_text_parts)
