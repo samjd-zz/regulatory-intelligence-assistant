@@ -548,6 +548,61 @@ async def get_regulation(regulation_id: str):
         db.close()
 
 
+@router.get("/regulation/{regulation_id}/amendments")
+async def get_regulation_amendments(regulation_id: str):
+    """
+    Get all amendments for a regulation.
+
+    - **regulation_id**: Regulation UUID
+    """
+    from database import SessionLocal
+    from models.models import Amendment
+    from uuid import UUID
+    
+    db = SessionLocal()
+    
+    try:
+        # Parse UUID
+        try:
+            reg_uuid = UUID(regulation_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid regulation ID format"
+            )
+        
+        # Get all amendments for this regulation
+        amendments = db.query(Amendment).filter_by(
+            regulation_id=reg_uuid
+        ).order_by(Amendment.effective_date.desc()).all()
+        
+        return {
+            "success": True,
+            "regulation_id": regulation_id,
+            "amendments": [
+                {
+                    "id": str(a.id),
+                    "amendment_type": a.amendment_type,
+                    "effective_date": a.effective_date.isoformat() if a.effective_date else None,
+                    "description": a.description,
+                    "created_at": a.created_at.isoformat()
+                }
+                for a in amendments
+            ],
+            "count": len(amendments)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve amendments: {str(e)}"
+        )
+    finally:
+        db.close()
+
+
 @router.post("/index", response_model=IndexResponse)
 async def index_document(request: DocumentIndexRequest):
     """

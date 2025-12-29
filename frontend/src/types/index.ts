@@ -134,10 +134,14 @@ export interface RegulationRelationships {
   references: RelatedDocument[]
   referenced_by: RelatedDocument[]
   implements: RelatedDocument[]
+  implemented_by: RelatedDocument[]
+  applies_to: RelatedDocument[]
   counts: {
     references: number
     referenced_by: number
     implements: number
+    implemented_by: number
+    applies_to: number
   }
 }
 

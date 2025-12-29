@@ -179,6 +179,8 @@ async def get_regulation_relationships(
     - References (documents this regulation cites via its sections)
     - Referenced By (documents that cite this regulation via their sections)
     - Implements (parent legislation this regulation implements)
+    - Implemented By (regulations that implement this legislation)
+    - Applies To (programs this regulation applies to)
     """
     try:
         # Query for relationships at the Section level, then aggregate to Regulation level
@@ -186,23 +188,32 @@ async def get_regulation_relationships(
         #                   MATCH (doc1:Regulation)-[:HAS_SECTION]->(s1)
         #                   MATCH (doc2:Regulation)-[:HAS_SECTION]->(s2)
         query = """
-        MATCH (r:Regulation {id: $regulation_id})
+        MATCH (r {id: $regulation_id})
+        WHERE r:Regulation OR r:Legislation
         
-        // Find regulations referenced by this regulation's sections
-        OPTIONAL MATCH (r)-[:HAS_SECTION]->(s:Section)-[:REFERENCES]->(refSec:Section)<-[:HAS_SECTION]-(refReg:Regulation)
-        WHERE refReg.id <> r.id
+        // Find documents referenced by this document's sections
+        OPTIONAL MATCH (r)-[:HAS_SECTION]->(s:Section)-[:REFERENCES]->(refSec:Section)<-[:HAS_SECTION]-(refReg)
+        WHERE (refReg:Regulation OR refReg:Legislation) AND refReg.id <> r.id
         
-        // Find regulations that reference this regulation's sections
-        OPTIONAL MATCH (r)-[:HAS_SECTION]->(mySec:Section)<-[:REFERENCES]-(refBySec:Section)<-[:HAS_SECTION]-(refByReg:Regulation)
-        WHERE refByReg.id <> r.id
+        // Find documents that reference this document's sections
+        OPTIONAL MATCH (r)-[:HAS_SECTION]->(mySec:Section)<-[:REFERENCES]-(refBySec:Section)<-[:HAS_SECTION]-(refByReg)
+        WHERE (refByReg:Regulation OR refByReg:Legislation) AND refByReg.id <> r.id
         
-        // Find legislation this regulation implements
+        // Find legislation this document implements
         OPTIONAL MATCH (r)-[:IMPLEMENTS]->(impl)
         
+        // Find documents that implement this legislation (reverse IMPLEMENTS)
+        OPTIONAL MATCH (r)<-[:IMPLEMENTS]-(implBy)
+        
+        // Find programs this document applies to
+        OPTIONAL MATCH (r)-[:APPLIES_TO]->(appliesTo)
+        
         RETURN 
-            [x IN collect(DISTINCT refReg) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0]}] as references,
-            [x IN collect(DISTINCT refByReg) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0]}] as referenced_by,
-            [x IN collect(DISTINCT impl) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0]}] as implements
+            [x IN collect(DISTINCT refReg) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0], relationship: 'REFERENCES'}] as references,
+            [x IN collect(DISTINCT refByReg) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0], relationship: 'REFERENCED_BY'}] as referenced_by,
+            [x IN collect(DISTINCT impl) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0], relationship: 'IMPLEMENTS'}] as implements,
+            [x IN collect(DISTINCT implBy) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0], relationship: 'IMPLEMENTED_BY'}] as implemented_by,
+            [x IN collect(DISTINCT appliesTo) WHERE x IS NOT NULL | {id: x.id, title: CASE WHEN 'Program' IN labels(x) THEN x.name ELSE x.title END, type: labels(x)[0], relationship: 'APPLIES_TO'}] as applies_to
         """
         
         results = neo4j.execute_query(
@@ -216,10 +227,14 @@ async def get_regulation_relationships(
                 "references": [],
                 "referenced_by": [],
                 "implements": [],
+                "implemented_by": [],
+                "applies_to": [],
                 "counts": {
                     "references": 0,
                     "referenced_by": 0,
-                    "implements": 0
+                    "implements": 0,
+                    "implemented_by": 0,
+                    "applies_to": 0
                 }
             }
         
@@ -229,16 +244,22 @@ async def get_regulation_relationships(
         references = result.get('references', [])
         referenced_by = result.get('referenced_by', [])
         implements = result.get('implements', [])
+        implemented_by = result.get('implemented_by', [])
+        applies_to = result.get('applies_to', [])
         
         return {
             "regulation_id": str(regulation_id),
             "references": references,
             "referenced_by": referenced_by,
             "implements": implements,
+            "implemented_by": implemented_by,
+            "applies_to": applies_to,
             "counts": {
                 "references": len(references),
                 "referenced_by": len(referenced_by),
-                "implements": len(implements)
+                "implements": len(implements),
+                "implemented_by": len(implemented_by),
+                "applies_to": len(applies_to)
             }
         }
         

@@ -3,8 +3,10 @@ import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { KnowledgeGraphVisualization } from "@/components/regulation/KnowledgeGraphVisualization";
+import { AmendmentTimeline } from "@/components/regulation/AmendmentTimeline";
 import { formatDate } from "@/lib/utils";
-import { getRegulationDetail, getRegulationRelationships } from "@/services/api";
+import { getRegulationDetail, getRegulationRelationships, getRegulationAmendments } from "@/services/api";
 import type { RegulationRelationships } from "@/types";
 
 interface RegulationData {
@@ -24,6 +26,14 @@ interface RegulationData {
 	}>;
 }
 
+interface AmendmentData {
+	id: string;
+	amendment_type: string;
+	effective_date: string | null;
+	description: string;
+	created_at: string;
+}
+
 export function RegulationDetail() {
 	const { t } = useTranslation();
 	const { id } = useParams<{ id: string }>();
@@ -31,7 +41,7 @@ export function RegulationDetail() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [relationships, setRelationships] = useState<RegulationRelationships | null>(null);
-	const [relationshipsLoading, setRelationshipsLoading] = useState(false);
+	const [amendments, setAmendments] = useState<AmendmentData[]>([]);
 
 	useEffect(() => {
 		if (!id) return;
@@ -72,24 +82,19 @@ export function RegulationDetail() {
 
 		let cancelled = false;
 
-		async function fetchRelationships() {
-			try {
-				setRelationshipsLoading(true);
-				const data = await getRegulationRelationships(id!);
-				if (!cancelled) {
-					setRelationships(data);
-				}
-			} catch (err) {
-				if (!cancelled) {
-					console.error("Error fetching relationships:", err);
-					// Non-critical error - don't show error to user
-				}
-			} finally {
-				if (!cancelled) {
-					setRelationshipsLoading(false);
-				}
+	async function fetchRelationships() {
+		try {
+			const data = await getRegulationRelationships(id!);
+			if (!cancelled) {
+				setRelationships(data);
+			}
+		} catch (err) {
+			if (!cancelled) {
+				console.error("Error fetching relationships:", err);
+				// Non-critical error - don't show error to user
 			}
 		}
+	}
 
 		fetchRelationships();
 
@@ -97,6 +102,33 @@ export function RegulationDetail() {
 			cancelled = true;
 		};
 	}, [id, regulation]);
+
+	// Fetch regulation amendments
+	useEffect(() => {
+		if (!id) return;
+
+		let cancelled = false;
+
+		async function fetchAmendments() {
+			try {
+				const data = await getRegulationAmendments(id!);
+				if (!cancelled) {
+					setAmendments(data.amendments || []);
+				}
+			} catch (err) {
+				if (!cancelled) {
+					console.error("Error fetching amendments:", err);
+					// Non-critical error - don't show error to user
+				}
+			}
+		}
+
+		fetchAmendments();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [id]);
 
 	if (loading) {
 		return (
@@ -171,48 +203,102 @@ export function RegulationDetail() {
 					{t('regulation.backToSearch')}
 				</Link>
 
-				{/* Header */}
-				<div className="mb-12 animate-slide-up">
-					<div className="flex items-center gap-3 mb-4">
-						<span className="text-xs font-bold bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-300 px-2 py-1 rounded uppercase">
-							{regulation.jurisdiction} • {regulation.status}
-						</span>
-					</div>
-					<h1 className="text-4xl font-light text-slate-900 dark:text-zinc-100 mb-4">
-						{regulation.title}
-					</h1>
-					<div className="flex flex-wrap gap-6 text-sm text-slate-600 dark:text-zinc-400">
-						<div className="flex items-center gap-2">
-							<span className="material-symbols-outlined text-base">
-								gavel
-							</span>
-							<span>
-								<span className="font-medium">{t('regulation.citation')}:</span>{" "}
-								{regulation.citation}
-							</span>
+			{/* Header */}
+			<div className="mb-12 animate-slide-up">
+				<div className="flex items-center gap-3 mb-4">
+					<span className="text-xs font-bold bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-300 px-2 py-1 rounded uppercase">
+						{regulation.jurisdiction} • {regulation.status}
+					</span>
+				</div>
+				<h1 className="text-4xl font-light text-slate-900 dark:text-zinc-100 mb-6">
+					{regulation.title}
+				</h1>
+
+				{/* Metadata Cards */}
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+					{/* Citation Card */}
+					{regulation.citation && regulation.citation.trim() !== "" && (
+						<div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+							<div className="flex items-start gap-3">
+								<span className="material-symbols-outlined text-teal-500 dark:text-teal-400 mt-0.5">
+									gavel
+								</span>
+								<div className="flex-1 min-w-0">
+									<p className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+										{t('regulation.citation')}
+									</p>
+									<p className="text-sm font-medium text-slate-900 dark:text-zinc-100 font-mono break-words">
+										{regulation.citation}
+									</p>
+								</div>
+							</div>
 						</div>
-						<div className="flex items-center gap-2">
-							<span className="material-symbols-outlined text-base">
-								account_balance
-							</span>
-							<span>
-								<span className="font-medium">{t('regulation.authority')}:</span>{" "}
-								{regulation.authority}
-							</span>
+					)}
+
+					{/* Authority Card */}
+					{regulation.authority && regulation.authority.trim() !== "" && (
+						<div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+							<div className="flex items-start gap-3">
+								<span className="material-symbols-outlined text-blue-500 dark:text-blue-400 mt-0.5">
+									account_balance
+								</span>
+								<div className="flex-1 min-w-0">
+									<p className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+										{t('regulation.authority')}
+									</p>
+									<p className="text-sm font-medium text-slate-900 dark:text-zinc-100 break-words">
+										{regulation.authority}
+									</p>
+								</div>
+							</div>
 						</div>
-						{regulation.effective_date && (
-							<div className="flex items-center gap-2">
-								<span className="material-symbols-outlined text-base">
+					)}
+
+					{/* Effective Date Card */}
+					{regulation.effective_date && (
+						<div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+							<div className="flex items-start gap-3">
+								<span className="material-symbols-outlined text-purple-500 dark:text-purple-400 mt-0.5">
 									event
 								</span>
-								<span>
-									<span className="font-medium">{t('regulation.effectiveDate')}:</span>{" "}
-									{formatDate(regulation.effective_date)}
-								</span>
+								<div className="flex-1 min-w-0">
+									<p className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+										{t('regulation.effectiveDate')}
+									</p>
+									<p className="text-sm font-medium text-slate-900 dark:text-zinc-100">
+										{formatDate(regulation.effective_date)}
+									</p>
+								</div>
 							</div>
-						)}
-					</div>
+						</div>
+					)}
 				</div>
+			</div>
+
+			{/* Knowledge Graph Section */}
+			{relationships && (
+				<div className="mb-12">
+					<KnowledgeGraphVisualization
+						relationships={relationships}
+						currentRegulationTitle={regulation.title}
+					/>
+				</div>
+			)}
+
+			{/* Amendment Timeline Section */}
+			<div className="mb-12">
+				<AmendmentTimeline
+					amendments={amendments.map(a => ({
+						id: a.id,
+						date: a.effective_date || a.created_at,
+						type: (a.amendment_type.toLowerCase().includes('repeal') ? 'repealed' :
+							   a.amendment_type.toLowerCase().includes('add') ? 'added' : 'amended') as 'amended' | 'added' | 'repealed',
+						description: a.description || a.amendment_type,
+						citation: undefined
+					}))}
+					effectiveDate={regulation.effective_date}
+				/>
+			</div>
 
 				{/* Content */}
 				<div className="border-t border-slate-100 dark:border-zinc-800/60 pt-8">
@@ -249,115 +335,6 @@ export function RegulationDetail() {
 					)}
 				</div>
 
-				{/* Related Regulations Section */}
-				{relationships && (relationships.counts.references > 0 || relationships.counts.referenced_by > 0 || relationships.counts.implements > 0) && (
-					<div className="border-t border-slate-100 dark:border-zinc-800/60 pt-8 mt-12">
-						<h2 className="text-2xl font-light text-slate-800 dark:text-zinc-200 mb-6">
-							Related Regulations
-						</h2>
-
-						<div className="space-y-6">
-							{/* Implements */}
-							{relationships.implements.length > 0 && (
-								<div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-lg p-6">
-									<h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-4 flex items-center gap-2">
-										<span className="material-symbols-outlined text-base">account_balance</span>
-										Implements ({relationships.counts.implements})
-									</h3>
-									<p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
-										Parent legislation that this regulation implements
-									</p>
-									<div className="space-y-2">
-										{relationships.implements.map((doc) => (
-											<Link
-												key={doc.id}
-												to={`/regulation/${doc.id}`}
-												className="block bg-white dark:bg-zinc-800 rounded-md p-3 hover:shadow-md transition-shadow border border-blue-200 dark:border-blue-800"
-											>
-												<div className="flex items-start gap-3">
-													<span className="material-symbols-outlined text-blue-500 dark:text-blue-400 mt-0.5">description</span>
-													<div className="flex-1 min-w-0">
-														<p className="font-medium text-slate-900 dark:text-zinc-100 truncate">{doc.title}</p>
-														<p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">{doc.type}</p>
-													</div>
-													<span className="material-symbols-outlined text-slate-400 dark:text-zinc-500">arrow_forward</span>
-												</div>
-											</Link>
-										))}
-									</div>
-								</div>
-							)}
-
-							{/* References */}
-							{relationships.references.length > 0 && (
-								<div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-100 dark:border-teal-900/30 rounded-lg p-6">
-									<h3 className="text-lg font-medium text-teal-900 dark:text-teal-100 mb-4 flex items-center gap-2">
-										<span className="material-symbols-outlined text-base">link</span>
-										References ({relationships.counts.references})
-									</h3>
-									<p className="text-sm text-teal-700 dark:text-teal-300 mb-4">
-										Documents that this regulation cites
-									</p>
-									<div className="space-y-2">
-										{relationships.references.map((doc) => (
-											<Link
-												key={doc.id}
-												to={`/regulation/${doc.id}`}
-												className="block bg-white dark:bg-zinc-800 rounded-md p-3 hover:shadow-md transition-shadow border border-teal-200 dark:border-teal-800"
-											>
-												<div className="flex items-start gap-3">
-													<span className="material-symbols-outlined text-teal-500 dark:text-teal-400 mt-0.5">description</span>
-													<div className="flex-1 min-w-0">
-														<p className="font-medium text-slate-900 dark:text-zinc-100 truncate">{doc.title}</p>
-														<p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">{doc.type}</p>
-													</div>
-													<span className="material-symbols-outlined text-slate-400 dark:text-zinc-500">arrow_forward</span>
-												</div>
-											</Link>
-										))}
-									</div>
-								</div>
-							)}
-
-							{/* Referenced By */}
-							{relationships.referenced_by.length > 0 && (
-								<div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-lg p-6">
-									<h3 className="text-lg font-medium text-purple-900 dark:text-purple-100 mb-4 flex items-center gap-2">
-										<span className="material-symbols-outlined text-base">published_with_changes</span>
-										Referenced By ({relationships.counts.referenced_by})
-									</h3>
-									<p className="text-sm text-purple-700 dark:text-purple-300 mb-4">
-										Documents that cite this regulation
-									</p>
-									<div className="space-y-2">
-										{relationships.referenced_by.map((doc) => (
-											<Link
-												key={doc.id}
-												to={`/regulation/${doc.id}`}
-												className="block bg-white dark:bg-zinc-800 rounded-md p-3 hover:shadow-md transition-shadow border border-purple-200 dark:border-purple-800"
-											>
-												<div className="flex items-start gap-3">
-													<span className="material-symbols-outlined text-purple-500 dark:text-purple-400 mt-0.5">description</span>
-													<div className="flex-1 min-w-0">
-														<p className="font-medium text-slate-900 dark:text-zinc-100 truncate">{doc.title}</p>
-														<p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">{doc.type}</p>
-													</div>
-													<span className="material-symbols-outlined text-slate-400 dark:text-zinc-500">arrow_forward</span>
-												</div>
-											</Link>
-										))}
-									</div>
-								</div>
-							)}
-						</div>
-
-						{relationshipsLoading && (
-							<div className="flex items-center justify-center py-8">
-								<LoadingSpinner size="sm" message="Loading relationships..." />
-							</div>
-						)}
-					</div>
-				)}
 			</div>
 		</div>
 	);
