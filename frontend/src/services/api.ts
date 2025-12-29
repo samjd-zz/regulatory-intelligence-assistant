@@ -8,6 +8,7 @@ import type {
   ComplianceCheckResponse,
   Regulation,
   ValidationResult,
+  RegulationRelationships,
 } from '@/types'
 
 // Create axios instance with base configuration
@@ -117,6 +118,13 @@ export async function getRegulationDetail(id: string): Promise<{
 export async function getRelatedRegulations(id: string): Promise<Regulation[]> {
   const { data } = await api.get(`/graph/related/${id}`)
   return data.related || []
+}
+
+export async function getRegulationRelationships(
+  id: string
+): Promise<RegulationRelationships> {
+  const { data } = await api.get(`/graph/regulation/${id}/relationships`)
+  return data
 }
 
 // ============================================================================

@@ -61,11 +61,6 @@ class Regulation(Base):
     extra_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Full-text search vectors (generated columns - defined in migration g2h4j5k6m7n8)
-    # These are auto-populated by PostgreSQL and indexed with GIN for fast search
-    search_vector = Column(TSVECTOR, nullable=True)  # English FTS
-    search_vector_fr = Column(TSVECTOR, nullable=True)  # French FTS
 
     # Relationships
     sections = relationship(
@@ -96,11 +91,6 @@ class Section(Base):
     extra_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Full-text search vectors (generated columns - defined in migration g2h4j5k6m7n8)
-    # These are auto-populated by PostgreSQL and indexed with GIN for fast search
-    search_vector = Column(TSVECTOR, nullable=True)  # English FTS
-    search_vector_fr = Column(TSVECTOR, nullable=True)  # French FTS
 
     # Relationships
     regulation = relationship("Regulation", back_populates="sections")

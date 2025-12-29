@@ -88,6 +88,19 @@
           }
         }
       },
+      "regulation_title": {
+        "type": "text",
+        "analyzer": "legal_text_analyzer",
+        "fields": {
+          "exact": {
+            "type": "keyword"
+          },
+          "raw": {
+            "type": "text",
+            "analyzer": "standard"
+          }
+        }
+      },
       "content": {
         "type": "text",
         "analyzer": "legal_text_analyzer",

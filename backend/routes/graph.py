@@ -15,7 +15,7 @@ from services.graph_builder import GraphBuilder
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/graph", tags=["Knowledge Graph"])
+router = APIRouter(prefix="/api/graph", tags=["Knowledge Graph"])
 
 
 
@@ -166,6 +166,84 @@ async def get_section_references(
         
     except Exception as e:
         logger.error(f"Error fetching section references: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/regulation/{regulation_id}/relationships")
+async def get_regulation_relationships(
+    regulation_id: UUID,
+    neo4j: Neo4jClient = Depends(get_neo4j_client)
+):
+    """
+    Get all relationships for a regulation including:
+    - References (documents this regulation cites via its sections)
+    - Referenced By (documents that cite this regulation via their sections)
+    - Implements (parent legislation this regulation implements)
+    """
+    try:
+        # Query for relationships at the Section level, then aggregate to Regulation level
+        # Pattern based on: MATCH (s1:Section)-[:REFERENCES]->(s2:Section)
+        #                   MATCH (doc1:Regulation)-[:HAS_SECTION]->(s1)
+        #                   MATCH (doc2:Regulation)-[:HAS_SECTION]->(s2)
+        query = """
+        MATCH (r:Regulation {id: $regulation_id})
+        
+        // Find regulations referenced by this regulation's sections
+        OPTIONAL MATCH (r)-[:HAS_SECTION]->(s:Section)-[:REFERENCES]->(refSec:Section)<-[:HAS_SECTION]-(refReg:Regulation)
+        WHERE refReg.id <> r.id
+        
+        // Find regulations that reference this regulation's sections
+        OPTIONAL MATCH (r)-[:HAS_SECTION]->(mySec:Section)<-[:REFERENCES]-(refBySec:Section)<-[:HAS_SECTION]-(refByReg:Regulation)
+        WHERE refByReg.id <> r.id
+        
+        // Find legislation this regulation implements
+        OPTIONAL MATCH (r)-[:IMPLEMENTS]->(impl)
+        
+        RETURN 
+            [x IN collect(DISTINCT refReg) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0]}] as references,
+            [x IN collect(DISTINCT refByReg) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0]}] as referenced_by,
+            [x IN collect(DISTINCT impl) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0]}] as implements
+        """
+        
+        results = neo4j.execute_query(
+            query,
+            {"regulation_id": str(regulation_id)}
+        )
+        
+        if not results or len(results) == 0:
+            return {
+                "regulation_id": str(regulation_id),
+                "references": [],
+                "referenced_by": [],
+                "implements": [],
+                "counts": {
+                    "references": 0,
+                    "referenced_by": 0,
+                    "implements": 0
+                }
+            }
+        
+        result = results[0]
+        
+        # Results are already filtered by the query, but ensure they're lists
+        references = result.get('references', [])
+        referenced_by = result.get('referenced_by', [])
+        implements = result.get('implements', [])
+        
+        return {
+            "regulation_id": str(regulation_id),
+            "references": references,
+            "referenced_by": referenced_by,
+            "implements": implements,
+            "counts": {
+                "references": len(references),
+                "referenced_by": len(referenced_by),
+                "implements": len(implements)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching regulation relationships: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

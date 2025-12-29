@@ -107,7 +107,14 @@ class DataIngestionPipeline:
         # Everything else is a Regulation (rules, regulations, etc.)
         return 'Regulation'
     
-    async def ingest_from_directory(self, xml_dir: str, limit: Optional[int] = None, force: bool = False):
+    async def ingest_from_directory(
+        self,
+        xml_dir: str,
+        limit: Optional[int] = None,
+        force: bool = False,
+        clear_postgres: bool = False,
+        postgres_only: bool = False
+    ):
         """
         Ingest all XML files from a directory (including subdirectories).
         Automatically detects language from directory structure (en/ or fr/).
@@ -116,41 +123,89 @@ class DataIngestionPipeline:
             xml_dir: Directory containing XML files (may have en/ and fr/ subdirectories)
             limit: Maximum number of files to process (for testing)
             force: If True, skip duplicate checking and re-ingest all files
+            clear_postgres: If True, clear PostgreSQL before ingestion (batched deletion)
+            postgres_only: If True, only rebuild PostgreSQL (skip Neo4j and Elasticsearch)
         """
         xml_path = Path(xml_dir)
         
         if not xml_path.exists():
             raise ValueError(f"Directory not found: {xml_dir}")
         
-        # FORCE MODE CLEANUP: Clear Neo4j and Elasticsearch before re-ingestion
-        if force:
+        # CLEAR POSTGRESQL: Batched deletion to avoid memory issues
+        if clear_postgres:
             logger.warning("=" * 80)
-            logger.warning("FORCE MODE: Clearing Neo4j and Elasticsearch data before re-ingestion")
+            logger.warning("CLEARING POSTGRESQL: Deleting all regulations, sections, amendments, citations")
             logger.warning("=" * 80)
             
-            # Clear Neo4j knowledge graph
             try:
-                logger.info("Clearing Neo4j knowledge graph...")
-                clear_result = self.graph_service.clear_all_data()
-                if clear_result.get('status') == 'success':
-                    logger.info("✓ Neo4j data cleared successfully")
-                else:
-                    logger.error(f"✗ Neo4j clear failed: {clear_result.get('message')}")
+                # Delete in reverse dependency order: Citations → Amendments → Sections → Regulations
+                batch_size = 2500
+                
+                # 1. Delete Citations
+                logger.info("Deleting citations...")
+                while True:
+                    # Get IDs of citations to delete
+                    ids_to_delete = self.db.query(Citation.id).limit(batch_size).all()
+                    if not ids_to_delete:
+                        break
+                    
+                    # Delete by IDs
+                    ids_list = [id[0] for id in ids_to_delete]
+                    deleted = self.db.query(Citation).filter(Citation.id.in_(ids_list)).delete(synchronize_session=False)
+                    self.db.commit()
+                    logger.info(f"  Deleted {deleted} citations")
+                
+                # 2. Delete Amendments
+                logger.info("Deleting amendments...")
+                while True:
+                    # Get IDs of amendments to delete
+                    ids_to_delete = self.db.query(Amendment.id).limit(batch_size).all()
+                    if not ids_to_delete:
+                        break
+                    
+                    # Delete by IDs
+                    ids_list = [id[0] for id in ids_to_delete]
+                    deleted = self.db.query(Amendment).filter(Amendment.id.in_(ids_list)).delete(synchronize_session=False)
+                    self.db.commit()
+                    logger.info(f"  Deleted {deleted} amendments")
+                
+                # 3. Delete Sections
+                logger.info("Deleting sections...")
+                while True:
+                    # Get IDs of sections to delete
+                    ids_to_delete = self.db.query(Section.id).limit(batch_size).all()
+                    if not ids_to_delete:
+                        break
+                    
+                    # Delete by IDs
+                    ids_list = [id[0] for id in ids_to_delete]
+                    deleted = self.db.query(Section).filter(Section.id.in_(ids_list)).delete(synchronize_session=False)
+                    self.db.commit()
+                    logger.info(f"  Deleted {deleted} sections")
+                
+                # 4. Delete Regulations
+                logger.info("Deleting regulations...")
+                while True:
+                    # Get IDs of regulations to delete
+                    ids_to_delete = self.db.query(Regulation.id).limit(batch_size).all()
+                    if not ids_to_delete:
+                        break
+                    
+                    # Delete by IDs
+                    ids_list = [id[0] for id in ids_to_delete]
+                    deleted = self.db.query(Regulation).filter(Regulation.id.in_(ids_list)).delete(synchronize_session=False)
+                    self.db.commit()
+                    logger.info(f"  Deleted {deleted} regulations")
+                
+                logger.info("✓ PostgreSQL cleared successfully")
+                
             except Exception as e:
-                logger.error(f"✗ Failed to clear Neo4j data: {e}")
-            
-            # Recreate Elasticsearch index (deletes and recreates)
-            try:
-                logger.info("Recreating Elasticsearch index...")
-                if self.search_service.create_index(force_recreate=True):
-                    logger.info("✓ Elasticsearch index recreated successfully")
-                else:
-                    logger.error("✗ Elasticsearch index recreation failed")
-            except Exception as e:
-                logger.error(f"✗ Failed to recreate Elasticsearch index: {e}")
+                logger.error(f"✗ Failed to clear PostgreSQL: {e}")
+                self.db.rollback()
+                raise
             
             logger.warning("=" * 80)
-            logger.warning("Cleanup complete. Starting fresh ingestion...")
+            logger.warning("PostgreSQL cleanup complete. Starting fresh ingestion...")
             logger.warning("=" * 80)
         
         # Find all XML files recursively (to handle en/ and fr/ subdirectories)
@@ -216,19 +271,56 @@ class DataIngestionPipeline:
             logger.error(f"Final commit failed: {e}")
             self.db.rollback()
             raise
-        
-        logger.info("Running global inter-document linking...")
-        try:
-            from utils.neo4j_client import get_neo4j_client
-            from services.graph_builder import GraphBuilder
-            
-            # We need a temporary builder instance for this global operation
-            neo4j_client = get_neo4j_client()
-            linker = GraphBuilder(self.db, neo4j_client)
-            linker.create_inter_document_relationships()
-            logger.info("Global linking complete.")
-        except Exception as e:
-            logger.error(f"Global linking failed: {e}")
+        if not postgres_only:
+            # Build Neo4j graph
+            logger.info("Running populate NEO4J graph...")
+            try:
+                from utils.neo4j_client import get_neo4j_client
+                from tasks.populate_graph import clear_graph, populate_from_postgresql
+                
+                neo4j_client = get_neo4j_client()
+                if force:
+                    logger.info("Force mode: Clearing existing Neo4j graph data...")
+                    clear_graph(neo4j_client, confirm=True)
+
+                populate_from_postgresql(self.db, neo4j_client)
+                
+                logger.info("Populate NEO4J graph complete.")
+            except Exception as e:
+                logger.error(f"Populate graph failed: {e}")
+
+            logger.info("Running Elasticsearch reindex...")
+            try:
+                import subprocess
+                import sys
+                
+                # Get the path to the reindex script
+                script_path = Path(__file__).parent.parent / "scripts" / "reindex_elasticsearch.py"
+                
+                # Build command with conditional --force-recreate
+                cmd = [sys.executable, str(script_path)]
+                if force:
+                    cmd.append("--force-recreate")
+                
+                # Run the script and capture output
+                logger.info(f"Running command: {' '.join(cmd)}")
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                # Log stdout output for visibility
+                if result.stdout:
+                    logger.info("Elasticsearch reindex output:")
+                    for line in result.stdout.strip().split('\n'):
+                        if line.strip():
+                            logger.info(f"  {line}")
+                
+                if result.returncode == 0:
+                    logger.info("Elasticsearch reindex complete.")
+                else:
+                    logger.error(f"Elasticsearch reindex failed: {result.stderr}")
+                    raise Exception(f"Reindex failed with exit code {result.returncode}")
+                    
+            except Exception as e:
+                logger.error(f"Elasticsearch reindex failed: {e}")
 
         # Final statistics
         logger.info("=" * 60)
@@ -236,7 +328,11 @@ class DataIngestionPipeline:
         logger.info("=" * 60)
         self._log_stats()
     
-    async def ingest_xml_file(self, xml_path: str, force: bool = False) -> Dict[str, Any]:
+    async def ingest_xml_file(
+            self, 
+            xml_path: str, 
+            force: bool = False
+            ) -> Dict[str, Any]:
         """
         Ingest a single XML file through the entire pipeline.
         
@@ -249,17 +345,20 @@ class DataIngestionPipeline:
         """
         logger.info(f"Ingesting: {xml_path}")
         
-        # Detect language from path (en/ or fr/ subdirectory)
+        # Detect language from path (en/, fr/, en-regs/, fr-regs/ subdirectories)
         language = 'en'  # default to English
         xml_path_obj = Path(xml_path)
-        # Check if path contains /en/ or /fr/ directory
-        if '/fr/' in str(xml_path) or '\\fr\\' in str(xml_path):
+        # Check if path contains /fr/, /fr-regs/ or \fr\, \fr-regs\ directory
+        if ('/fr/' in str(xml_path) or '\\fr\\' in str(xml_path) or
+            '/fr-regs/' in str(xml_path) or '\\fr-regs\\' in str(xml_path)):
             language = 'fr'
-        elif any(part == 'fr' for part in xml_path_obj.parts):
+        elif any(part == 'fr' or part == 'fr-regs' for part in xml_path_obj.parts):
             language = 'fr'
-        elif '/en/' in str(xml_path) or '\\en\\' in str(xml_path):
+        # Check if path contains /en/, /en-regs/ or \en\, \en-regs\ directory
+        elif ('/en/' in str(xml_path) or '\\en\\' in str(xml_path) or
+              '/en-regs/' in str(xml_path) or '\\en-regs\\' in str(xml_path)):
             language = 'en'
-        elif any(part == 'en' for part in xml_path_obj.parts):
+        elif any(part == 'en' or part == 'en-regs' for part in xml_path_obj.parts):
             language = 'en'
         
         logger.info(f"Detected language: {language}")
@@ -329,38 +428,6 @@ class DataIngestionPipeline:
         # Stage 2: Store in PostgreSQL
         regulation = await self._store_in_postgres(parsed_reg, content_hash, language)
         self.stats['regulations_created'] += 1
-        
-        # Stage 3: Build knowledge graph (skip if title+jurisdiction duplicate)
-        if not is_title_duplicate:
-            try:
-                graph_result = await self._build_knowledge_graph(regulation, parsed_reg)
-                self.stats['graph_nodes_created'] += graph_result.get('nodes_created', 0)
-                self.stats['graph_relationships_created'] += graph_result.get('relationships_created', 0)
-            except Exception as e:
-                logger.error(f"Knowledge graph creation failed: {e}")
-                # Continue even if graph fails
-        else:
-            logger.info(
-                f"Skipping graph creation for title+jurisdiction duplicate: "
-                f"{parsed_reg.title} (regulation_id={regulation.id})"
-            )
-        
-        # Stage 4: Index in Elasticsearch (skip if title+jurisdiction duplicate)
-        if not is_title_duplicate:
-            try:
-                await self._index_in_elasticsearch(regulation, parsed_reg)
-                self.stats['elasticsearch_indexed'] += 1
-            except Exception as e:
-                logger.error(f"Elasticsearch indexing failed: {e}")
-                # Continue even if ES fails
-        else:
-            logger.info(
-                f"Skipping ES indexing for title+jurisdiction duplicate: "
-                f"{parsed_reg.title} (regulation_id={regulation.id})"
-            )
-        
-        # Stage 5: Upload to Gemini (optional, for RAG)
-        # This will be handled separately as Gemini has API rate limits
         
         logger.info(f"Successfully ingested: {parsed_reg.title}")
         
@@ -523,159 +590,8 @@ class DataIngestionPipeline:
                    f"{len(parsed_reg.cross_references)} citations")
         
         return regulation
-    
-    async def _build_knowledge_graph(
-        self,
-        regulation: Regulation,
-        parsed_reg: ParsedRegulation
-    ) -> Dict[str, int]:
-        """
-        Build knowledge graph in Neo4j using optimized two-pass processing.
         
-        Pass 1: Create all nodes (Regulation, Sections, Programs, Situations)
-        Pass 2: Create all relationships (HAS_SECTION, REFERENCES, APPLIES_TO, etc.)
-        
-        Args:
-            regulation: Regulation DB object
-            parsed_reg: Parsed regulation data
-            
-        Returns:
-            Dictionary with counts of created nodes/relationships
-        """
-        logger.info(f"Building knowledge graph for: {parsed_reg.title}")
-        
-        # Use GraphBuilder to create graph structure
-        from services.graph_builder import GraphBuilder
-        from utils.neo4j_client import get_neo4j_client
-        
-        # Get Neo4j client (GraphBuilder expects neo4j_client, not graph_service)
-        neo4j_client = get_neo4j_client()
-        
-        # Initialize GraphBuilder with batching (default batch_size=2500)
-        graph_builder = GraphBuilder(self.db, neo4j_client, batch_size=2500)
-        
-        try:
-            # Verify Neo4j connectivity
-            if not neo4j_client.verify_connectivity():
-                logger.error("Failed to connect to Neo4j")
-                return 1
-            
-            logger.info("✓ Connected to Neo4j")
-            
-            # Setup constraints and indexes
-            setup_neo4j_constraints(neo4j_client)
 
-            # PASS 1: Create all nodes using optimized batching
-            logger.debug(f"[Pass 1] Creating nodes for {parsed_reg.title[:60]}...")
-            graph_builder.create_nodes_for_regulation(regulation)
-            
-            # Flush all node batches from Pass 1
-            graph_builder.flush_all_batches()
-            
-            # PASS 2: Create all relationships using optimized batching
-            logger.debug(f"[Pass 2] Creating relationships for {parsed_reg.title[:60]}...")
-            graph_builder.create_relationships_for_regulation(regulation)
-            
-            # Flush all relationship batches from Pass 2
-            graph_builder.flush_all_batches()
-            
-            # Get statistics
-            result = graph_builder.get_stats()
-            
-            logger.info(f"Created {result.get('nodes_created', 0)} nodes, "
-                       f"{result.get('relationships_created', 0)} relationships")
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"Graph building failed for {parsed_reg.title}: {e}")
-            raise
-    
-    async def _index_in_elasticsearch(
-        self,
-        regulation: Regulation,
-        parsed_reg: ParsedRegulation
-    ) -> None:
-        """
-        Index regulation in Elasticsearch.
-        
-        Args:
-            regulation: Regulation DB object
-            parsed_reg: Parsed regulation data
-        """
-        logger.info(f"Indexing in Elasticsearch: {parsed_reg.title}")
-        
-        # Extract programs from metadata
-        programs = regulation.extra_metadata.get('programs', []) if regulation.extra_metadata else []
-        
-        # Determine node type (Legislation vs Regulation) using same logic as graph builder
-        node_type = self._determine_node_type(regulation.title)
-        
-        # Index the full regulation
-        doc = {
-            'id': str(regulation.id),
-            'regulation_id': str(regulation.id),
-            'title': regulation.title,
-            'content': regulation.full_text,
-            'document_type': 'regulation',  # Generic doc type for backward compatibility
-            'node_type': node_type,  # Legislation or Regulation
-            'jurisdiction': regulation.jurisdiction,
-            'authority': regulation.authority,
-            'citation': parsed_reg.chapter or regulation.authority or f"{regulation.title}",
-            'legislation_name': regulation.title,
-            'language': regulation.language or 'en',  # Add language field
-            'effective_date': regulation.effective_date.isoformat() if regulation.effective_date else None,
-            'status': regulation.status,
-            'programs': programs,  # Add programs field for filtering
-            'metadata': {
-                'chapter': parsed_reg.chapter,
-                'act_type': parsed_reg.act_type,
-                'programs': programs,
-                **parsed_reg.metadata
-            }
-        }
-        
-        # index_document is synchronous
-        self.search_service.index_document(
-            doc_id=str(regulation.id),
-            document=doc
-        )
-        
-        # Index individual sections for better search granularity
-        sections = self.db.query(Section).filter_by(
-            regulation_id=regulation.id
-        ).all()
-        
-        # Extract citation and programs for sections (same as regulation)
-        section_citation = parsed_reg.chapter or regulation.authority or f"{regulation.title}"
-        
-        for section in sections:
-            section_doc = {
-                'id': str(section.id),
-                'regulation_id': str(regulation.id),
-                'section_id': str(section.id),
-                'section_number': section.section_number,
-                'title': section.title or regulation.title,
-                'content': section.content,
-                'document_type': 'section',
-                'node_type': node_type,  # Inherit node type from parent regulation
-                'jurisdiction': regulation.jurisdiction,
-                'authority': regulation.authority,
-                'citation': section_citation,
-                'legislation_name': regulation.title,
-                'regulation_title': regulation.title,
-                'language': regulation.language or 'en',  # Inherit language from regulation
-                'programs': programs,  # Inherit programs from regulation
-                'metadata': section.extra_metadata or {}
-            }
-            
-            self.search_service.index_document(
-                doc_id=str(section.id),
-                document=section_doc
-            )
-        
-        logger.info(f"Indexed 1 regulation + {len(sections)} sections")
-    
     def _calculate_content_hash(self, content: str) -> str:
         """Calculate SHA-256 hash of content."""
         return hashlib.sha256(content.encode('utf-8')).hexdigest()
@@ -851,6 +767,8 @@ async def main():
     parser.add_argument('--limit', type=int, help='Limit number of files to process')
     parser.add_argument('--validate', action='store_true', help='Validate after ingestion')
     parser.add_argument('--force', action='store_true', help='Force re-ingestion, skip duplicate checking')
+    parser.add_argument('--clear-postgres', action='store_true', help='Clear PostgreSQL database before ingestion')
+    parser.add_argument('--postgres-only', action='store_true', help='Only ingest into PostgreSQL, skip Neo4j and Elasticsearch')
     
     args = parser.parse_args()
     
@@ -900,7 +818,9 @@ async def main():
         await pipeline.ingest_from_directory(
             xml_dir=args.xml_dir,
             limit=args.limit,
-            force=args.force
+            force=args.force,
+            clear_postgres = args.clear_postgres,
+            postgres_only= args.postgres_only
         )
         logger.info("Ingestion completed, now committing main session...")
         

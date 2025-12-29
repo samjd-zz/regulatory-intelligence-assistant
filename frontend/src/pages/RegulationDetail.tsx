@@ -4,7 +4,8 @@ import { Link, useParams } from "react-router-dom";
 
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { formatDate } from "@/lib/utils";
-import { getRegulationDetail } from "@/services/api";
+import { getRegulationDetail, getRegulationRelationships } from "@/services/api";
+import type { RegulationRelationships } from "@/types";
 
 interface RegulationData {
 	id: string;
@@ -29,6 +30,8 @@ export function RegulationDetail() {
 	const [regulation, setRegulation] = useState<RegulationData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [relationships, setRelationships] = useState<RegulationRelationships | null>(null);
+	const [relationshipsLoading, setRelationshipsLoading] = useState(false);
 
 	useEffect(() => {
 		if (!id) return;
@@ -62,6 +65,38 @@ export function RegulationDetail() {
 			cancelled = true;
 		};
 	}, [id]);
+
+	// Fetch regulation relationships from Neo4j graph
+	useEffect(() => {
+		if (!id || !regulation) return;
+
+		let cancelled = false;
+
+		async function fetchRelationships() {
+			try {
+				setRelationshipsLoading(true);
+				const data = await getRegulationRelationships(id!);
+				if (!cancelled) {
+					setRelationships(data);
+				}
+			} catch (err) {
+				if (!cancelled) {
+					console.error("Error fetching relationships:", err);
+					// Non-critical error - don't show error to user
+				}
+			} finally {
+				if (!cancelled) {
+					setRelationshipsLoading(false);
+				}
+			}
+		}
+
+		fetchRelationships();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [id, regulation]);
 
 	if (loading) {
 		return (
@@ -213,6 +248,116 @@ export function RegulationDetail() {
 						</div>
 					)}
 				</div>
+
+				{/* Related Regulations Section */}
+				{relationships && (relationships.counts.references > 0 || relationships.counts.referenced_by > 0 || relationships.counts.implements > 0) && (
+					<div className="border-t border-slate-100 dark:border-zinc-800/60 pt-8 mt-12">
+						<h2 className="text-2xl font-light text-slate-800 dark:text-zinc-200 mb-6">
+							Related Regulations
+						</h2>
+
+						<div className="space-y-6">
+							{/* Implements */}
+							{relationships.implements.length > 0 && (
+								<div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-lg p-6">
+									<h3 className="text-lg font-medium text-blue-900 dark:text-blue-100 mb-4 flex items-center gap-2">
+										<span className="material-symbols-outlined text-base">account_balance</span>
+										Implements ({relationships.counts.implements})
+									</h3>
+									<p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
+										Parent legislation that this regulation implements
+									</p>
+									<div className="space-y-2">
+										{relationships.implements.map((doc) => (
+											<Link
+												key={doc.id}
+												to={`/regulation/${doc.id}`}
+												className="block bg-white dark:bg-zinc-800 rounded-md p-3 hover:shadow-md transition-shadow border border-blue-200 dark:border-blue-800"
+											>
+												<div className="flex items-start gap-3">
+													<span className="material-symbols-outlined text-blue-500 dark:text-blue-400 mt-0.5">description</span>
+													<div className="flex-1 min-w-0">
+														<p className="font-medium text-slate-900 dark:text-zinc-100 truncate">{doc.title}</p>
+														<p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">{doc.type}</p>
+													</div>
+													<span className="material-symbols-outlined text-slate-400 dark:text-zinc-500">arrow_forward</span>
+												</div>
+											</Link>
+										))}
+									</div>
+								</div>
+							)}
+
+							{/* References */}
+							{relationships.references.length > 0 && (
+								<div className="bg-teal-50 dark:bg-teal-900/10 border border-teal-100 dark:border-teal-900/30 rounded-lg p-6">
+									<h3 className="text-lg font-medium text-teal-900 dark:text-teal-100 mb-4 flex items-center gap-2">
+										<span className="material-symbols-outlined text-base">link</span>
+										References ({relationships.counts.references})
+									</h3>
+									<p className="text-sm text-teal-700 dark:text-teal-300 mb-4">
+										Documents that this regulation cites
+									</p>
+									<div className="space-y-2">
+										{relationships.references.map((doc) => (
+											<Link
+												key={doc.id}
+												to={`/regulation/${doc.id}`}
+												className="block bg-white dark:bg-zinc-800 rounded-md p-3 hover:shadow-md transition-shadow border border-teal-200 dark:border-teal-800"
+											>
+												<div className="flex items-start gap-3">
+													<span className="material-symbols-outlined text-teal-500 dark:text-teal-400 mt-0.5">description</span>
+													<div className="flex-1 min-w-0">
+														<p className="font-medium text-slate-900 dark:text-zinc-100 truncate">{doc.title}</p>
+														<p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">{doc.type}</p>
+													</div>
+													<span className="material-symbols-outlined text-slate-400 dark:text-zinc-500">arrow_forward</span>
+												</div>
+											</Link>
+										))}
+									</div>
+								</div>
+							)}
+
+							{/* Referenced By */}
+							{relationships.referenced_by.length > 0 && (
+								<div className="bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 rounded-lg p-6">
+									<h3 className="text-lg font-medium text-purple-900 dark:text-purple-100 mb-4 flex items-center gap-2">
+										<span className="material-symbols-outlined text-base">published_with_changes</span>
+										Referenced By ({relationships.counts.referenced_by})
+									</h3>
+									<p className="text-sm text-purple-700 dark:text-purple-300 mb-4">
+										Documents that cite this regulation
+									</p>
+									<div className="space-y-2">
+										{relationships.referenced_by.map((doc) => (
+											<Link
+												key={doc.id}
+												to={`/regulation/${doc.id}`}
+												className="block bg-white dark:bg-zinc-800 rounded-md p-3 hover:shadow-md transition-shadow border border-purple-200 dark:border-purple-800"
+											>
+												<div className="flex items-start gap-3">
+													<span className="material-symbols-outlined text-purple-500 dark:text-purple-400 mt-0.5">description</span>
+													<div className="flex-1 min-w-0">
+														<p className="font-medium text-slate-900 dark:text-zinc-100 truncate">{doc.title}</p>
+														<p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">{doc.type}</p>
+													</div>
+													<span className="material-symbols-outlined text-slate-400 dark:text-zinc-500">arrow_forward</span>
+												</div>
+											</Link>
+										))}
+									</div>
+								</div>
+							)}
+						</div>
+
+						{relationshipsLoading && (
+							<div className="flex items-center justify-center py-8">
+								<LoadingSpinner size="sm" message="Loading relationships..." />
+							</div>
+						)}
+					</div>
+				)}
 			</div>
 		</div>
 	);

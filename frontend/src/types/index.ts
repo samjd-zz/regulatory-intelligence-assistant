@@ -123,6 +123,24 @@ export interface Regulation {
   sections?: Section[]
 }
 
+export interface RelatedDocument {
+  id: string
+  title: string
+  type: string
+}
+
+export interface RegulationRelationships {
+  regulation_id: string
+  references: RelatedDocument[]
+  referenced_by: RelatedDocument[]
+  implements: RelatedDocument[]
+  counts: {
+    references: number
+    referenced_by: number
+    implements: number
+  }
+}
+
 export interface RegulationMetadata {
   citation: string
   document_type: string

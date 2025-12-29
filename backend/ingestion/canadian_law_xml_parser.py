@@ -169,9 +169,19 @@ class CanadianLawXMLParser:
         return element.findall(path, self.namespace_map)
     
     def _get_text(self, element: Optional[ET.Element], default: str = "") -> str:
-        """Safely get text from element."""
-        if element is not None and element.text:
-            return element.text.strip()
+        """
+        Safely get text from element, including all text from child elements.
+        
+        This handles cases where XML has inline formatting tags like:
+        <Text>The employer shall <Emphasis>prepare</Emphasis> a plan</Text>
+        
+        Using itertext() ensures we get ALL text content, not just the first text node.
+        """
+        if element is not None:
+            # Get all text content, including text from child elements
+            text = ''.join(element.itertext()).strip()
+            if text:
+                return text
         return default
     
     def _detect_jurisdiction_from_metadata(self, root: ET.Element, title: str, chapter: str) -> str:
@@ -735,7 +745,7 @@ class CanadianLawXMLParser:
         full_text_parts = [f"Section {number}"]
         if title:
             full_text_parts.append(f"{title}")
-            content_parts.append(title)
+            # Don't add title to content_parts - title is stored separately
         
         # Parse subsections
         subsections = []
@@ -754,11 +764,13 @@ class CanadianLawXMLParser:
                     if key.endswith('id'):
                         sub_id = subsection_elem.attrib[key]
                         break
-            # Get subsection title (if any), fallback to regulation_title if missing
+            # Get subsection title - inherit from parent section if missing
+            # Subsections typically don't have separate titles in legal documents
             sub_margin_elem = self._find(subsection_elem, 'MarginalNote')
             sub_title = self._get_text(sub_margin_elem) if sub_margin_elem is not None else None
-            if (not sub_title or not sub_title.strip()) and regulation_title:
-                sub_title = regulation_title
+            # Inherit title from parent section first, then fall back to regulation title
+            if not sub_title or not sub_title.strip():
+                sub_title = title if title else regulation_title
             if sub_text:
                 # Create subsection
                 subsection = ParsedSection(
