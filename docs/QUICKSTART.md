@@ -131,6 +131,65 @@ docker compose exec backend python -m ingestion.data_pipeline data/regulations/c
 docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --postgres-only
 ```
 
+## Specialized Rebuild Tools
+
+If you need to rebuild just **Neo4j** or **Elasticsearch** without re-ingesting from XML files, use these specialized scripts:
+
+### Rebuild Neo4j Knowledge Graph
+
+**`backend/tasks/populate_graph.py`** - Rebuilds Neo4j graph from PostgreSQL data:
+
+```bash
+# Rebuild entire graph from PostgreSQL
+docker compose exec backend python tasks/populate_graph.py
+
+# Clear existing graph and rebuild (DESTRUCTIVE)
+docker compose exec backend python tasks/populate_graph.py --clear
+
+# Limit to first 100 regulations for testing
+docker compose exec backend python tasks/populate_graph.py --limit 100
+
+# Setup indexes only (don't populate)
+docker compose exec backend python tasks/populate_graph.py --setup-only
+
+# Custom batch size for performance tuning
+docker compose exec backend python tasks/populate_graph.py --batch-size 5000
+```
+
+**What it does:**
+- **Pass 1**: Creates all nodes (Legislation, Regulation, Section)
+- **Pass 2**: Creates all relationships (HAS_SECTION, REFERENCES, CITES, etc.)
+- Uses batching for memory efficiency (default: 2,500 nodes/batch)
+- Two-pass design prevents errors with cross-regulation references
+
+### Rebuild Elasticsearch Index
+
+**`backend/scripts/reindex_elasticsearch.py`** - Re-indexes documents from PostgreSQL to Elasticsearch:
+
+```bash
+# Incremental update (default) - updates existing docs, adds new ones
+docker compose exec backend python scripts/reindex_elasticsearch.py
+
+# Full recreation - deletes and rebuilds index (use when mappings change)
+docker compose exec backend python scripts/reindex_elasticsearch.py --force-recreate
+
+# Custom batch size for performance tuning
+docker compose exec backend python scripts/reindex_elasticsearch.py --batch-size 5000
+```
+
+**What it does:**
+- Indexes all regulations and sections from PostgreSQL
+- Generates embeddings for semantic search
+- Uses bulk indexing for efficiency (default: 2,500 docs/batch)
+- Incremental mode: zero downtime, updates existing documents
+- Force-recreate mode: complete rebuild (causes temporary search downtime)
+
+**When to use:**
+- ✅ After modifying Elasticsearch mappings (use `--force-recreate`)
+- ✅ After manually adding data to PostgreSQL
+- ✅ To fix inconsistencies between PostgreSQL and Elasticsearch
+- ✅ After upgrading Elasticsearch version
+
 ## Check Data Statistics
 
 Use the **Data Summary Script** to view comprehensive statistics across all databases:
