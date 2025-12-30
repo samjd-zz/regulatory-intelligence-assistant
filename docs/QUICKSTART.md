@@ -104,6 +104,103 @@ Once data is loaded, you can access:
 
 **Tip**: The frontend will show "No results" until you load data in step 4.
 
+## Understanding the Data Pipeline
+
+Behind the scenes, `init_data.py` uses the **Data Ingestion Pipeline** (`backend/ingestion/data_pipeline.py`) which orchestrates a 6-stage process:
+
+**Pipeline Stages:**
+1. 📥 **Download**: Fetches XML files from Justice Canada's Open Data portal
+2. 🔍 **Parse**: Extracts structured data using CanadianLawXMLParser
+3. 💾 **PostgreSQL**: Stores regulations, sections, amendments, and citations
+4. 🕸️ **Neo4j Graph**: Builds knowledge graph with relationships
+5. 🔎 **Elasticsearch**: Indexes full-text for semantic search
+6. 🤖 **Gemini RAG**: (Optional) Uploads to Gemini API for AI Q&A
+
+**Advanced Usage:**
+```bash
+# Direct pipeline usage (for advanced scenarios)
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 100
+
+# Clear PostgreSQL and rebuild from scratch
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --clear-postgres
+
+# Force re-ingestion (skip duplicate checking)
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --force
+
+# Ingest only to PostgreSQL (skip Neo4j and Elasticsearch)
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --postgres-only
+```
+
+## Check Data Statistics
+
+Use the **Data Summary Script** to view comprehensive statistics across all databases:
+
+```bash
+# Run from project root
+bash backend/scripts/data_summary.sh
+
+# Or from within Docker
+docker compose exec backend bash scripts/data_summary.sh
+```
+
+**Sample Output:**
+```
+╔═══════════════════════════════════════════════════════════════╗
+║   REGULATORY INTELLIGENCE ASSISTANT - DATA SUMMARY REPORT    ║
+╚═══════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  POSTGRESQL DATABASE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Regulations:
+    Total:           4,240
+    English:         3,800
+    French:          440
+    Active:          4,240
+
+  Sections:          395,465
+  Citations:         12,384
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  NEO4J KNOWLEDGE GRAPH
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Nodes by Type:
+    Section:             278,858
+    Legislation:         800
+    Regulation:          3,440
+
+  Total Nodes:         399,705
+
+  Relationships by Type:
+    HAS_SECTION:         395,465
+    REFERENCES:          74,888
+
+  Total Relationships: 470,353
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ELASTICSEARCH SEARCH INDEX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Index:             regulatory_documents
+  Total Documents:   399,705
+  Documents by Type:
+    Regulations:     4,240
+    Sections:        395,465
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SUMMARY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  System Health:
+    ✓ All systems operational
+    ✓ Data present in all databases
+    ✓ PostgreSQL and Elasticsearch are in sync
+```
+
+This script shows:
+- **PostgreSQL**: Regulation counts, language breakdown, jurisdictions
+- **Neo4j**: Node and relationship counts by type
+- **Elasticsearch**: Index size and document counts
+- **Health Checks**: Data consistency across all systems
+
 ## Verify Installation
 
 ### Test Search
