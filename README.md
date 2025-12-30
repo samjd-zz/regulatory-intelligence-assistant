@@ -15,10 +15,16 @@ cp backend/.env.example backend/.env
 # 2. Add your Gemini API key to backend/.env
 # GEMINI_API_KEY=your_key_here
 
-# 3. Start all services
+# 3. Start all services (includes frontend, backend, PostgreSQL, Neo4j, Elasticsearch, Redis)
 docker compose up -d
 
-# 4. Initialize database with data (interactive wizard)
+# 4. Wait for services to initialize (~30 seconds)
+# The backend automatically:
+#   - Runs database migrations
+#   - Initializes Neo4j schema and indexes
+#   - Waits for all dependencies to be ready
+
+# 5. Initialize with data (interactive wizard)
 docker compose exec backend python scripts/init_data.py
 
 # The wizard guides you through:
@@ -27,15 +33,17 @@ docker compose exec backend python scripts/init_data.py
 #   3. Both (Full Dataset) - ~5,040 documents total
 #   Plus optional limits for testing (e.g., 10, 50, 100)
 
-# 5. Access the application
+# 6. Access the application
 # Frontend: http://localhost:5173
 # API Docs: http://localhost:8000/docs
-# Neo4j: http://localhost:7474 (neo4j/password123)
+# Neo4j Browser: http://localhost:7474 (neo4j/password123)
 ```
 
 **First time?** See the [Quick Start Guide](./docs/QUICKSTART.md) for detailed instructions.
 
 **Quick test?** Load 10 documents: `docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive`
+
+**Automated startup?** Set `AUTO_INIT_DATA=true` in `docker-compose.yml` to auto-load 50 documents on first start.
 
 ## ✨ Key Features
 
@@ -247,55 +255,103 @@ See [Development Guide](./docs/DEVELOPMENT.md) for full setup.
 ## 🐋 Docker Deployment
 
 ### Development Mode (Hot Reload)
+
+All services run in Docker with automatic hot reload for code changes:
+
 ```bash
-# Start all services with hot reload
+# Start all services (frontend + backend + databases)
 docker compose up -d
 
-# Initialize with data (interactive)
-docker compose exec backend python scripts/init_data.py
-
-# View logs
+# View logs for all services
 docker compose logs -f
 
-# Stop services
+# View logs for specific service
+docker compose logs -f backend
+docker compose logs -f frontend
+
+# Restart a service after major changes
+docker compose restart backend
+
+# Stop all services
 docker compose down
+
+# Stop and remove volumes (WARNING: deletes all data)
+docker compose down -v
+```
+
+### Automatic Startup Initialization
+
+The backend container automatically handles initialization on startup:
+
+**What happens automatically:**
+1. ✅ **Database migrations** - Alembic runs migrations to latest schema
+2. ✅ **Neo4j setup** - Creates constraints, indexes, and fulltext search indexes
+3. ✅ **Health checks** - Waits for Neo4j and Elasticsearch to be ready
+4. ✅ **Data check** - Detects if database is empty (<100 regulations)
+
+**Environment Variables (docker-compose.yml):**
+```yaml
+# Auto-load sample data on first start (50 documents)
+AUTO_INIT_DATA=true
+
+# Auto-reindex Elasticsearch on startup
+REINDEX_ELASTICSEARCH=true
 ```
 
 ### Data Initialization Options
-
-The intelligent data loader offers flexible options for loading data:
 
 **Interactive Mode (Recommended):**
 ```bash
 docker compose exec backend python scripts/init_data.py
 ```
-- Guides you through choosing data type (laws/regulations/both)
-- Prompts for optional limits
-- Downloads data if missing
-- Shows progress and statistics
+- ✅ Guides you through choosing data type (laws/regulations/both)
+- ✅ Prompts for optional limits (10, 50, 100, or ALL)
+- ✅ Auto-downloads from Justice Canada if data files missing
+- ✅ Shows progress and final statistics
+- ✅ Loads into PostgreSQL, Neo4j, and Elasticsearch simultaneously
 
 **Non-Interactive Examples:**
 ```bash
 # Quick test - 10 laws
 docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive
 
-# Development - 50 regulations  
-docker compose exec backend python scripts/init_data.py --type regulations --limit 50 --non-interactive
+# Development - 50 documents (mixed laws and regulations)
+docker compose exec backend python scripts/init_data.py --type both --limit 50 --non-interactive
 
-# Production - all laws (~800 documents)
+# Production - all laws (~800 documents, ~10-15 minutes)
 docker compose exec backend python scripts/init_data.py --type laws --non-interactive
 
-# Production - everything (~5,040 documents)
+# Production - all regulations (~4,240 documents, ~45-60 minutes)
+docker compose exec backend python scripts/init_data.py --type regulations --non-interactive
+
+# Production - everything (~5,040 documents, ~60-90 minutes)
 docker compose exec backend python scripts/init_data.py --type both --non-interactive
+
+# Force re-ingest even if data exists
+docker compose exec backend python scripts/init_data.py --type both --force --non-interactive
 ```
 
-**How it works:**
-- ✅ **Checks existing data** - Won't reload if already present
-- ✅ **Auto-downloads** - Offers to download from Justice Canada if missing
-- ✅ **Smart filtering** - Separates laws (Acts/Lois) from regulations (SOR/DORS)
-- ✅ **Respects limits** - Applies your specified limit after filtering
-- ✅ **Multi-database** - Loads into PostgreSQL, Neo4j, and Elasticsearch
-- ✅ **Progress tracking** - Shows real-time progress and final statistics
+**Advanced Ingestion (using data_pipeline.py directly):**
+```bash
+# Clear PostgreSQL and re-ingest everything
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --clear-postgres
+
+# Force re-ingest, skip duplicate checking
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --force
+
+# Ingest only to PostgreSQL (skip Neo4j and Elasticsearch)
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --postgres-only
+
+# Limit to first 100 files for testing
+docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --limit 100
+```
+
+**How Data Loading Works:**
+- ✅ **Smart filtering** - Separates laws (Acts/Lois) from regulations based on filename
+- ✅ **Duplicate detection** - Skips already-ingested documents (unless `--force` used)
+- ✅ **Bilingual support** - Auto-detects English (`/en/`) and French (`/fr/`) from directory structure
+- ✅ **Multi-database sync** - Automatically loads into all three databases (PostgreSQL → Neo4j → Elasticsearch)
+- ✅ **Progress tracking** - Real-time progress with statistics at completion
 
 ### Production Mode
 ```bash

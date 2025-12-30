@@ -34,14 +34,28 @@ GEMINI_API_KEY=your_gemini_api_key_here
 ### 3. Start Services
 
 ```bash
-# Start all services (PostgreSQL, Neo4j, Elasticsearch, Backend, Frontend)
+# Start all services (PostgreSQL, Neo4j, Elasticsearch, Redis, Backend, Frontend)
 docker compose up -d
 
 # Wait for services to be ready (~30 seconds)
 docker compose ps
 ```
 
-### 4. Initialize Database & Load Data
+**What happens automatically on startup:**
+1. ✅ **Database migrations** - Alembic runs migrations to latest schema
+2. ✅ **Neo4j setup** - Creates constraints, indexes, and fulltext search indexes  
+3. ✅ **Health checks** - Waits for Neo4j and Elasticsearch to be ready
+4. ✅ **Data check** - Detects if database is empty (<100 regulations)
+
+**Optional: Automatic data loading**
+
+To auto-load sample data on first start, set in `docker-compose.yml`:
+```yaml
+environment:
+  - AUTO_INIT_DATA=true  # Loads 50 documents automatically
+```
+
+### 4. Initialize Database & Load Data (Manual)
 
 The intelligent data loader makes it easy to get started:
 
@@ -72,17 +86,23 @@ docker compose exec backend python scripts/init_data.py --type both --non-intera
 ```
 
 **What it does:**
-- ✅ Checks if data files exist (downloads if missing)
-- ✅ Filters by type (laws vs regulations)
-- ✅ Applies your limit for testing
-- ✅ Loads into PostgreSQL, Neo4j, and Elasticsearch
-- ✅ Shows progress and statistics
+- ✅ Checks if data files exist (auto-downloads from Justice Canada if missing)
+- ✅ Smart filtering by type (Acts/Lois vs Regulations based on filename)
+- ✅ Applies your limit after filtering
+- ✅ Loads into all three databases simultaneously (PostgreSQL → Neo4j → Elasticsearch)
+- ✅ Shows real-time progress and final statistics
+- ✅ Skips duplicates (use `--force` to re-ingest)
 
 ### 5. Access the Application
 
+Once data is loaded, you can access:
+
 - **Frontend**: http://localhost:5173
-- **API Docs**: http://localhost:8000/docs
-- **Neo4j Browser**: http://localhost:7474 (neo4j/password123)
+- **API Documentation**: http://localhost:8000/docs (interactive Swagger UI)
+- **Neo4j Browser**: http://localhost:7474 (username: neo4j, password: password123)
+- **Health Check**: http://localhost:8000/api/health
+
+**Tip**: The frontend will show "No results" until you load data in step 4.
 
 ## Verify Installation
 
