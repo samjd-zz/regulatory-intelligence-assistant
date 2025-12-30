@@ -168,6 +168,22 @@ class CanadianLawXMLParser:
         """Find all elements with namespace support."""
         return element.findall(path, self.namespace_map)
     
+    def _get_text(self, element: Optional[ET.Element], default: str = "") -> str:
+        """
+        Safely get text from element, including all text from child elements.
+        
+        This handles cases where XML has inline formatting tags like:
+        <Text>The employer shall <Emphasis>prepare</Emphasis> a plan</Text>
+        
+        Using itertext() ensures we get ALL text content, not just the first text node.
+        """
+        if element is not None:
+            # Get all text content, including text from child elements
+            text = ''.join(element.itertext()).strip()
+            if text:
+                return text
+        return default
+    
     def _get_subsection_text(self, subsection_elem: ET.Element) -> str:
         """
         Get all text content from a subsection, including nested elements like Paragraph, List, etc.
