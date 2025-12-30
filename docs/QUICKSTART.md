@@ -142,7 +142,10 @@ The **RAG Service** (`backend/services/rag_service.py`) powers the AI question-a
 1. 🔍 **Query Parsing**: Extracts intent, entities, and filters from user question
 2. 🔎 **Multi-Tier Search**: Progressive 5-tier fallback system for document retrieval
 3. 📊 **Semantic Search**: Uses SentenceTransformer embeddings indexed in Elasticsearch
-4. 🔗 **Graph Enhancement**: (Optional) Adds related documents via Neo4j relationships
+4. 🔗 **Graph Enhancement**: (Situational) Selectively adds related documents via Neo4j relationships when:
+   - Query mentions specific sections or acts
+   - Intent is INTERPRETATION or COMPLIANCE
+   - Initial results have low relationship diversity (Tier 1/2 only)
 
 **Generation Phase** (LLM):
 5. 🤖 **Answer Generation**: LLM (Gemini or Ollama) generates answer from retrieved context
