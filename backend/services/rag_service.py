@@ -534,8 +534,8 @@ Be precise and cite specific sections when possible."""
                 metadata={"error": "empty_response", "num_context_docs": len(context_docs)}
             )
 
-        # Extract citations from answer
-        citations = self._extract_citations(answer_text, context_docs)
+        # Build citations from context document metadata
+        citations = self._build_citations_from_context(context_docs)
 
         # Calculate confidence score
         confidence = self._calculate_confidence(
@@ -1713,73 +1713,47 @@ Be precise and cite specific sections when possible."""
         # Join with separators
         return "\n---\n\n".join(context_parts)
     
-    def _extract_citations(
+    def _build_citations_from_context(
         self,
-        answer: str,
         context_docs: List[Dict[str, Any]]
     ) -> List[Citation]:
         """
-        Extract citations from generated answer.
+        Build citations from context document metadata.
         
-        Looks for patterns like:
-        - [Document Title, Section X]
-        - Section X(Y)
-        - Section X
+        Citations are derived from document metadata in priority order:
+        1. citation field (from extra_metadata.chapter/act_number/authority/title)
+        2. title as fallback
         
         Args:
-            answer: Generated answer text
             context_docs: Context documents used for generation
         
         Returns:
-            List of Citation objects
+            List of Citation objects with high confidence (1.0)
         """
         citations = []
         
-        # Pattern 1: [Document Title, Section X]
-        pattern1 = r'\[([^\]]+),\s*Section\s+([^\]]+)\]'
-        for match in re.finditer(pattern1, answer):
-            doc_title = match.group(1).strip()
-            section = match.group(2).strip()
+        for doc in context_docs:
+            # Get citation from metadata (already prioritized in indexing)
+            citation_text = doc.get('citation', '').strip()
+            if not citation_text:
+                # Fallback to title if no citation metadata
+                citation_text = doc.get('title', 'Untitled Document')
             
-            # Find matching document
-            matching_doc = None
-            for doc in context_docs:
-                if doc_title.lower() in doc.get('title', '').lower():
-                    matching_doc = doc
-                    break
+            # Add section reference if available
+            section = doc.get('section_number', '')
+            if section:
+                citation_text = f"{citation_text}, Section {section}"
             
             citation = Citation(
-                text=match.group(0),
-                document_id=matching_doc['id'] if matching_doc else None,
-                document_title=doc_title,
+                text=citation_text,
+                document_id=doc.get('id'),
+                document_title=doc.get('title', 'Untitled'),
                 section=section,
-                confidence=0.9 if matching_doc else 0.5
+                confidence=1.0  # Metadata-based citations are highly reliable
             )
             citations.append(citation)
         
-        # Pattern 2: Section X or Section X(Y)
-        pattern2 = r'Section\s+(\d+(?:\(\d+\))?)'
-        for match in re.finditer(pattern2, answer):
-            section = match.group(1).strip()
-            
-            # Find matching document by section
-            matching_doc = None
-            for doc in context_docs:
-                doc_section = doc.get('section_number', '')
-                if doc_section and section.startswith(doc_section):
-                    matching_doc = doc
-                    break
-            
-            citation = Citation(
-                text=match.group(0),
-                document_id=matching_doc['id'] if matching_doc else None,
-                document_title=matching_doc.get('title') if matching_doc else None,
-                section=section,
-                confidence=0.8 if matching_doc else 0.4
-            )
-            citations.append(citation)
-        
-        # Remove duplicates
+        # Remove duplicates based on citation text
         unique_citations = []
         seen_texts = set()
         for citation in citations:
@@ -1819,16 +1793,13 @@ Be precise and cite specific sections when possible."""
         confidence = intent_confidence
         
         # Citation factor (0.0 - 0.3)
+        # Citations are now always available from metadata with 1.0 confidence
         if citations:
-            # Average citation confidence
-            avg_citation_conf = sum(c.confidence for c in citations) / len(citations)
-            # Number of citations (capped at 5)
+            # All citations have 1.0 confidence from metadata
             citation_count = min(len(citations), 5) / 5.0
-            citation_factor = (avg_citation_conf * 0.7 + citation_count * 0.3) * 0.3
+            citation_factor = (1.0 * 0.7 + citation_count * 0.3) * 0.3
             confidence += citation_factor
-        else:
-            # Penalty for no citations
-            confidence -= 0.15
+        # No penalty for missing citations since they're always built from metadata
         
         # Context quality factor (0.0 - 0.2)
         if context_docs:

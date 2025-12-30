@@ -149,8 +149,8 @@ The **RAG Service** (`backend/services/rag_service.py`) powers the AI question-a
 
 **Generation Phase** (LLM):
 5. 🤖 **Answer Generation**: LLM (Gemini or Ollama) generates answer from retrieved context
-6. 📝 **Citation Extraction**: Extracts legal citations from generated answer
-7. 🎯 **Confidence Scoring**: Calculates confidence based on citations and context quality
+6. 📝 **Citation Building**: Builds citations from document metadata (no LLM parsing required)
+7. 🎯 **Confidence Scoring**: High confidence for metadata-based citations
 
 ### Multi-Tier Search Fallback System
 
@@ -166,6 +166,21 @@ The RAG service uses a **5-tier progressive fallback** to ensure high success ra
 
 **Quality Checks**: Each tier's results are assessed for minimum score, average score, and keyword coverage before accepting.
 
+### Citation System
+
+The RAG service uses a **metadata-based citation system** that automatically generates accurate legal citations:
+
+**How Citations Work:**
+- **Source**: Citations are built from document metadata indexed in Elasticsearch (`citation` field)
+- **Priority**: `extra_metadata.chapter` → `extra_metadata.act_number` → `regulation.authority` → `regulation.title`
+- **Format**: Automatic generation in proper legal format (e.g., "S.C. 1996, c. 23")
+- **Confidence**: 1.0 confidence for all metadata-based citations (no parsing errors)
+
+**System Prompt Updates:**
+- **Simplified Instructions**: LLM prompts no longer contain citation formatting rules
+- **Natural References**: LLM focuses on conversational document references (e.g., "According to the Employment Insurance Act...")
+- **Citation Freedom**: No requirement for LLM to generate formal citation strings
+
 ### Query Routing
 
 The RAG service intelligently routes different query types:
@@ -177,8 +192,8 @@ The RAG service intelligently routes different query types:
 ### Key Features
 
 ✅ **Language Detection**: Auto-detects English/French and filters results accordingly  
-✅ **Citation Validation**: Extracts and validates legal citations from answers  
-✅ **Confidence Scoring**: Provides transparency on answer reliability  
+✅ **Citation Building**: Automatic citation generation from document metadata  
+✅ **Confidence Scoring**: High confidence scores for metadata-based citations  
 ✅ **Caching**: In-memory caching for frequently asked questions  
 ✅ **Fallback Resilience**: 5-tier system ensures <1% zero-result rate  
 ✅ **Graph Enhancement**: Selectively adds related documents for section-specific queries  

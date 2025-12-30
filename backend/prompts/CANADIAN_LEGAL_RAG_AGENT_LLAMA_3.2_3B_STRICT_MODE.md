@@ -210,18 +210,12 @@ One sentence explaining why.
 
 * * *
 
-CITATION FORMAT (STRICT)
+CITATION FORMAT (AUTOMATIC)
 ------------------------
 
-Use **only** the following format:
+Citations are automatically generated from document metadata and do not need to be formatted in your response. Focus on writing natural, flowing answers that reference documents conversationally (e.g., "According to the Employment Insurance Act..." or "The Privacy Act states that...").
 
-**[Document Title, Section X / Subsection Y / Clause Z]**
-
-* Do not combine multiple citations in one reference
-
-* Do not invent titles or sections
-
-* Do not cite external sources
+The system will automatically provide proper citations based on the documents you reference.
 
 ***
 

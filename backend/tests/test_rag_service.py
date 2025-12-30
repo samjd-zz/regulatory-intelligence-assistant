@@ -248,35 +248,53 @@ class TestRAGService:
         assert 'Content 2' in context
         assert '---' in context  # Separator
 
-    def test_extract_citations_pattern1(self, rag_service):
-        """Test citation extraction - pattern [Title, Section X]"""
-        answer = "[Employment Insurance Act, Section 7] states that benefits are payable."
-        docs = [{
-            'id': 'ei-act',
-            'title': 'Employment Insurance Act',
-            'content': 'Test',
-            'section_number': '7'
-        }]
+    def test_build_citations_from_context(self, rag_service):
+        """Test citation building from context document metadata"""
+        docs = [
+            {
+                'id': 'ei-act',
+                'title': 'Employment Insurance Act',
+                'content': 'Test content',
+                'citation': 'S.C. 1996, c. 23',
+                'section_number': '7'
+            },
+            {
+                'id': 'privacy-act',
+                'title': 'Privacy Act',
+                'content': 'Test content',
+                'citation': 'R.S.C., 1985, c. P-21',
+                'section_number': ''
+            }
+        ]
 
-        citations = rag_service._extract_citations(answer, docs)
+        citations = rag_service._build_citations_from_context(docs)
 
-        assert len(citations) > 0
-        assert any('Section 7' in c.text for c in citations)
+        assert len(citations) == 2
+        assert citations[0].text == 'S.C. 1996, c. 23, Section 7'
+        assert citations[0].document_id == 'ei-act'
+        assert citations[0].confidence == 1.0
+        assert citations[1].text == 'R.S.C., 1985, c. P-21'
+        assert citations[1].document_id == 'privacy-act'
+        assert citations[1].confidence == 1.0
 
-    def test_extract_citations_pattern2(self, rag_service):
-        """Test citation extraction - pattern Section X"""
-        answer = "According to Section 7(1), benefits are available."
-        docs = [{
-            'id': 'test',
-            'title': 'Test Doc',
-            'content': 'Test',
-            'section_number': '7(1)'
-        }]
+    def test_build_citations_fallback_to_title(self, rag_service):
+        """Test citation building falls back to title when no citation metadata"""
+        docs = [
+            {
+                'id': 'test-doc',
+                'title': 'Test Regulation',
+                'content': 'Test content',
+                'citation': '',  # Empty citation
+                'section_number': '5'
+            }
+        ]
 
-        citations = rag_service._extract_citations(answer, docs)
+        citations = rag_service._build_citations_from_context(docs)
 
-        assert len(citations) > 0
-        assert any('7(1)' in c.section for c in citations if c.section)
+        assert len(citations) == 1
+        assert citations[0].text == 'Test Regulation, Section 5'
+        assert citations[0].document_id == 'test-doc'
+        assert citations[0].confidence == 1.0
 
     def test_confidence_with_citations(self, rag_service):
         """Test confidence calculation with citations"""
