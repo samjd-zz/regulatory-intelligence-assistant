@@ -285,7 +285,28 @@ class DataIngestionPipeline:
 
                 populate_from_postgresql(self.db, neo4j_client)
                 
+                # Get actual graph statistics
+                graph_stats = neo4j_client.get_graph_stats()
+                
+                # Sum up node counts from all node types
+                total_nodes = 0
+                if 'nodes' in graph_stats and graph_stats['nodes']:
+                    # nodes is a list of dicts with 'node_count' and 'labels'
+                    for node_info in graph_stats['nodes']:
+                        total_nodes += node_info.get('node_count', 0)
+                
+                # Sum up relationship counts from all relationship types  
+                total_relationships = 0
+                if 'relationships' in graph_stats and graph_stats['relationships']:
+                    # relationships is a list of dicts with 'rel_count' and 'type'
+                    for rel_info in graph_stats['relationships']:
+                        total_relationships += rel_info.get('rel_count', 0)
+                
+                self.stats['graph_nodes_created'] = total_nodes
+                self.stats['graph_relationships_created'] = total_relationships
+                
                 logger.info("Populate NEO4J graph complete.")
+                logger.info(f"Graph statistics: {total_nodes} nodes, {total_relationships} relationships")
             except Exception as e:
                 logger.error(f"Populate graph failed: {e}")
 
@@ -293,6 +314,7 @@ class DataIngestionPipeline:
             try:
                 import subprocess
                 import sys
+                import re
                 
                 # Get the path to the reindex script
                 script_path = Path(__file__).parent.parent / "scripts" / "reindex_elasticsearch.py"
@@ -314,6 +336,17 @@ class DataIngestionPipeline:
                             logger.info(f"  {line}")
                 
                 if result.returncode == 0:
+                    # Parse the output to extract indexing statistics
+                    stdout_text = result.stdout
+                    
+                    # Look for patterns like "✓ Successfully indexed: X documents"
+                    indexed_match = re.search(r'Successfully indexed:\s*(\d+)', stdout_text)
+                    if indexed_match:
+                        self.stats['elasticsearch_indexed'] = int(indexed_match.group(1))
+                        logger.info(f"Parsed elasticsearch statistics: {self.stats['elasticsearch_indexed']} documents indexed")
+                    else:
+                        logger.warning("Could not parse elasticsearch indexing count from output")
+                    
                     logger.info("Elasticsearch reindex complete.")
                 else:
                     logger.error(f"Elasticsearch reindex failed: {result.stderr}")
