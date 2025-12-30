@@ -260,6 +260,138 @@ This script shows:
 - **Elasticsearch**: Index size and document counts
 - **Health Checks**: Data consistency across all systems
 
+## Download Scripts for Real Canadian Data
+
+If you want to work with real Canadian regulatory data instead of the sample data, three specialized download scripts are available:
+
+### Option 1: Complete End-to-End Download & Ingestion
+
+**`backend/scripts/download_and_ingest_real_data.sh`** - The most comprehensive option that automates the entire process:
+
+```bash
+# Run from project root
+bash backend/scripts/download_and_ingest_real_data.sh
+```
+
+**What it does:**
+1. ✅ **Downloads** - Clones official Justice Canada GitHub repo (laws-lois-xml)
+2. ✅ **Backs up** - Creates backup of existing sample data
+3. ✅ **Validates** - Checks for required dependencies (git, docker, curl)
+4. ✅ **Clears** - Drops all existing data from PostgreSQL, Neo4j, and Elasticsearch
+5. ✅ **Copies** - Extracts XML files from repo (English + French)
+6. ✅ **Ingests** - Runs full data pipeline to load all databases
+7. ✅ **Verifies** - Tests search, API health, and graph integrity
+
+**Source**: Official Government of Canada open data repository  
+**License**: Open Government License - Canada  
+**URL**: https://github.com/justicecanada/laws-lois-xml
+
+**Expected Results:**
+- ~800 Canadian federal acts (English + French)
+- ~1-2 hour processing time for full dataset
+- Complete database population across all systems
+
+**Use when:**
+- 🎯 Setting up production environment
+- 🎯 You want the most comprehensive, official dataset
+- 🎯 You need a fully automated workflow
+- ⚠️ **Warning**: This script is **DESTRUCTIVE** - it clears all existing data!
+
+### Option 2: Bulk Regulation Download
+
+**`backend/scripts/download_bulk_regulations.sh`** - Downloads thousands of SOR/DORS regulations incrementally:
+
+```bash
+# Run from project root
+bash backend/scripts/download_bulk_regulations.sh
+```
+
+**What it does:**
+1. ✅ Downloads regulations from Justice Canada website (laws-lois.justice.gc.ca)
+2. ✅ Works backwards from recent years (2025 → 2000)
+3. ✅ Downloads both English (SOR) and French (DORS) versions
+4. ✅ Auto-ingests in chunks of 100 regulations (background processing)
+5. ✅ Targets 5,000 most recent regulations
+6. ✅ Skips existing files (resumable downloads)
+7. ✅ Handles 404 errors gracefully (not all SOR numbers exist)
+
+**Expected Results:**
+- Up to 5,000 regulations (English + French)
+- ~2-3 hours for full download + ingestion
+- Incremental chunk ingestion (no waiting until end)
+
+**Directory Structure:**
+```
+backend/data/regulations/canadian_laws/
+  ├── en-regs/     # English regulations (SOR-YYYY-NNN.xml)
+  └── fr-regs/     # French regulations (DORS-YYYY-NNN.xml)
+```
+
+**Use when:**
+- 🎯 You need a large volume of regulations (not just acts)
+- 🎯 You want incremental downloading with auto-ingestion
+- 🎯 You're building a production regulatory database
+- 🎯 You want to resume interrupted downloads
+
+### Option 3: Priority Acts (Sample Generator)
+
+**`backend/ingestion/download_canadian_laws.py`** - Creates sample XML files for 100 priority Canadian acts:
+
+```bash
+# Generate sample files for testing
+docker compose exec backend python -m ingestion.download_canadian_laws
+
+# Limit to 10 acts for quick testing
+docker compose exec backend python -m ingestion.download_canadian_laws --limit 10
+
+# Show instructions for getting real data
+docker compose exec backend python -m ingestion.download_canadian_laws --show-instructions
+```
+
+**What it does:**
+1. ✅ Creates **sample XML files** for 100 priority acts (10 categories)
+2. ✅ Provides instructions for downloading real XML from Open Canada portal
+3. ✅ Generates realistic test data with proper XML structure
+4. ⚠️ **Important**: These are SAMPLE files, not real legal data!
+
+**Priority Categories (100 total):**
+- Social Services & Employment (10 acts)
+- Immigration & Citizenship (10 acts)
+- Tax & Finance (15 acts)
+- Transparency & Privacy (10 acts)
+- Justice & Rights (15 acts)
+- Health & Safety (10 acts)
+- Environment (10 acts)
+- Business & Commerce (10 acts)
+- Defense & Security (10 acts)
+- Government Operations (10 acts)
+
+**Use when:**
+- 🎯 Testing the ingestion pipeline
+- 🎯 Validating system architecture
+- 🎯 Demo purposes
+- 🎯 You need a specific subset of high-priority acts
+- ⚠️ **Not for production** - use Option 1 or 2 for real data
+
+### Comparison: Which Script to Use?
+
+| Feature | End-to-End | Bulk Regulations | Priority Acts |
+|---------|-----------|------------------|---------------|
+| **Data Source** | GitHub repo | Justice Canada web | Sample generator |
+| **Data Type** | Acts + Regulations | Regulations only | Acts only (samples) |
+| **Volume** | ~800 acts | ~5,000 regulations | 100 sample acts |
+| **Real Data?** | ✅ Yes | ✅ Yes | ❌ No (samples) |
+| **Auto-Ingest?** | ✅ Yes | ✅ Yes (chunks) | ❌ No |
+| **Destructive?** | ⚠️ Yes (clears all) | ❌ No | ❌ No |
+| **Time Required** | 1-2 hours | 2-3 hours | <1 minute |
+| **Best For** | Production setup | Large regulatory DB | Testing/demos |
+
+**Recommendation:**
+- 🎯 **First time users**: Use built-in `init_data.py` (loads sample data automatically)
+- 🎯 **Production**: Use `download_and_ingest_real_data.sh` (complete official dataset)
+- 🎯 **Regulations only**: Use `download_bulk_regulations.sh` (SOR/DORS regulations)
+- 🎯 **Testing**: Use `download_canadian_laws.py` (quick sample generation)
+
 ## Verify Installation
 
 ### Test Search
