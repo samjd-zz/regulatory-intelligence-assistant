@@ -113,8 +113,9 @@ Behind the scenes, `init_data.py` uses the **Data Ingestion Pipeline** (`backend
 2. 🔍 **Parse**: Extracts structured data using CanadianLawXMLParser
 3. 💾 **PostgreSQL**: Stores regulations, sections, amendments, and citations
 4. 🕸️ **Neo4j Graph**: Builds knowledge graph with relationships
-5. 🔎 **Elasticsearch**: Indexes full-text for semantic search
-6. 🤖 **Gemini RAG**: (Optional) Uploads to Gemini API for AI Q&A
+5. 🔎 **Elasticsearch**: Indexes full-text with SentenceTransformer embeddings for semantic search
+
+**Note**: Embeddings are generated using SentenceTransformer during Elasticsearch indexing, NOT uploaded to Gemini. The LLM (Gemini/Ollama) is only used for final answer generation in the RAG Q&A feature.
 
 **Advanced Usage:**
 ```bash
@@ -130,6 +131,75 @@ docker compose exec backend python -m ingestion.data_pipeline data/regulations/c
 # Ingest only to PostgreSQL (skip Neo4j and Elasticsearch)
 docker compose exec backend python -m ingestion.data_pipeline data/regulations/canadian_laws --postgres-only
 ```
+
+## Understanding the RAG Q&A System
+
+The **RAG Service** (`backend/services/rag_service.py`) powers the AI question-answering feature. Here's how it works:
+
+### RAG Architecture
+
+**Retrieval Phase** (Elasticsearch + SentenceTransformer):
+1. 🔍 **Query Parsing**: Extracts intent, entities, and filters from user question
+2. 🔎 **Multi-Tier Search**: Progressive 5-tier fallback system for document retrieval
+3. 📊 **Semantic Search**: Uses SentenceTransformer embeddings indexed in Elasticsearch
+4. 🔗 **Graph Enhancement**: (Optional) Adds related documents via Neo4j relationships
+
+**Generation Phase** (LLM):
+5. 🤖 **Answer Generation**: LLM (Gemini or Ollama) generates answer from retrieved context
+6. 📝 **Citation Extraction**: Extracts legal citations from generated answer
+7. 🎯 **Confidence Scoring**: Calculates confidence based on citations and context quality
+
+### Multi-Tier Search Fallback System
+
+The RAG service uses a **5-tier progressive fallback** to ensure high success rates (target: 85%+ on Tier 1):
+
+| Tier | Method | When Used | Success Rate Target |
+|------|--------|-----------|---------------------|
+| **Tier 1** | Optimized Elasticsearch (hybrid keyword + semantic) | Default | 85%+ |
+| **Tier 2** | Relaxed Elasticsearch (expanded synonyms, fewer filters) | Tier 1 insufficient | 10-12% |
+| **Tier 3** | Neo4j Graph Traversal (relationship-based discovery) | Tiers 1-2 fail | 2-3% |
+| **Tier 4** | PostgreSQL Full-Text Search (comprehensive text matching) | Tiers 1-3 fail | 1-2% |
+| **Tier 5** | Metadata-Only Search (last resort, low confidence) | All others fail | <1% |
+
+**Quality Checks**: Each tier's results are assessed for minimum score, average score, and keyword coverage before accepting.
+
+### Query Routing
+
+The RAG service intelligently routes different query types:
+
+- **Regular Questions** → RAG pipeline (retrieval + LLM generation)
+- **Graph Relationship Questions** → Neo4j direct queries (e.g., "What sections does X reference?")
+- **Statistics Questions** → Database direct queries (e.g., "How many regulations exist?")
+
+### Key Features
+
+✅ **Language Detection**: Auto-detects English/French and filters results accordingly  
+✅ **Citation Validation**: Extracts and validates legal citations from answers  
+✅ **Confidence Scoring**: Provides transparency on answer reliability  
+✅ **Caching**: In-memory caching for frequently asked questions  
+✅ **Fallback Resilience**: 5-tier system ensures <1% zero-result rate  
+✅ **Graph Enhancement**: Selectively adds related documents for section-specific queries  
+
+### Testing the RAG Service
+
+```bash
+# Test basic Q&A
+curl -X POST http://localhost:8000/api/rag/answer \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Who is eligible for employment insurance?"}'
+
+# Test with French query
+curl -X POST http://localhost:8000/api/rag/answer \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Qui est admissible à l'\''assurance-emploi?"}'
+
+# Test graph relationship query
+curl -X POST http://localhost:8000/api/rag/answer \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What sections does the Employment Insurance Act reference?"}'
+```
+
+**Note**: The RAG service requires either a Gemini API key or Ollama to be running. Set `GEMINI_API_KEY` in `backend/.env` or configure Ollama in `docker-compose.yml`.
 
 ## Specialized Rebuild Tools
 
