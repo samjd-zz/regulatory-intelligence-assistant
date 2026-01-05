@@ -1721,7 +1721,7 @@ Be precise and cite specific sections when possible."""
         Build citations from context document metadata.
         
         Citations are derived from document metadata in priority order:
-        1. citation field (from extra_metadata.chapter/act_number/authority/title)
+        1. citation field (from Elasticsearch: chapter/SOR → act_number → authority → title)
         2. title as fallback
         
         Args:

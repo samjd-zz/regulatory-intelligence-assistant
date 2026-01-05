@@ -521,11 +521,17 @@ class DataIngestionPipeline:
         metadata = parsed_reg.metadata.copy() if parsed_reg.metadata else {}
         metadata['programs'] = detected_programs
         
+        # Only set authority for Acts, not Regulations
+        # Regulations store their SOR numbers in extra_metadata['chapter']
+        authority = None
+        if parsed_reg.metadata and parsed_reg.metadata.get('act_type') != 'Regulation':
+            authority = parsed_reg.chapter
+        
         # Create regulation record
         regulation = Regulation(
             title=parsed_reg.title,
             jurisdiction=final_jurisdiction,
-            authority=parsed_reg.chapter,
+            authority=authority,
             language=language,
             effective_date=effective_date,
             status='active',
