@@ -243,3 +243,5 @@ checkpoints/
 
 !backend/models
 !backend/neo4j
+
+media/
