@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { KnowledgeGraphVisualization } from "@/components/regulation/KnowledgeGraphVisualization";
+import { AmendmentTimeline } from "@/components/regulation/AmendmentTimeline";
 import { formatDate } from "@/lib/utils";
-import { getRegulationDetail } from "@/services/api";
+import { getRegulationDetail, getRegulationRelationships, getRegulationAmendments } from "@/services/api";
+import type { RegulationRelationships } from "@/types";
 
 interface RegulationData {
 	id: string;
@@ -22,11 +26,22 @@ interface RegulationData {
 	}>;
 }
 
+interface AmendmentData {
+	id: string;
+	amendment_type: string;
+	effective_date: string | null;
+	description: string;
+	created_at: string;
+}
+
 export function RegulationDetail() {
+	const { t } = useTranslation();
 	const { id } = useParams<{ id: string }>();
 	const [regulation, setRegulation] = useState<RegulationData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
+	const [relationships, setRelationships] = useState<RegulationRelationships | null>(null);
+	const [amendments, setAmendments] = useState<AmendmentData[]>([]);
 
 	useEffect(() => {
 		if (!id) return;
@@ -61,6 +76,60 @@ export function RegulationDetail() {
 		};
 	}, [id]);
 
+	// Fetch regulation relationships from Neo4j graph
+	useEffect(() => {
+		if (!id || !regulation) return;
+
+		let cancelled = false;
+
+	async function fetchRelationships() {
+		try {
+			const data = await getRegulationRelationships(id!);
+			if (!cancelled) {
+				setRelationships(data);
+			}
+		} catch (err) {
+			if (!cancelled) {
+				console.error("Error fetching relationships:", err);
+				// Non-critical error - don't show error to user
+			}
+		}
+	}
+
+		fetchRelationships();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [id, regulation]);
+
+	// Fetch regulation amendments
+	useEffect(() => {
+		if (!id) return;
+
+		let cancelled = false;
+
+		async function fetchAmendments() {
+			try {
+				const data = await getRegulationAmendments(id!);
+				if (!cancelled) {
+					setAmendments(data.amendments || []);
+				}
+			} catch (err) {
+				if (!cancelled) {
+					console.error("Error fetching amendments:", err);
+					// Non-critical error - don't show error to user
+				}
+			}
+		}
+
+		fetchAmendments();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [id]);
+
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center h-full">
@@ -77,7 +146,7 @@ export function RegulationDetail() {
 						error
 					</span>
 					<h2 className="text-lg font-medium text-red-900 dark:text-red-100 mb-2">
-						Error Loading Regulation
+						{t('regulation.errorLoading')}
 					</h2>
 					<p className="text-sm text-red-700 dark:text-red-300 mb-4">
 						{error}
@@ -89,7 +158,7 @@ export function RegulationDetail() {
 						<span className="material-symbols-outlined text-base">
 							arrow_back
 						</span>
-						Back to Search
+						{t('regulation.backToSearch')}
 					</Link>
 				</div>
 			</div>
@@ -104,7 +173,7 @@ export function RegulationDetail() {
 						description
 					</span>
 					<h2 className="text-lg font-medium text-slate-700 dark:text-zinc-300 mb-2">
-						Regulation Not Found
+						{t('regulation.notFound')}
 					</h2>
 					<Link
 						to="/search"
@@ -113,7 +182,7 @@ export function RegulationDetail() {
 						<span className="material-symbols-outlined text-base">
 							arrow_back
 						</span>
-						Back to Search
+						{t('regulation.backToSearch')}
 					</Link>
 				</div>
 			</div>
@@ -131,58 +200,112 @@ export function RegulationDetail() {
 					<span className="material-symbols-outlined text-base">
 						arrow_back
 					</span>
-					Back to Search
+					{t('regulation.backToSearch')}
 				</Link>
 
-				{/* Header */}
-				<div className="mb-12 animate-slide-up">
-					<div className="flex items-center gap-3 mb-4">
-						<span className="text-xs font-bold bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-300 px-2 py-1 rounded uppercase">
-							{regulation.jurisdiction} • {regulation.status}
-						</span>
-					</div>
-					<h1 className="text-4xl font-light text-slate-900 dark:text-zinc-100 mb-4">
-						{regulation.title}
-					</h1>
-					<div className="flex flex-wrap gap-6 text-sm text-slate-600 dark:text-zinc-400">
-						<div className="flex items-center gap-2">
-							<span className="material-symbols-outlined text-base">
-								gavel
-							</span>
-							<span>
-								<span className="font-medium">Citation:</span>{" "}
-								{regulation.citation}
-							</span>
+			{/* Header */}
+			<div className="mb-12 animate-slide-up">
+				<div className="flex items-center gap-3 mb-4">
+					<span className="text-xs font-bold bg-slate-100 dark:bg-zinc-800 text-slate-500 dark:text-zinc-300 px-2 py-1 rounded uppercase">
+						{regulation.jurisdiction} • {regulation.status}
+					</span>
+				</div>
+				<h1 className="text-4xl font-light text-slate-900 dark:text-zinc-100 mb-6">
+					{regulation.title}
+				</h1>
+
+				{/* Metadata Cards */}
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+					{/* Citation Card */}
+					{regulation.citation && regulation.citation.trim() !== "" && (
+						<div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+							<div className="flex items-start gap-3">
+								<span className="material-symbols-outlined text-teal-500 dark:text-teal-400 mt-0.5">
+									gavel
+								</span>
+								<div className="flex-1 min-w-0">
+									<p className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+										{t('regulation.citation')}
+									</p>
+									<p className="text-sm font-medium text-slate-900 dark:text-zinc-100 font-mono break-words">
+										{regulation.citation}
+									</p>
+								</div>
+							</div>
 						</div>
-						<div className="flex items-center gap-2">
-							<span className="material-symbols-outlined text-base">
-								account_balance
-							</span>
-							<span>
-								<span className="font-medium">Authority:</span>{" "}
-								{regulation.authority}
-							</span>
+					)}
+
+					{/* Authority Card */}
+					{regulation.authority && regulation.authority.trim() !== "" && (
+						<div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+							<div className="flex items-start gap-3">
+								<span className="material-symbols-outlined text-blue-500 dark:text-blue-400 mt-0.5">
+									account_balance
+								</span>
+								<div className="flex-1 min-w-0">
+									<p className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+										{t('regulation.authority')}
+									</p>
+									<p className="text-sm font-medium text-slate-900 dark:text-zinc-100 break-words">
+										{regulation.authority}
+									</p>
+								</div>
+							</div>
 						</div>
-						{regulation.effective_date && (
-							<div className="flex items-center gap-2">
-								<span className="material-symbols-outlined text-base">
+					)}
+
+					{/* Effective Date Card */}
+					{regulation.effective_date && (
+						<div className="bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+							<div className="flex items-start gap-3">
+								<span className="material-symbols-outlined text-purple-500 dark:text-purple-400 mt-0.5">
 									event
 								</span>
-								<span>
-									<span className="font-medium">Effective:</span>{" "}
-									{formatDate(regulation.effective_date)}
-								</span>
+								<div className="flex-1 min-w-0">
+									<p className="text-xs text-slate-500 dark:text-zinc-400 uppercase tracking-wide mb-1">
+										{t('regulation.effectiveDate')}
+									</p>
+									<p className="text-sm font-medium text-slate-900 dark:text-zinc-100">
+										{formatDate(regulation.effective_date)}
+									</p>
+								</div>
 							</div>
-						)}
-					</div>
+						</div>
+					)}
 				</div>
+			</div>
+
+			{/* Knowledge Graph Section */}
+			{relationships && (
+				<div className="mb-12">
+					<KnowledgeGraphVisualization
+						relationships={relationships}
+						currentRegulationTitle={regulation.title}
+					/>
+				</div>
+			)}
+
+			{/* Amendment Timeline Section */}
+			<div className="mb-12">
+				<AmendmentTimeline
+					amendments={amendments.map(a => ({
+						id: a.id,
+						date: a.effective_date || a.created_at,
+						type: (a.amendment_type.toLowerCase().includes('repeal') ? 'repealed' :
+							   a.amendment_type.toLowerCase().includes('add') ? 'added' : 'amended') as 'amended' | 'added' | 'repealed',
+						description: a.description || a.amendment_type,
+						citation: undefined
+					}))}
+					effectiveDate={regulation.effective_date}
+				/>
+			</div>
 
 				{/* Content */}
 				<div className="border-t border-slate-100 dark:border-zinc-800/60 pt-8">
 					{regulation.sections && regulation.sections.length > 0 ? (
 						<div className="space-y-8">
 							<h2 className="text-2xl font-light text-slate-800 dark:text-zinc-200 mb-6">
-								Sections
+								{t('regulation.sections')}
 							</h2>
 							{regulation.sections.map((section, idx) => (
 								<div
@@ -191,7 +314,7 @@ export function RegulationDetail() {
 									style={{ animationDelay: `${idx * 50}ms` }}
 								>
 									<h3 className="text-lg font-medium text-slate-700 dark:text-zinc-300 mb-2">
-										Section {section.number}
+										{t('regulation.section')} {section.number}
 										{section.title && `: ${section.title}`}
 									</h3>
 									<div className="prose prose-slate dark:prose-invert max-w-none text-sm text-slate-600 dark:text-zinc-400 leading-relaxed">
@@ -203,7 +326,7 @@ export function RegulationDetail() {
 					) : (
 						<div className="animate-slide-up">
 							<h2 className="text-2xl font-light text-slate-800 dark:text-zinc-200 mb-6">
-								Full Text
+								{t('regulation.fullText')}
 							</h2>
 							<div className="prose prose-slate dark:prose-invert max-w-none text-sm text-slate-600 dark:text-zinc-400 leading-relaxed">
 								<p className="whitespace-pre-wrap">{regulation.full_text}</p>
@@ -211,6 +334,7 @@ export function RegulationDetail() {
 						</div>
 					)}
 				</div>
+
 			</div>
 		</div>
 	);

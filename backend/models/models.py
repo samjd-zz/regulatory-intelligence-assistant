@@ -16,7 +16,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Index,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, TSVECTOR, JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -50,14 +50,15 @@ class Regulation(Base):
     __tablename__ = "regulations"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    title = Column(String(500), nullable=False, index=True)
+    title = Column(Text, nullable=False, index=True)
     jurisdiction = Column(String(100), nullable=False, index=True)
     authority = Column(String(255), nullable=True)
+    language = Column(String(10), nullable=False, default="en", index=True)
     effective_date = Column(Date, nullable=True)
     status = Column(String(50), default="active", index=True)
     full_text = Column(Text, nullable=True)
     content_hash = Column(String(64), nullable=True, index=True)
-    extra_metadata = Column(JSON, default=dict)
+    extra_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -84,22 +85,26 @@ class Section(Base):
     regulation_id = Column(
         UUID(as_uuid=True), ForeignKey("regulations.id"), nullable=False
     )
-    section_number = Column(String(50), nullable=False)
-    title = Column(String(500), nullable=True)
+    section_number = Column(String(255), nullable=False)  # Increased from 50 to handle long titles
+    title = Column(Text, nullable=True)
     content = Column(Text, nullable=True)
-    extra_metadata = Column(JSON, default=dict)
+    extra_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     regulation = relationship("Regulation", back_populates="sections")
     citations = relationship(
-        "Citation", back_populates="section", foreign_keys="Citation.section_id"
+        "Citation",
+        back_populates="section",
+        foreign_keys="Citation.section_id",
+        cascade="all, delete-orphan",
     )
     cited_by = relationship(
         "Citation",
         back_populates="cited_section",
         foreign_keys="Citation.cited_section_id",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -144,7 +149,7 @@ class Amendment(Base):
     amendment_type = Column(String(50), nullable=False)
     effective_date = Column(Date, nullable=True)
     description = Column(Text, nullable=True)
-    extra_metadata = Column(JSON, default=dict)
+    extra_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -181,7 +186,7 @@ class WorkflowSession(Base):
     status = Column(String(50), default="active")
     started_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
-    extra_metadata = Column(JSON, default=dict)
+    extra_metadata = Column(JSONB, default=dict)
 
     # Relationships
     user = relationship("User", back_populates="workflow_sessions")
@@ -245,7 +250,7 @@ class Alert(Base):
     )
     summary = Column(Text, nullable=True)
     read = Column(Boolean, default=False)
-    extra_metadata = Column(JSON, default=dict)
+    extra_metadata = Column(JSONB, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships

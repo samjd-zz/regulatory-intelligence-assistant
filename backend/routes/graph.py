@@ -11,18 +11,12 @@ import logging
 from database import get_db
 from utils.neo4j_client import get_neo4j_client, Neo4jClient
 from services.graph_builder import GraphBuilder
-from models.document_models import Document, DocumentType
+
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/graph", tags=["Knowledge Graph"])
+router = APIRouter(prefix="/api/graph", tags=["Knowledge Graph"])
 
-
-class GraphBuildRequest(BaseModel):
-    """Request to build graph for specific documents."""
-    document_ids: Optional[List[UUID]] = Field(None, description="Specific document IDs to process")
-    document_types: Optional[List[DocumentType]] = Field(None, description="Document types to process")
-    limit: Optional[int] = Field(None, description="Maximum number of documents to process", ge=1, le=1000)
 
 
 class GraphBuildResponse(BaseModel):
@@ -39,98 +33,6 @@ class GraphStatsResponse(BaseModel):
     summary: Dict[str, int]
 
 
-@router.post("/build", response_model=GraphBuildResponse)
-async def build_graph(
-    request: GraphBuildRequest,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    neo4j: Neo4jClient = Depends(get_neo4j_client)
-):
-    """
-    Build knowledge graph from processed documents.
-    
-    This operation runs in the background and processes documents asynchronously.
-    """
-    try:
-        builder = GraphBuilder(db, neo4j)
-        
-        # Build query
-        query = db.query(Document).filter_by(is_processed=True)
-        
-        if request.document_ids:
-            query = query.filter(Document.id.in_(request.document_ids))
-        
-        if request.document_types:
-            query = query.filter(Document.document_type.in_(request.document_types))
-        
-        if request.limit:
-            query = query.limit(request.limit)
-        
-        document_count = query.count()
-        
-        if document_count == 0:
-            raise HTTPException(
-                status_code=404,
-                detail="No processed documents found matching criteria"
-            )
-        
-        # Start background task
-        background_tasks.add_task(
-            _build_graph_background,
-            db,
-            neo4j,
-            request
-        )
-        
-        return GraphBuildResponse(
-            status="started",
-            message=f"Graph building started for {document_count} documents",
-            stats={"documents_queued": document_count}
-        )
-        
-    except Exception as e:
-        logger.error(f"Error starting graph build: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/build/{document_id}", response_model=GraphBuildResponse)
-async def build_document_graph(
-    document_id: UUID,
-    db: Session = Depends(get_db),
-    neo4j: Neo4jClient = Depends(get_neo4j_client)
-):
-    """
-    Build knowledge graph for a single document.
-    
-    This operation runs synchronously and returns immediately.
-    """
-    try:
-        # Check document exists
-        document = db.query(Document).filter_by(id=document_id).first()
-        if not document:
-            raise HTTPException(status_code=404, detail="Document not found")
-        
-        if not document.is_processed:
-            raise HTTPException(
-                status_code=400,
-                detail="Document has not been processed yet"
-            )
-        
-        # Build graph
-        builder = GraphBuilder(db, neo4j)
-        stats = builder.build_document_graph(document_id)
-        
-        return GraphBuildResponse(
-            status="completed",
-            message=f"Graph built successfully for {document.title}",
-            stats=stats
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error building graph for document {document_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/stats", response_model=GraphStatsResponse)
@@ -267,6 +169,105 @@ async def get_section_references(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/regulation/{regulation_id}/relationships")
+async def get_regulation_relationships(
+    regulation_id: UUID,
+    neo4j: Neo4jClient = Depends(get_neo4j_client)
+):
+    """
+    Get all relationships for a regulation including:
+    - References (documents this regulation cites via its sections)
+    - Referenced By (documents that cite this regulation via their sections)
+    - Implements (parent legislation this regulation implements)
+    - Implemented By (regulations that implement this legislation)
+    - Applies To (programs this regulation applies to)
+    """
+    try:
+        # Query for relationships at the Section level, then aggregate to Regulation level
+        # Pattern based on: MATCH (s1:Section)-[:REFERENCES]->(s2:Section)
+        #                   MATCH (doc1:Regulation)-[:HAS_SECTION]->(s1)
+        #                   MATCH (doc2:Regulation)-[:HAS_SECTION]->(s2)
+        query = """
+        MATCH (r {id: $regulation_id})
+        WHERE r:Regulation OR r:Legislation
+        
+        // Find documents referenced by this document's sections
+        OPTIONAL MATCH (r)-[:HAS_SECTION]->(s:Section)-[:REFERENCES]->(refSec:Section)<-[:HAS_SECTION]-(refReg)
+        WHERE (refReg:Regulation OR refReg:Legislation) AND refReg.id <> r.id
+        
+        // Find documents that reference this document's sections
+        OPTIONAL MATCH (r)-[:HAS_SECTION]->(mySec:Section)<-[:REFERENCES]-(refBySec:Section)<-[:HAS_SECTION]-(refByReg)
+        WHERE (refByReg:Regulation OR refByReg:Legislation) AND refByReg.id <> r.id
+        
+        // Find legislation this document implements
+        OPTIONAL MATCH (r)-[:IMPLEMENTS]->(impl)
+        
+        // Find documents that implement this legislation (reverse IMPLEMENTS)
+        OPTIONAL MATCH (r)<-[:IMPLEMENTS]-(implBy)
+        
+        // Find programs this document applies to
+        OPTIONAL MATCH (r)-[:APPLIES_TO]->(appliesTo)
+        
+        RETURN 
+            [x IN collect(DISTINCT refReg) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0], relationship: 'REFERENCES'}] as references,
+            [x IN collect(DISTINCT refByReg) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0], relationship: 'REFERENCED_BY'}] as referenced_by,
+            [x IN collect(DISTINCT impl) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0], relationship: 'IMPLEMENTS'}] as implements,
+            [x IN collect(DISTINCT implBy) WHERE x IS NOT NULL | {id: x.id, title: x.title, type: labels(x)[0], relationship: 'IMPLEMENTED_BY'}] as implemented_by,
+            [x IN collect(DISTINCT appliesTo) WHERE x IS NOT NULL | {id: x.id, title: CASE WHEN 'Program' IN labels(x) THEN x.name ELSE x.title END, type: labels(x)[0], relationship: 'APPLIES_TO'}] as applies_to
+        """
+        
+        results = neo4j.execute_query(
+            query,
+            {"regulation_id": str(regulation_id)}
+        )
+        
+        if not results or len(results) == 0:
+            return {
+                "regulation_id": str(regulation_id),
+                "references": [],
+                "referenced_by": [],
+                "implements": [],
+                "implemented_by": [],
+                "applies_to": [],
+                "counts": {
+                    "references": 0,
+                    "referenced_by": 0,
+                    "implements": 0,
+                    "implemented_by": 0,
+                    "applies_to": 0
+                }
+            }
+        
+        result = results[0]
+        
+        # Results are already filtered by the query, but ensure they're lists
+        references = result.get('references', [])
+        referenced_by = result.get('referenced_by', [])
+        implements = result.get('implements', [])
+        implemented_by = result.get('implemented_by', [])
+        applies_to = result.get('applies_to', [])
+        
+        return {
+            "regulation_id": str(regulation_id),
+            "references": references,
+            "referenced_by": referenced_by,
+            "implements": implements,
+            "implemented_by": implemented_by,
+            "applies_to": applies_to,
+            "counts": {
+                "references": len(references),
+                "referenced_by": len(referenced_by),
+                "implements": len(implements),
+                "implemented_by": len(implemented_by),
+                "applies_to": len(applies_to)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching regulation relationships: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/clear")
 async def clear_graph(
     confirm: bool = False,
@@ -297,49 +298,3 @@ async def clear_graph(
     except Exception as e:
         logger.error(f"Error clearing graph: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-def _build_graph_background(
-    db: Session,
-    neo4j: Neo4jClient,
-    request: GraphBuildRequest
-):
-    """
-    Background task to build graph.
-    
-    This runs asynchronously and doesn't return results to the caller.
-    """
-    try:
-        logger.info("Starting background graph building...")
-        
-        builder = GraphBuilder(db, neo4j)
-        
-        # Build query
-        query = db.query(Document).filter_by(is_processed=True)
-        
-        if request.document_ids:
-            query = query.filter(Document.id.in_(request.document_ids))
-        
-        if request.document_types:
-            query = query.filter(Document.document_type.in_(request.document_types))
-        
-        if request.limit:
-            query = query.limit(request.limit)
-        
-        documents = query.all()
-        
-        # Process each document
-        for doc in documents:
-            try:
-                builder.build_document_graph(doc.id)
-                logger.info(f"Built graph for: {doc.title}")
-            except Exception as e:
-                logger.error(f"Failed to build graph for {doc.title}: {e}")
-        
-        # Create inter-document relationships
-        builder.create_inter_document_relationships()
-        
-        logger.info("Background graph building completed")
-        
-    except Exception as e:
-        logger.error(f"Background graph building failed: {e}")

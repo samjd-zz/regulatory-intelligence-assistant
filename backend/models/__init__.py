@@ -3,7 +3,7 @@ Models package for regulatory intelligence assistant.
 Contains all SQLAlchemy ORM models.
 """
 
-from models.models import (
+from .models import (
     User,
     Regulation,
     Section,
@@ -16,16 +16,6 @@ from models.models import (
     Alert,
 )
 
-from models.document_models import (
-    Document,
-    DocumentSection,
-    DocumentSubsection,
-    DocumentClause,
-    CrossReference,
-    DocumentMetadata,
-    DocumentType,
-    DocumentStatus,
-)
 
 __all__ = [
     # Core models
@@ -39,13 +29,4 @@ __all__ = [
     "WorkflowStep",
     "AlertSubscription",
     "Alert",
-    # Document models
-    "Document",
-    "DocumentSection",
-    "DocumentSubsection",
-    "DocumentClause",
-    "CrossReference",
-    "DocumentMetadata",
-    "DocumentType",
-    "DocumentStatus",
 ]

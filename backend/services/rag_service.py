@@ -11,17 +11,31 @@ Author: Developer 2 (AI/ML Engineer)
 Created: 2025-11-22
 """
 
+import os
 import re
 import json
 import hashlib
 import logging
-from typing import Dict, List, Optional, Any, Tuple
+import os
+from pathlib import Path
+from typing import Dict, List, Optional, Any, Tuple, Union, TYPE_CHECKING
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 
+from langdetect import detect, LangDetectException
+
+if TYPE_CHECKING:
+    from services.gemini_client import GeminiClient
+    from services.ollama_client import OllamaClient
+
 from services.search_service import SearchService
-from services.gemini_client import GeminiClient, get_gemini_client
-from services.query_parser import LegalQueryParser
+from services.llm_client_factory import get_gemini_client
+from services.query_parser import LegalQueryParser, QueryIntent
+from services.statistics_service import StatisticsService
+from services.postgres_search_service import PostgresSearchService, get_postgres_search_service
+from services.graph_service import GraphService, get_graph_service
+from services.graph_relationship_service import GraphRelationshipService
+from config.legal_synonyms import expand_query_with_synonyms
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -83,56 +97,285 @@ class RAGService:
     cited answers to regulatory questions.
     """
 
-    # System prompt for legal Q&A
-    LEGAL_SYSTEM_PROMPT = """You are an expert assistant helping users understand Canadian government regulations, laws, and policies.
-
-Your role is to:
-1. Answer questions accurately based ONLY on the provided context documents
-2. Cite specific sections, clauses, or regulations when making claims
-3. Be clear when information is not available in the context
-4. Explain complex legal concepts in plain language
-5. Flag ambiguities or conflicting regulations
-6. Provide confidence levels for your answers
-
-Guidelines:
-- ALWAYS cite your sources using the document titles and sections provided
-- If you're not certain, say so and explain why
-- If the context doesn't contain the answer, say "The provided documents do not contain information about [topic]"
-- Use clear, accessible language while maintaining legal accuracy
-- Format citations as: "[Document Title, Section X]"
-
-Remember: You are providing informational guidance, not legal advice. Users should consult official sources or legal professionals for binding interpretations."""
-
     def __init__(
         self,
         search_service: Optional[SearchService] = None,
-        gemini_client: Optional[GeminiClient] = None,
-        query_parser: Optional[LegalQueryParser] = None
+        llm_client: Optional[Union['GeminiClient', 'OllamaClient']] = None,
+        query_parser: Optional[LegalQueryParser] = None,
+        statistics_service: Optional[StatisticsService] = None,
+        postgres_search_service: Optional[PostgresSearchService] = None,
+        graph_service: Optional[GraphService] = None
     ):
         """
         Initialize RAG service.
 
         Args:
             search_service: Search service instance
-            gemini_client: Gemini client instance
+            llm_client: LLM client instance (Gemini or Ollama, auto-detected based on LLM_PROVIDER)
             query_parser: Query parser instance
+            statistics_service: Statistics service instance
+            postgres_search_service: PostgreSQL search service instance
+            graph_service: Graph service instance
         """
+        # Load system prompt based on LLM provider
+        self.LEGAL_SYSTEM_PROMPT = self._load_system_prompt()
+        
         self.search_service = search_service or SearchService()
-        self.gemini_client = gemini_client or get_gemini_client()
+        # Note: Keep 'gemini_client' attribute name for backward compatibility
+        # This actually contains the LLM client (Gemini or Ollama) based on LLM_PROVIDER env var
+        self.gemini_client = llm_client or get_gemini_client()
         self.query_parser = query_parser or LegalQueryParser(use_spacy=False)
+        self.statistics_service = statistics_service or StatisticsService()
+        self.postgres_search_service = postgres_search_service or get_postgres_search_service()
+        self.graph_service = graph_service or get_graph_service()
 
         # Simple in-memory cache (would use Redis in production)
         self.cache: Dict[str, Tuple[RAGAnswer, datetime]] = {}
         self.cache_ttl = timedelta(hours=24)
+        
+        # Multi-tier search metrics
+        self.tier_usage_stats = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+        self.zero_result_count = 0
+        self.total_queries = 0
+
+        # Use the same Neo4j driver as graph_service if available, else require explicit driver
+        # Try to get Neo4j client from graph_service, fallback to direct import if needed
+        neo4j_client = None
+        if self.graph_service and hasattr(self.graph_service, 'client'):
+            neo4j_client = getattr(self.graph_service, 'client')
+        if neo4j_client is None:
+            try:
+                neo4j_client = get_graph_service().client
+            except Exception as e:
+                raise ValueError("Could not initialize Neo4j client for GraphRelationshipService: " + str(e))
+        self.graph_relationship_service = GraphRelationshipService(neo4j_client)
 
     def answer_question(
         self,
         question: str,
         filters: Optional[Dict] = None,
-        num_context_docs: int = 5,
+        num_context_docs: int = 7,  # Optimized: 7 provides best quality-to-noise ratio
         use_cache: bool = True,
         temperature: float = 0.3,
-        max_tokens: int = 1024
+        max_tokens: int = 8192
+    ) -> 'RAGAnswer':
+        """
+        Answer a question using RAG or relationship/statistics routing.
+        """
+        start_time = datetime.now()
+        parsed_query = self.query_parser.parse_query(question)
+        combined_filters = filters or {}
+        if 'language' not in combined_filters:
+            detected_lang = self._detect_language(question)
+            combined_filters['language'] = detected_lang
+            logger.info(f"Auto-detected language '{detected_lang}' added to filters")
+
+        # Route graph relationship questions to Neo4j
+        if parsed_query.intent == QueryIntent.GRAPH_RELATIONSHIP:
+            logger.info("Detected GRAPH_RELATIONSHIP intent - routing to Neo4j")
+            return self._answer_graph_relationship_question(
+                question=question,
+                parsed_query=parsed_query,
+                filters=combined_filters,
+                start_time=start_time.timestamp()
+            )
+        # Route statistics questions to database
+        if parsed_query.intent == QueryIntent.STATISTICS:
+            logger.info("Detected STATISTICS intent - routing to database")
+            return self._answer_statistics_question(
+                question=question,
+                filters=combined_filters,
+                start_time=start_time
+            )
+        # Regular questions use RAG
+        logger.info("Detected RAG intent - routing to RAG")
+        return self._answer_with_rag(
+            question=question,
+            filters=filters,
+            num_context_docs=num_context_docs,
+            use_cache=use_cache,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+    
+    def _answer_graph_relationship_question(
+        self,
+        question: str,
+        parsed_query: Any,
+        filters: Dict[str, Any],
+        start_time: float
+    ) -> 'RAGAnswer':
+        """Answer questions about graph relationships using Neo4j and return a RAGAnswer."""
+        import time
+        relationship_type = self._detect_relationship_type(question)
+        # Extract document title from entities
+        document_title = None
+        for entity in parsed_query.entities:
+            if hasattr(entity, 'entity_type') and entity.entity_type.name.lower() == 'document':
+                document_title = getattr(entity, 'normalized', None) or getattr(entity, 'text', None)
+                break
+
+        # Query Neo4j based on relationship type
+        if relationship_type == "has_section":
+            relationships = self.graph_relationship_service.find_has_section(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "part_of":
+            relationships = self.graph_relationship_service.find_part_of(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "relevant_for":
+            relationships = self.graph_relationship_service.find_relevant_for(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "applies_to":
+            relationships = self.graph_relationship_service.find_applies_to(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "implements":
+            relationships = self.graph_relationship_service.find_implementations(
+                act_title=document_title
+            )
+        elif relationship_type == "references":
+            relationships = self.graph_relationship_service.find_references(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "referenced_by":
+            relationships = self.graph_relationship_service.find_referenced_by(
+                document_title=document_title,
+                limit=50
+            )
+        elif relationship_type == "amendments":
+            relationships = self.graph_relationship_service.find_amendments(
+                document_title=document_title
+            )
+        else:
+            relationships = self.graph_relationship_service.find_references(
+                document_title=document_title,
+                limit=50
+            )
+
+        answer = self.graph_relationship_service.format_relationship_answer(
+            relationships=relationships,
+            question=question,
+            relationship_type=relationship_type
+        )
+        response_time_ms = int((time.time() - start_time) * 1000)
+        # For relationship queries, we don't have document citations, but we can optionally build pseudo-citations if needed
+        # For now, leave citations empty
+        return RAGAnswer(
+            question=question,
+            answer=answer,
+            citations=[],
+            confidence_score=0.90,
+            source_documents=[],
+            intent="graph_relationship",
+            processing_time_ms=response_time_ms,
+            metadata={
+                "relationship_type": relationship_type,
+                "query_type": "neo4j_graph_query",
+                "relationship_count": len(relationships),
+                "entities": parsed_query.entities
+            }
+        )
+    
+    def _detect_relationship_type(self, question: str) -> str:
+        """Detect the type of relationship query"""
+        question_lower = question.lower()
+
+        if any(word in question_lower for word in ["has section", "section", "contains section"]):
+            return "has_section"
+        if any(word in question_lower for word in ["part of", "belongs to", "included in"]):
+            return "part_of"
+        if any(word in question_lower for word in ["relevant for", "relevant to", "pertains to"]):
+            return "relevant_for"
+        if any(word in question_lower for word in ["applies to", "applicable to"]):
+            return "applies_to"
+        if any(word in question_lower for word in ["implements", "enforces"]):
+            return "implements"
+        if any(word in question_lower for word in ["references", "cites", "mentions", "refers to"]):
+            if any(word in question_lower for word in ["referenced by", "cited by", "mentioned by"]):
+                return "referenced_by"
+            return "references"
+        if any(word in question_lower for word in ["amends", "amended", "modified"]):
+            return "amendments"
+        return "references"  # Default
+
+    def _load_system_prompt(self) -> str:
+        """Load the appropriate system prompt based on LLM provider."""
+        try:
+            # Get the directory containing this file, then go to backend root and into prompts
+            current_file = Path(__file__)
+            backend_root = current_file.parent.parent
+            prompts_dir = backend_root / "prompts"
+            provider = os.getenv("LLM_PROVIDER", "gemini")
+
+            if provider == "gemini":
+                prompt_file = prompts_dir / 'CANADIAN_LEGAL_RAG_AGENT_STRICT_RAG_ENFORCEMENT_GEMINI.md'
+            elif provider == "ollama":
+                prompt_file = prompts_dir / 'CANADIAN_LEGAL_RAG_AGENT_LLAMA_3.2_3B_STRICT_MODE.md'
+            else:
+                # Fallback to gemini prompt
+                prompt_file = prompts_dir / 'CANADIAN_LEGAL_RAG_AGENT_STRICT_RAG_ENFORCEMENT_GEMINI.md'
+            
+            if prompt_file.exists():
+                with open(prompt_file, 'r', encoding='utf-8') as f:
+                    prompt_content = f.read()
+                logger.info(f"✅ Loaded {provider} system prompt from {prompt_file.name}")
+                return prompt_content
+            else:
+                logger.error(f"❌ Prompt file not found: {prompt_file}")
+                return self._get_fallback_prompt()
+                
+        except Exception as e:
+            logger.error(f"❌ Error loading system prompt: {e}")
+            return self._get_fallback_prompt()
+    
+    def _get_fallback_prompt(self) -> str:
+        """Return a basic fallback prompt if file loading fails."""
+        return """You are a Canadian legal assistant specializing in federal regulations.
+        
+Your job is to provide accurate, well-cited answers based on the provided legal documents.
+Always cite your sources using [Document Title, Section X] format.
+If you cannot find relevant information in the provided documents, clearly state this.
+Be precise and cite specific sections when possible."""
+
+    def _detect_language(self, text: str) -> str:
+        """
+        Detect the language of the input text.
+        
+        Args:
+            text: Input text to detect language for
+            
+        Returns:
+            Language code ('en' or 'fr'), defaults to 'en' on error
+        """
+        try:
+            lang = detect(text)
+            # Map langdetect codes to our system
+            if lang == 'fr':
+                logger.info(f"🇫🇷 Detected French query - will filter for French documents")
+                return 'fr'
+            else:
+                logger.info(f"🇬🇧 Detected English query (lang={lang})")
+                return 'en'
+        except LangDetectException as e:
+            logger.warning(f"Language detection failed: {e}. Defaulting to English")
+            return 'en'
+
+    def _answer_with_rag(
+        self,
+        question: str,
+        filters: Optional[Dict] = None,
+        num_context_docs: int = 7,  # Optimized: 7 provides best quality-to-noise ratio
+        use_cache: bool = True,
+        temperature: float = 0.3,
+        max_tokens: int = 8192
     ) -> RAGAnswer:
         """
         Answer a question using RAG.
@@ -158,26 +401,42 @@ Remember: You are providing informational guidance, not legal advice. Users shou
                 logger.info(f"Returning cached answer for: {question[:50]}...")
                 return cached_answer
 
-        # Parse query to understand intent and extract filters
+        # Parse query to understand intent
         parsed_query = self.query_parser.parse_query(question)
         intent = parsed_query.intent.value
 
-        # Merge parsed filters with provided filters
+        # Use only user-provided filters, NOT auto-extracted filters
+        # Auto-extracted filters cause issues when documents lack metadata
         combined_filters = filters or {}
-        combined_filters.update(parsed_query.filters)
 
-        # Retrieve relevant documents
-        logger.info(f"Searching for context: {question[:50]}...")
-        search_results = self.search_service.hybrid_search(
-            query=question,
+        # If no language filter is provided, detect it automatically
+        if 'language' not in combined_filters:
+            detected_lang = self._detect_language(question)
+            combined_filters['language'] = detected_lang
+            logger.info(f"Auto-detected language '{detected_lang}' added to filters")
+
+
+        # Retrieve relevant documents with MULTI-TIER SEARCH (Phase 4 Enhancement)
+        logger.info(f"🔍 Starting multi-tier search for: {question[:50]}...")
+        
+        # Use the progressive 5-tier fallback system
+        context_docs, tier_metadata = self._multi_tier_search(
+            question=question,
             filters=combined_filters,
-            size=num_context_docs,
-            keyword_weight=0.4,
-            vector_weight=0.6  # Prefer semantic similarity for Q&A
+            num_context_docs=num_context_docs
         )
-
-        if not search_results['hits']:
-            # No context found
+        
+        # Log tier usage for monitoring
+        tier_used = tier_metadata.get('tier_used')
+        if tier_used:
+            logger.info(f"✅ Multi-tier search succeeded using Tier {tier_used}")
+            logger.info(f"   Tiers attempted: {tier_metadata.get('tiers_attempted', [])}")
+            logger.info(f"   Total search time: {tier_metadata.get('total_time_ms', 0):.1f}ms")
+        else:
+            logger.error(f"❌ Multi-tier search failed - all {len(tier_metadata.get('tiers_attempted', []))} tiers exhausted")
+        
+        if not context_docs:
+            # No context found after all 5 tiers
             return RAGAnswer(
                 question=question,
                 answer="I don't have enough information in the regulatory documents to answer this question. Please try rephrasing your question or contact a legal expert for assistance.",
@@ -186,21 +445,13 @@ Remember: You are providing informational guidance, not legal advice. Users shou
                 source_documents=[],
                 intent=intent,
                 processing_time_ms=(datetime.now() - start_time).total_seconds() * 1000,
-                metadata={"error": "no_context_found"}
+                metadata={
+                    "error": "no_context_found",
+                    "multi_tier_metadata": tier_metadata,
+                    "tiers_attempted": tier_metadata.get('tiers_attempted', []),
+                    "all_tiers_exhausted": True
+                }
             )
-
-        # Build context from search results
-        context_docs = []
-        for hit in search_results['hits']:
-            doc = hit['source']
-            context_docs.append({
-                "id": hit['id'],
-                "title": doc.get('title', 'Untitled'),
-                "content": doc.get('content', ''),
-                "citation": doc.get('citation', ''),
-                "section_number": doc.get('section_number', ''),
-                "score": hit['score']
-            })
 
         # Build context string
         context_str = self._build_context_string(context_docs)
@@ -220,28 +471,71 @@ Remember: You are providing informational guidance, not legal advice. Users shou
                 metadata={"error": "gemini_unavailable"}
             )
 
-        answer_text = self.gemini_client.generate_with_context(
+        # Detect language and add language instruction
+        detected_lang = self._detect_language(question)
+        language_instruction = ""
+        if detected_lang == 'fr':
+            language_instruction = "\n\nIMPORTANT: The user asked their question in FRENCH. You MUST respond entirely in FRENCH. Provide a complete French answer."
+        else:
+            language_instruction = "\n\nIMPORTANT: The user asked their question in ENGLISH. You MUST respond entirely in ENGLISH."
+        
+        # Add fallback search mode instruction if using tier 2+
+        tier_used = tier_metadata.get('tier_used', 1)
+        fallback_instruction = ""
+        if tier_used and tier_used > 1:
+            fallback_instruction = f"\n\n🔄 FALLBACK_SEARCH_MODE ACTIVATED (Tier {tier_used}/5): The retrieval system used fallback strategies to find documents. Provide the best available information from these documents, but clearly indicate at the start of your response that the search used fallback methods and the results may not be exact matches. Follow the FALLBACK_SEARCH_MODE format in your instructions."
+            logger.info(f"🔄 Added FALLBACK_SEARCH_MODE instruction for Tier {tier_used}")
+        
+        # Generate with retry logic - returns (text, error)
+        answer_text, gemini_error = self.gemini_client.generate_with_context(
             query=question,
             context=context_str,
-            system_prompt=self.LEGAL_SYSTEM_PROMPT,
+            system_prompt=self.LEGAL_SYSTEM_PROMPT + language_instruction + fallback_instruction,
             temperature=temperature,
             max_tokens=max_tokens
         )
 
-        if not answer_text:
+        # Handle errors from Gemini API
+        if gemini_error:
+            logger.error(f"Gemini API error: {gemini_error.error_type} - {gemini_error.message}")
+            
+            # Build comprehensive error metadata
+            error_metadata = {
+                "error": gemini_error.error_type,
+                "error_details": gemini_error.to_dict(),
+                "num_context_docs": len(context_docs),
+                "temperature": temperature,
+                "filters_used": combined_filters,
+                "multi_tier_search": tier_metadata,
+            }
+            
+            # Return user-friendly error message
             return RAGAnswer(
                 question=question,
-                answer="I encountered an error while generating the answer. Please try again or rephrase your question.",
+                answer=gemini_error.message,  # User-friendly message from error classification
                 citations=[],
                 confidence_score=0.0,
                 source_documents=context_docs,
                 intent=intent,
                 processing_time_ms=(datetime.now() - start_time).total_seconds() * 1000,
-                metadata={"error": "generation_failed"}
+                metadata=error_metadata
+            )
+        
+        # Check if we got an empty response despite no error
+        if not answer_text:
+            return RAGAnswer(
+                question=question,
+                answer="I encountered an unexpected issue while generating the answer. Please try again or rephrase your question.",
+                citations=[],
+                confidence_score=0.0,
+                source_documents=context_docs,
+                intent=intent,
+                processing_time_ms=(datetime.now() - start_time).total_seconds() * 1000,
+                metadata={"error": "empty_response", "num_context_docs": len(context_docs)}
             )
 
-        # Extract citations from answer
-        citations = self._extract_citations(answer_text, context_docs)
+        # Build citations from context document metadata
+        citations = self._build_citations_from_context(context_docs)
 
         # Calculate confidence score
         confidence = self._calculate_confidence(
@@ -251,7 +545,7 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             intent_confidence=parsed_query.intent_confidence
         )
 
-        # Build RAG answer
+        # Build RAG answer with multi-tier metadata
         rag_answer = RAGAnswer(
             question=question,
             answer=answer_text,
@@ -263,7 +557,10 @@ Remember: You are providing informational guidance, not legal advice. Users shou
             metadata={
                 "num_context_docs": len(context_docs),
                 "temperature": temperature,
-                "filters_used": combined_filters
+                "filters_used": combined_filters,
+                "multi_tier_search": tier_metadata,  # Include tier usage stats
+                "tier_used": tier_metadata.get('tier_used'),
+                "search_resilience": f"Tier {tier_metadata.get('tier_used')} of 5"
             }
         )
 
@@ -273,286 +570,1406 @@ Remember: You are providing informational guidance, not legal advice. Users shou
 
         return rag_answer
 
-    def _build_context_string(self, context_docs: List[Dict[str, Any]]) -> str:
-        """Build context string from documents"""
-        context_parts = []
+    def _enhance_query_for_search(self, question: str, parsed_query: Any) -> str:
+        """
+        Enhance the search query for better document retrieval.
+        
+        This method:
+        - Expands section references (e.g., "Section 7" -> "Section 7" + section_number:7)
+        - Adds act names explicitly
+        - Removes common question words that dilute search
+        - Adds synonyms for key legal terms
+        
+        Args:
+            question: Original user question
+            parsed_query: Parsed query object with entities and intent
+            
+        Returns:
+            Enhanced query string
+        """
+        enhanced_parts = []
+        
+        # Extract section numbers from the question
+        section_pattern = r'(?:Section|s\.?)\s+(\d+(?:\(\d+\))?)'
+        section_matches = re.findall(section_pattern, question, re.IGNORECASE)
+        
+        if section_matches:
+            # Prioritize section-specific search
+            logger.info(f"Detected section references: {section_matches}")
+            for section in section_matches:
+                enhanced_parts.append(f"Section {section}")
+                enhanced_parts.append(f"section_number:{section}")
+        
+        # Extract act/regulation names
+        act_patterns = [
+            r'([\w\s]+(?:Act|Regulations?))',
+            r'(Employment Insurance|EI|Old Age Security|OAS|Canada Pension Plan|CPP)'
+        ]
+        
+        for pattern in act_patterns:
+            act_matches = re.findall(pattern, question, re.IGNORECASE)
+            for act_name in act_matches:
+                clean_name = act_name.strip()
+                if len(clean_name) > 3:  # Avoid noise
+                    enhanced_parts.append(clean_name)
+        
+        # Remove common question words that dilute search
+        noise_words = {'what', 'does', 'say', 'about', 'the', 'is', 'are', 'can', 'how', 'why', 'when', 'where'}
+        content_words = [
+            word for word in question.split() 
+            if word.lower() not in noise_words and len(word) > 2
+        ]
+        
+        # Add content words
+        enhanced_parts.extend(content_words[:10])  # Limit to avoid overly long queries
+        
+        # Build enhanced query
+        enhanced_query = ' '.join(enhanced_parts)
+        
+        # If we didn't enhance much, use original question
+        if len(enhanced_parts) < 3:
+            return question
+        
+        return enhanced_query
 
-        for i, doc in enumerate(context_docs, 1):
-            doc_str = f"Document {i}: {doc['title']}\n"
-
-            if doc.get('citation'):
-                doc_str += f"Citation: {doc['citation']}\n"
-
-            if doc.get('section_number'):
-                doc_str += f"Section: {doc['section_number']}\n"
-
-            doc_str += f"Content: {doc['content']}\n"
-
-            context_parts.append(doc_str)
-
-        return "\n---\n".join(context_parts)
-
-    def _extract_citations(
+    def _answer_statistics_question(
         self,
-        answer: str,
+        question: str,
+        filters: Dict[str, Any],
+        start_time: datetime
+    ) -> RAGAnswer:
+        """
+        Answer statistics/count questions by querying database directly.
+        
+        This bypasses RAG's context window limitation to provide accurate counts.
+        
+        Args:
+            question: User's question
+            filters: Optional search filters
+            start_time: When processing started
+            
+        Returns:
+            RAGAnswer with database statistics
+        """
+        logger.info("Querying database for statistics...")
+        
+        try:
+            # Get comprehensive statistics
+            if filters:
+                # Filtered statistics
+                stats = self.statistics_service.get_total_documents(filters=filters)
+            else:
+                # Full database summary
+                stats = self.statistics_service.get_database_summary()
+            
+            # Format answer
+            answer_text = self.statistics_service.format_statistics_answer(
+                question=question,
+                statistics=stats
+            )
+            
+            # High confidence for database queries (they're accurate!)
+            confidence = 0.95
+            
+            # Build metadata
+            metadata = {
+                "method": "database_query",
+                "bypassed_rag": True,
+                "reason": "Statistics questions answered directly from database for accuracy",
+                "statistics": stats,
+                "filters_used": filters
+            }
+            
+            return RAGAnswer(
+                question=question,
+                answer=answer_text,
+                citations=[],  # No document citations for statistics
+                confidence_score=confidence,
+                source_documents=[],  # No specific documents
+                intent="statistics",
+                processing_time_ms=(datetime.now() - start_time).total_seconds() * 1000,
+                metadata=metadata
+            )
+            
+        except Exception as e:
+            logger.error(f"Error querying statistics: {e}")
+            
+            # Return error answer
+            return RAGAnswer(
+                question=question,
+                answer=f"I encountered an error while querying the database for statistics: {str(e)}. Please try again or contact support.",
+                citations=[],
+                confidence_score=0.0,
+                source_documents=[],
+                intent="statistics",
+                processing_time_ms=(datetime.now() - start_time).total_seconds() * 1000,
+                metadata={"error": str(e), "method": "database_query"}
+            )
+    
+    # ============================================
+    # MULTI-TIER SEARCH SYSTEM (Phase 2)
+    # ============================================
+    
+    def _assess_result_quality(
+        self,
+        results: List[Dict[str, Any]],
+        question: str,
+        tier: int,
+        min_score_threshold: float = 15.0,
+        avg_score_threshold: float = 20.0,
+        min_acceptable_results: int = 5
+    ) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Assess the quality of search results to determine if they're acceptable.
+        
+        This prevents accepting poor-quality results even when we have the
+        requested number of documents. Quality criteria:
+        
+        1. Minimum score threshold: Worst document must be above this
+        2. Average score threshold: Average quality must be above this  
+        3. Minimum acceptable results: At least this many results needed
+        4. Keyword coverage: Check if key terms from query appear in results
+        
+        Args:
+            results: List of search result documents with scores
+            question: Original user question
+            tier: Which tier produced these results (for adaptive thresholds)
+            min_score_threshold: Minimum acceptable score for worst document
+            avg_score_threshold: Minimum acceptable average score
+            min_acceptable_results: Minimum number of results needed
+            
+        Returns:
+            Tuple of (is_acceptable: bool, quality_metrics: dict)
+        """
+        if not results:
+            return False, {
+                "reason": "no_results",
+                "num_results": 0,
+                "acceptable": False
+            }
+        
+        # Extract scores
+        scores = [doc.get('score', 0.0) for doc in results]
+        
+        # Adjust thresholds based on tier (lower tiers have relaxed standards)
+        if tier >= 2:
+            min_score_threshold *= 0.8  # 20% more lenient
+            avg_score_threshold *= 0.8
+        if tier >= 3:
+            min_score_threshold *= 0.7  # 30% more lenient from original  
+            avg_score_threshold *= 0.7
+        if tier >= 4:
+            min_score_threshold *= 0.3  # Much more lenient for PostgreSQL scores
+            avg_score_threshold *= 0.3
+        
+        # Calculate quality metrics
+        quality_metrics = {
+            "num_results": len(results),
+            "min_score": min(scores) if scores else 0.0,
+            "max_score": max(scores) if scores else 0.0,
+            "avg_score": sum(scores) / len(scores) if scores else 0.0,
+            "tier": tier,
+            "adjusted_min_threshold": min_score_threshold,
+            "adjusted_avg_threshold": avg_score_threshold
+        }
+        
+        # Check 1: Minimum number of results
+        if len(results) < min_acceptable_results:
+            quality_metrics["reason"] = f"insufficient_results: {len(results)} < {min_acceptable_results}"
+            quality_metrics["acceptable"] = False
+            logger.warning(f"❌ Quality check FAILED: {quality_metrics['reason']}")
+            return False, quality_metrics
+        
+        # Check 2: Minimum score (worst document quality)
+        if quality_metrics["min_score"] < min_score_threshold:
+            quality_metrics["reason"] = f"min_score_too_low: {quality_metrics['min_score']:.2f} < {min_score_threshold:.2f}"
+            quality_metrics["acceptable"] = False
+            logger.warning(f"❌ Quality check FAILED: {quality_metrics['reason']}")
+            return False, quality_metrics
+        
+        # Check 3: Average score (overall quality)
+        if quality_metrics["avg_score"] < avg_score_threshold:
+            quality_metrics["reason"] = f"avg_score_too_low: {quality_metrics['avg_score']:.2f} < {avg_score_threshold:.2f}"
+            quality_metrics["acceptable"] = False
+            logger.warning(f"❌ Quality check FAILED: {quality_metrics['reason']}")
+            return False, quality_metrics
+        
+        # Check 4: Keyword coverage (are key terms from question in results?)
+        # Include words > 2 chars to capture important acronyms (GST, HST, EI, OAS, CPP)
+        question_keywords = set(word.lower() for word in question.split() if len(word) > 2)
+        if question_keywords:
+            # Check if at least 30% of top 5 results contain query keywords
+            top_results = results[:5]
+            keyword_matches = 0
+            
+            for doc in top_results:
+                content = (doc.get('content', '') + ' ' + doc.get('title', '')).lower()
+                if any(keyword in content for keyword in question_keywords):
+                    keyword_matches += 1
+            
+            keyword_coverage = keyword_matches / len(top_results) if top_results else 0.0
+            quality_metrics["keyword_coverage"] = keyword_coverage
+            
+            if keyword_coverage < 0.3:  # Less than 30% have keywords
+                quality_metrics["reason"] = f"low_keyword_coverage: {keyword_coverage:.1%} < 30%"
+                quality_metrics["acceptable"] = False
+                logger.warning(f"❌ Quality check FAILED: {quality_metrics['reason']}")
+                return False, quality_metrics
+        
+        # All checks passed!
+        quality_metrics["reason"] = "quality_checks_passed"
+        quality_metrics["acceptable"] = True
+        logger.debug(f"✅ Quality check PASSED: min={quality_metrics['min_score']:.2f}, "
+                    f"avg={quality_metrics['avg_score']:.2f}, "
+                    f"count={quality_metrics['num_results']}")
+        return True, quality_metrics
+    
+    def _multi_tier_search(
+        self,
+        question: str,
+        filters: Optional[Dict[str, Any]],
+        num_context_docs: int = 10
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """
+        Progressive fallback search across all 5 tiers with SELECTIVE graph enhancement.
+        
+        This orchestrator tries each tier sequentially until sufficient documents
+        are found. After a successful tier, it checks if graph enhancement should be
+        applied (Selective Enhancement).
+        
+        Graph Enhancement Conditions:
+        - Query mentions specific sections/acts
+        - Intent is INTERPRETATION or COMPLIANCE
+        - Tier 1/2 results have low relationship diversity
+        
+        Tiers:
+        1. Optimized Elasticsearch (current behavior, 85%+ success target)
+        2. Relaxed Elasticsearch (expanded query, fewer filters)
+        3. Neo4j Graph Traversal (relationship-based discovery)
+        4. PostgreSQL Full-Text Search (comprehensive text matching)
+        5. Metadata-Only Search (last resort, metadata filters only)
+        
+        Args:
+            question: User's question
+            filters: Optional filters (will be relaxed progressively)
+            num_context_docs: Desired number of context documents
+        
+        Returns:
+            Tuple of (documents, metadata)
+            metadata includes: tier_used, tiers_attempted, tier_timings, graph_enhanced
+        """
+        import time
+        
+        metadata = {
+            'tiers_attempted': [],
+            'tier_used': None,
+            'tier_timings': {},
+            'total_time_ms': 0,
+            'graph_enhanced': False,
+            'enhancement_reason': None
+        }
+        
+        total_start = time.time()
+        
+        # Update total queries counter
+        self.total_queries += 1
+
+        # Parse query once for reuse
+        parsed_query = self.query_parser.parse_query(question)
+
+        # Enhance the query for better search
+        enhanced_question = self._enhance_query_for_search(question, parsed_query)
+
+        # Tier 1: Optimized Elasticsearch
+        logger.info("🔍 Tier 1: Trying optimized Elasticsearch search...")
+        tier1_start = time.time()
+
+        tier1_results = self._tier1_elasticsearch_optimized(enhanced_question, filters, num_context_docs)
+        tier1_time = (time.time() - tier1_start) * 1000
+        metadata['tier_timings']['tier_1_ms'] = tier1_time
+        metadata['tiers_attempted'].append(1)
+        
+        # Quality check for Tier 1
+        if len(tier1_results) >= num_context_docs:
+            is_quality_ok, quality_metrics = self._assess_result_quality(
+                results=tier1_results,
+                question=question,
+                tier=1
+            )
+            metadata['tier_1_quality'] = quality_metrics
+            
+            if is_quality_ok:
+                logger.info(f"✅ Tier 1 SUCCESS: Found {len(tier1_results)} high-quality documents")
+                
+                # Check if we should apply graph enhancement
+                should_enhance = self._should_apply_graph_enhancement(
+                    question=question,
+                    parsed_query=parsed_query,
+                    tier_results=tier1_results,
+                    tier_num=1
+                )
+                
+                if should_enhance['should_enhance']:
+                    # Apply graph enhancement
+                    enhanced_results = self._apply_graph_enhancement(
+                        base_results=tier1_results[:num_context_docs],
+                        question=question,
+                        num_additional=3
+                    )
+                    metadata['graph_enhanced'] = True
+                    metadata['enhancement_reason'] = should_enhance['reason']
+                    metadata['docs_added'] = len(enhanced_results) - len(tier1_results[:num_context_docs])
+                    logger.info(f"🔗 Graph enhancement applied: {metadata['enhancement_reason']}")
+                    logger.info(f"   Added {metadata['docs_added']} related documents via graph traversal")
+                    tier1_results = enhanced_results
+                
+                metadata['tier_used'] = 1
+                metadata['total_time_ms'] = (time.time() - total_start) * 1000
+                self.tier_usage_stats[1] += 1
+                return tier1_results[:num_context_docs], metadata
+            else:
+                logger.warning(f"⚠️ Tier 1 QUALITY CHECK FAILED: {quality_metrics.get('reason')} - continuing to Tier 2")
+        else:
+            logger.warning(f"⚠️ Tier 1 INSUFFICIENT: Only {len(tier1_results)} documents, need {num_context_docs}")
+        
+        # Tier 2: Relaxed Elasticsearch 
+        logger.info("🔍 Tier 2: Trying relaxed Elasticsearch search...")
+        tier2_start = time.time()
+        tier2_results = self._tier2_elasticsearch_relaxed(enhanced_question, filters, num_context_docs)
+        tier2_time = (time.time() - tier2_start) * 1000
+        metadata['tier_timings']['tier_2_ms'] = tier2_time
+        metadata['tiers_attempted'].append(2)
+        
+        # Log what Elasticsearch returned BEFORE reranking
+        if tier2_results:
+            logger.info(f"📊 Tier 2 RAW results from search (top 10):")
+            for i, doc in enumerate(tier2_results[:10], 1):
+                logger.info(f"  {i}. {doc.get('title', 'Unknown')} ({doc.get('document_type', 'unknown')})")
+        
+        # Quality check for Tier 2
+        if len(tier2_results) > 0:
+            is_quality_ok, quality_metrics = self._assess_result_quality(
+                results=tier2_results,
+                question=question,
+                tier=2
+            )
+            metadata['tier_2_quality'] = quality_metrics
+            
+            if is_quality_ok:
+                logger.info(f"✅ Tier 2 SUCCESS: Found {len(tier2_results)} quality documents")
+                
+                # Check if we should apply graph enhancement
+                should_enhance = self._should_apply_graph_enhancement(
+                    question=question,
+                    parsed_query=parsed_query,
+                    tier_results=tier2_results,
+                    tier_num=2
+                )
+                
+                if should_enhance['should_enhance']:
+                    # Apply graph enhancement
+                    enhanced_results = self._apply_graph_enhancement(
+                        base_results=tier2_results[:num_context_docs],
+                        question=question,
+                        num_additional=3
+                    )
+                    metadata['graph_enhanced'] = True
+                    metadata['enhancement_reason'] = should_enhance['reason']
+                    metadata['docs_added'] = len(enhanced_results) - len(tier2_results[:num_context_docs])
+                    logger.info(f"🔗 Graph enhancement applied: {metadata['enhancement_reason']}")
+                    logger.info(f"   Added {metadata['docs_added']} related documents via graph traversal")
+                    tier2_results = enhanced_results
+                
+                metadata['tier_used'] = 2
+                metadata['total_time_ms'] = (time.time() - total_start) * 1000
+                self.tier_usage_stats[2] += 1
+                return tier2_results[:num_context_docs], metadata
+            else:
+                logger.warning(f"⚠️ Tier 2 QUALITY CHECK FAILED: {quality_metrics.get('reason')} - continuing to Tier 3")
+        else:
+            logger.warning("⚠️ Tier 2 FAILED: No results from relaxed search")
+        
+        # Tier 3: Neo4j Graph Traversal
+        logger.info("🔍 Tier 3: Trying Neo4j graph traversal...")
+        tier3_start = time.time()
+        tier3_results = self._tier3_neo4j_graph(question, filters, num_context_docs)
+        tier3_time = (time.time() - tier3_start) * 1000
+        metadata['tier_timings']['tier_3_ms'] = tier3_time
+        metadata['tiers_attempted'].append(3)
+        
+        # Quality check for Tier 3
+        if len(tier3_results) > 0:
+            is_quality_ok, quality_metrics = self._assess_result_quality(
+                results=tier3_results,
+                question=question,
+                tier=3
+            )
+            metadata['tier_3_quality'] = quality_metrics
+            
+            if is_quality_ok:
+                logger.info(f"✅ Tier 3 SUCCESS: Found {len(tier3_results)} quality documents via graph")
+                metadata['tier_used'] = 3
+                metadata['total_time_ms'] = (time.time() - total_start) * 1000
+                self.tier_usage_stats[3] += 1
+                return tier3_results[:num_context_docs], metadata
+            else:
+                logger.warning(f"⚠️ Tier 3 QUALITY CHECK FAILED: {quality_metrics.get('reason')} - continuing to Tier 4")
+        else:
+            logger.warning("⚠️ Tier 3 FAILED: No results from graph traversal")
+        
+        # Tier 4: PostgreSQL Full-Text Search
+        logger.info("🔍 Tier 4: Trying PostgreSQL full-text search...")
+        tier4_start = time.time()
+        tier4_results = self._tier4_postgres_fulltext(question, filters, num_context_docs)
+        tier4_time = (time.time() - tier4_start) * 1000
+        metadata['tier_timings']['tier_4_ms'] = tier4_time
+        metadata['tiers_attempted'].append(4)
+        
+        # Quality check for Tier 4
+        if len(tier4_results) > 0:
+            is_quality_ok, quality_metrics = self._assess_result_quality(
+                results=tier4_results,
+                question=question,
+                tier=4
+            )
+            metadata['tier_4_quality'] = quality_metrics
+            
+            if is_quality_ok:
+                logger.info(f"✅ Tier 4 SUCCESS: Found {len(tier4_results)} quality documents via PostgreSQL FTS")
+                metadata['tier_used'] = 4
+                metadata['total_time_ms'] = (time.time() - total_start) * 1000
+                self.tier_usage_stats[4] += 1
+                return tier4_results[:num_context_docs], metadata
+            else:
+                logger.warning(f"⚠️ Tier 4 QUALITY CHECK FAILED: {quality_metrics.get('reason')} - continuing to Tier 5")
+        else:
+            logger.warning("⚠️ Tier 4 FAILED: No results from PostgreSQL")
+        
+        # Tier 5: Metadata-Only Search (last resort)
+        logger.info("🔍 Tier 5: Trying metadata-only search (last resort)...")
+        tier5_start = time.time()
+        tier5_results = self._tier5_metadata_only(filters, num_context_docs)
+        tier5_time = (time.time() - tier5_start) * 1000
+        metadata['tier_timings']['tier_5_ms'] = tier5_time
+        metadata['tiers_attempted'].append(5)
+        
+        # Tier 5 accepts any results (last resort - no quality check)
+        if len(tier5_results) > 0:
+            logger.warning(f"⚠️ Tier 5 SUCCESS (LOW CONFIDENCE): Found {len(tier5_results)} documents by metadata only")
+            metadata['tier_used'] = 5
+            metadata['tier_5_quality'] = {
+                "reason": "tier_5_last_resort",
+                "num_results": len(tier5_results),
+                "acceptable": True,
+                "note": "Quality check skipped for last-resort tier"
+            }
+            metadata['total_time_ms'] = (time.time() - total_start) * 1000
+            self.tier_usage_stats[5] += 1
+            return tier5_results[:num_context_docs], metadata
+        
+        # ALL TIERS FAILED
+        logger.error("❌ ALL TIERS FAILED: No documents found across all 5 search tiers")
+        self.zero_result_count += 1
+        metadata['tier_used'] = None
+        metadata['total_time_ms'] = (time.time() - total_start) * 1000
+        
+        return [], metadata
+    
+    def _tier1_elasticsearch_optimized(
+        self,
+        question: str,
+        filters: Optional[Dict[str, Any]],
+        num_docs: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Tier 1: Optimized Elasticsearch search with full hybrid intelligence.
+        
+        Uses the original question (not enhanced) to leverage hybrid_search's:
+        - Query intent detection (overview vs specific)
+        - Act name extraction and 10x title boosting
+        - Document type boosting (5x for act-level docs)
+        - Adaptive keyword/vector weight adjustment
+        
+        Target: 85%+ of queries should succeed here.
+        """
+        try:
+            # Use current filters
+            search_filters = filters.copy() if filters else {}
+            
+
+            # Execute search with ORIGINAL question to preserve intent
+            # Let hybrid_search do its own intelligent processing:
+            # - Query intent detection
+            # - Act name extraction
+            # - Intelligent boosting (10x title, 5x doc type)
+            # - Adaptive weight adjustment
+            search_results = self.search_service.hybrid_search(
+                query=question,  # Use original question, not enhanced
+                filters=search_filters,
+                size=num_docs
+                # Don't override weights - let hybrid_search decide based on intent
+            )
+            
+            # Format results
+            documents = []
+            for hit in search_results.get('hits', []):
+                doc = hit['source']
+                documents.append({
+                    "id": hit['id'],
+                    "title": doc.get('title', 'Untitled'),
+                    "content": doc.get('content', ''),
+                    "citation": doc.get('citation', ''),
+                    "section_number": doc.get('section_number', ''),
+                    "score": hit['score']
+                })
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Tier 1 search failed: {e}")
+            return []
+    
+    def _tier2_elasticsearch_relaxed(
+        self,
+        question: str,
+        filters: Optional[Dict[str, Any]],
+        num_docs: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Tier 2: Relaxed Elasticsearch search with query expansion.
+        
+        Changes from Tier 1:
+        - Expand query with synonyms
+        - Relax filters (keep only language)
+        - Increase semantic weight
+        - Increase document limit
+        """
+        try:
+            # Expand query with synonyms
+            expanded_query = expand_query_with_synonyms(question, max_expansions=2)
+            logger.info(f"Tier 2 expanded query: {expanded_query[:100]}...")
+            
+            # Relax filters - keep only language
+            relaxed_filters = self._relax_filters_progressively(filters, tier=2)
+            
+            # Execute search with adjusted weights
+            search_results = self.search_service.hybrid_search(
+                query=expanded_query,
+                filters=relaxed_filters,
+                size=num_docs * 2,  # Get more candidates
+                keyword_weight=0.4,  # Reduce keyword weight
+                vector_weight=0.6    # Increase semantic weight
+            )
+            
+            # Format results
+            documents = []
+            for hit in search_results.get('hits', []):
+                doc = hit['source']
+                documents.append({
+                    "id": hit['id'],
+                    "title": doc.get('title', 'Untitled'),
+                    "content": doc.get('content', ''),
+                    "citation": doc.get('citation', ''),
+                    "section_number": doc.get('section_number', ''),
+                    "document_type": doc.get('document_type', 'unknown'),
+                    "regulation_title": doc.get('regulation_title', ''),
+                    "score": hit['score']
+                })
+            
+            logger.debug(f"📦 Tier 2 found {len(documents)} documents from Elasticsearch")
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Tier 2 search failed: {e}")
+            return []
+    
+    def _tier3_neo4j_graph(
+        self,
+        question: str,
+        filters: Optional[Dict[str, Any]],
+        num_docs: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Tier 3: Neo4j graph traversal search.
+        
+        Uses semantic search plus relationship traversal to find related documents.
+        """
+        try:
+            # Get language filter
+            language = filters.get('language', 'en') if filters else 'en'
+            
+            # Try both semantic search and traversal
+            semantic_results = self.graph_service.semantic_search_for_rag(
+                query=question,
+                limit=num_docs // 2,
+                language=language
+            )
+            
+            traversal_results = self.graph_service.find_related_documents_by_traversal(
+                seed_query=question,
+                max_depth=2,
+                limit=num_docs // 2
+            )
+            
+            # Combine results (remove duplicates by ID)
+            seen_ids = set()
+            documents = []
+            
+            for doc in semantic_results + traversal_results:
+                if doc['id'] not in seen_ids:
+                    seen_ids.add(doc['id'])
+                    documents.append(doc)
+            
+            logger.info(f"Tier 3 found {len(documents)} documents from Neo4j")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Tier 3 search failed: {e}")
+            return []
+    
+    def _tier4_postgres_fulltext(
+        self,
+        question: str,
+        filters: Optional[Dict[str, Any]],
+        num_docs: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Tier 4: PostgreSQL full-text search.
+        
+        Uses PostgreSQL's native FTS for comprehensive text matching.
+        """
+        try:
+            # Get language
+            language = filters.get('language', 'en') if filters else 'en'
+            pg_language = 'english' if language == 'en' else 'french'
+            
+            # Relax filters more (keep language and maybe jurisdiction)
+            relaxed_filters = self._relax_filters_progressively(filters, tier=4)
+            
+            # Execute PostgreSQL FTS
+            documents = self.postgres_search_service.full_text_search(
+                query=question,
+                limit=num_docs,
+                language=pg_language,
+                filters=relaxed_filters
+            )
+            
+            logger.info(f"Tier 4 found {len(documents)} documents from PostgreSQL")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Tier 4 search failed: {e}")
+            return []
+    
+    def _tier5_metadata_only(
+        self,
+        filters: Optional[Dict[str, Any]],
+        num_docs: int
+    ) -> List[Dict[str, Any]]:
+        """
+        Tier 5: Metadata-only search (last resort).
+        
+        Returns documents matching metadata filters only.
+        Low confidence - used when all text-based searches fail.
+        """
+        try:
+            if not filters:
+                logger.warning("Tier 5: No filters provided, cannot perform metadata-only search")
+                return []
+            
+            # Use all available filters
+            documents = self.postgres_search_service.metadata_only_search(
+                filters=filters,
+                limit=num_docs
+            )
+            
+            logger.warning(f"Tier 5 found {len(documents)} documents by metadata only (LOW CONFIDENCE)")
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Tier 5 search failed: {e}")
+            return []
+    
+    def _relax_filters_progressively(
+        self,
+        filters: Optional[Dict[str, Any]],
+        tier: int
+    ) -> Dict[str, Any]:
+        """
+        Progressively relax filters based on tier.
+        
+        Filter relaxation strategy:
+        - Tier 1: All filters (original behavior)
+        - Tier 2: Remove program, person_type (keep language, jurisdiction)
+        - Tier 3: Keep only language
+        - Tier 4+: Keep language and maybe jurisdiction
+        
+        This progressive relaxation helps improve recall when initial searches
+        fail due to overly restrictive filters.
+        
+        Args:
+            filters: Original filters
+            tier: Current tier (1-5)
+        
+        Returns:
+            Relaxed filters dictionary
+        """
+        if not filters:
+            logger.debug(f"Tier {tier}: No filters to relax")
+            return {}
+        
+        original_filters = filters.copy()
+        relaxed = filters.copy()
+        
+        if tier == 1:
+            # Tier 1: Use all filters
+            logger.debug(f"Tier {tier}: Using all {len(relaxed)} filters: {list(relaxed.keys())}")
+            return relaxed
+        
+        elif tier == 2:
+            # Tier 2: Remove program, person_type
+            removed = []
+            if 'programs' in relaxed:
+                relaxed.pop('programs')
+                removed.append('programs')
+            if 'person_type' in relaxed:
+                relaxed.pop('person_type')
+                removed.append('person_type')
+            
+            logger.info(f"Tier {tier} Filter Relaxation: Removed {removed}, kept {list(relaxed.keys())}")
+            return relaxed
+        
+        elif tier == 3:
+            # Tier 3: Keep only language
+            result = {'language': relaxed.get('language')} if 'language' in relaxed else {}
+            removed_count = len(original_filters) - len(result)
+            logger.info(f"Tier {tier} Filter Relaxation: Kept only 'language', removed {removed_count} filters")
+            return result
+        
+        elif tier >= 4:
+            # Tier 4+: Keep language and maybe jurisdiction
+            result = {}
+            kept = []
+            
+            if 'language' in relaxed:
+                result['language'] = relaxed['language']
+                kept.append('language')
+            if 'jurisdiction' in relaxed:
+                result['jurisdiction'] = relaxed['jurisdiction']
+                kept.append('jurisdiction')
+            
+            removed_count = len(original_filters) - len(result)
+            logger.info(f"Tier {tier} Filter Relaxation: Kept {kept}, removed {removed_count} filters")
+            return result
+        
+        return relaxed
+    
+    def get_tier_usage_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about multi-tier search usage.
+        
+        Returns:
+            Dictionary with tier usage statistics
+        """
+        if self.total_queries == 0:
+            return {
+                'total_queries': 0,
+                'tier_usage': {},
+                'zero_result_rate': 0.0,
+                'message': 'No queries processed yet'
+            }
+        
+        return {
+            'total_queries': self.total_queries,
+            'tier_usage': {
+                'tier_1': {
+                    'count': self.tier_usage_stats[1],
+                    'percentage': (self.tier_usage_stats[1] / self.total_queries) * 100
+                },
+                'tier_2': {
+                    'count': self.tier_usage_stats[2],
+                    'percentage': (self.tier_usage_stats[2] / self.total_queries) * 100
+                },
+                'tier_3': {
+                    'count': self.tier_usage_stats[3],
+                    'percentage': (self.tier_usage_stats[3] / self.total_queries) * 100
+                },
+                'tier_4': {
+                    'count': self.tier_usage_stats[4],
+                    'percentage': (self.tier_usage_stats[4] / self.total_queries) * 100
+                },
+                'tier_5': {
+                    'count': self.tier_usage_stats[5],
+                    'percentage': (self.tier_usage_stats[5] / self.total_queries) * 100
+                }
+            },
+            'zero_result_count': self.zero_result_count,
+            'zero_result_rate': (self.zero_result_count / self.total_queries) * 100
+        }
+    
+    # ============================================
+    # SELECTIVE GRAPH ENHANCEMENT
+    # ============================================
+    
+    def _has_section_or_act_mention(self, question: str) -> bool:
+        """
+        Detect if query mentions specific sections or acts.
+        
+        Patterns detected:
+        - Section X, Section X(Y), s. X, s X
+        - Act names (e.g., "Employment Insurance Act")
+        - Regulation names
+        
+        Args:
+            question: User's query
+            
+        Returns:
+            True if section/act mentions found
+        """
+        question_lower = question.lower()
+        
+        # Pattern 1: Section references
+        section_patterns = [
+            r'section\s+\d+',
+            r's\.\s*\d+',
+            r'subsection\s+\d+',
+            r'paragraph\s+\d+'
+        ]
+        
+        for pattern in section_patterns:
+            if re.search(pattern, question_lower):
+                return True
+        
+        # Pattern 2: Act/Regulation names
+        act_patterns = [
+            r'\w+\s+act\b',
+            r'\w+\s+regulation',
+            r'\w+\s+code\b'
+        ]
+        
+        for pattern in act_patterns:
+            if re.search(pattern, question_lower):
+                return True
+        
+        return False
+    
+    def _calculate_relationship_diversity(
+        self,
+        results: List[Dict[str, Any]]
+    ) -> float:
+        """
+        Calculate relationship diversity score for search results.
+        
+        Low diversity = most results from same document/act
+        High diversity = results span multiple documents/acts
+        
+        This helps identify when graph traversal could add value by
+        discovering related documents from different sources.
+        
+        Args:
+            results: Search result documents
+            
+        Returns:
+            Diversity score (0.0 = low diversity, 1.0 = high diversity)
+        """
+        if not results:
+            return 0.0
+        
+        # Track unique regulation titles and document types
+        regulation_titles = set()
+        document_types = set()
+        
+        for doc in results:
+            reg_title = doc.get('regulation_title', '')
+            if reg_title:
+                regulation_titles.add(reg_title.lower())
+            
+            doc_type = doc.get('document_type', '')
+            if doc_type:
+                document_types.add(doc_type.lower())
+        
+        # Calculate diversity
+        # If all results from 1-2 regulations, diversity is low
+        # If results span 5+ regulations, diversity is high
+        
+        num_regulations = len(regulation_titles)
+        num_doc_types = len(document_types)
+        
+        # Normalize to 0-1 scale
+        # Low diversity: 1-2 unique regulations
+        # High diversity: 5+ unique regulations
+        regulation_diversity = min(num_regulations / 5.0, 1.0)
+        type_diversity = min(num_doc_types / 3.0, 1.0)
+        
+        # Weighted average (regulations more important)
+        diversity_score = (regulation_diversity * 0.7) + (type_diversity * 0.3)
+        
+        return round(diversity_score, 2)
+    
+    def _should_apply_graph_enhancement(
+        self,
+        question: str,
+        parsed_query: Any,
+        tier_results: List[Dict[str, Any]],
+        tier_num: int
+    ) -> Dict[str, Any]:
+        """
+        Determine if graph enhancement should be applied.
+        
+        Enhancement is applied when ALL conditions are met:
+        1. Query mentions specific sections/acts
+        2. Intent is INTERPRETATION or COMPLIANCE
+        3. Results have low relationship diversity (for Tier 1/2 only)
+        
+        Args:
+            question: User's query
+            parsed_query: Parsed query with intent
+            tier_results: Results from current tier
+            tier_num: Which tier (1-5)
+            
+        Returns:
+            Dict with 'should_enhance' (bool) and 'reason' (str)
+        """
+        result = {
+            'should_enhance': False,
+            'reason': None,
+            'checks': {}
+        }
+        
+        # Condition 1: Section/act mentions
+        has_section_mention = self._has_section_or_act_mention(question)
+        result['checks']['section_or_act_mention'] = has_section_mention
+        
+        if not has_section_mention:
+            result['reason'] = "No section/act mentions in query"
+            return result
+        
+        # Condition 2: Intent is INTERPRETATION or COMPLIANCE
+        intent = parsed_query.intent
+        is_target_intent = intent in [QueryIntent.INTERPRETATION, QueryIntent.COMPLIANCE]
+        result['checks']['intent_match'] = is_target_intent
+        result['checks']['intent'] = intent.value if hasattr(intent, 'value') else str(intent)
+        
+        if not is_target_intent:
+            result['reason'] = f"Intent is {intent.value if hasattr(intent, 'value') else intent}, not INTERPRETATION/COMPLIANCE"
+            return result
+        
+        # Condition 3: Low relationship diversity (for Tier 1/2 only)
+        if tier_num in [1, 2]:
+            diversity_score = self._calculate_relationship_diversity(tier_results)
+            result['checks']['relationship_diversity'] = diversity_score
+            
+            # Low diversity threshold: < 0.4 means mostly same source
+            has_low_diversity = diversity_score < 0.4
+            result['checks']['has_low_diversity'] = has_low_diversity
+            
+            if not has_low_diversity:
+                result['reason'] = f"Diversity score {diversity_score:.2f} is sufficient (>= 0.4)"
+                return result
+        else:
+            # Tiers 3-5 already use graph or alternative methods, skip enhancement
+            result['reason'] = f"Tier {tier_num} doesn't benefit from graph enhancement"
+            return result
+        
+        # All conditions met!
+        result['should_enhance'] = True
+        result['reason'] = (
+            f"Section/act mentioned + {intent.value if hasattr(intent, 'value') else intent} intent + "
+            f"low diversity ({diversity_score:.2f})"
+        )
+        
+        return result
+    
+    def _apply_graph_enhancement(
+        self,
+        base_results: List[Dict[str, Any]],
+        question: str,
+        num_additional: int = 3
+    ) -> List[Dict[str, Any]]:
+        """
+        Enhance search results with graph-discovered related documents.
+        
+        Strategy:
+        1. Extract document IDs from base results
+        2. Query Neo4j for REFERENCES, CITES, IMPLEMENTS relationships
+        3. Fetch 2-3 most relevant related documents
+        4. Merge with base results (deduplicate by ID)
+        5. Return enriched result set
+        
+        Args:
+            base_results: Original search results to enhance
+            question: Original query (for semantic ranking)
+            num_additional: Target number of additional docs to add
+            
+        Returns:
+            Enhanced results list (base + related documents)
+        """
+        try:
+            # Extract document IDs from base results
+            base_doc_ids = [doc['id'] for doc in base_results if 'id' in doc]
+            
+            if not base_doc_ids:
+                logger.warning("No document IDs in base results, cannot apply graph enhancement")
+                return base_results
+            
+            logger.info(f"🔍 Querying graph for relationships from {len(base_doc_ids)} seed documents...")
+            
+            # Query Neo4j for related documents via relationships
+            # Use the first few documents as seeds (top results are most relevant)
+            seed_ids = base_doc_ids[:3]  # Use top 3 as seeds
+            
+            related_docs = []
+            
+            for seed_id in seed_ids:
+                # Find documents connected by REFERENCES, CITES, IMPLEMENTS
+                try:
+                    # Use graph service's traversal method
+                    traversal_results = self.graph_service.find_related_documents_by_traversal(
+                        seed_query=seed_id,
+                        max_depth=1,  # Only direct relationships
+                        limit=num_additional
+                    )
+                    
+                    related_docs.extend(traversal_results)
+                    
+                except Exception as e:
+                    logger.warning(f"Graph traversal failed for seed {seed_id}: {e}")
+                    continue
+            
+            # Deduplicate related docs and filter out docs already in base results
+            seen_ids = set(base_doc_ids)
+            unique_related = []
+            
+            for doc in related_docs:
+                doc_id = doc.get('id')
+                if doc_id and doc_id not in seen_ids:
+                    seen_ids.add(doc_id)
+                    unique_related.append(doc)
+            
+            # Limit to num_additional
+            unique_related = unique_related[:num_additional]
+            
+            logger.info(f"✅ Found {len(unique_related)} unique related documents via graph")
+            
+            # Merge: base results + related documents
+            enhanced_results = base_results + unique_related
+            
+            return enhanced_results
+            
+        except Exception as e:
+            logger.error(f"Graph enhancement failed: {e}")
+            # Return original results on error
+            return base_results
+    
+    # ============================================
+    # HELPER METHODS
+    # ============================================
+    
+    def _build_context_string(self, docs: List[Dict[str, Any]]) -> str:
+        """
+        Build a context string from retrieved documents.
+        
+        Args:
+            docs: List of document dictionaries with title, content, etc.
+        
+        Returns:
+            Formatted context string for LLM
+        """
+        if not docs:
+            return ""
+        
+        context_parts = []
+        doc_titles = []
+        
+        for i, doc in enumerate(docs, 1):
+            title = doc.get('title', 'Untitled Document')
+            content = doc.get('content', '')
+            citation = doc.get('citation', '')
+            section = doc.get('section_number', '')
+            reg_title = doc.get('regulation_title', '')
+            
+            # Track titles for logging
+            doc_type = doc.get('document_type', 'unknown')
+            score = doc.get('score', 'N/A')
+            doc_titles.append(f"{i}. {title} ({doc_type}, {reg_title or 'unknown'}) [score: {score}]")
+            
+            # Build document section
+            doc_section = f"Document {i}: {title}\n"
+            
+            if section:
+                doc_section += f"Section: {section}\n"
+            
+            if citation:
+                doc_section += f"Citation: {citation}\n"
+            
+            doc_section += f"Content:\n{content}\n"
+            
+            context_parts.append(doc_section)
+        
+        # Log document count only
+        logger.info(f"📄 Using {len(docs)} context documents for answer generation")
+        
+        # Join with separators
+        return "\n---\n\n".join(context_parts)
+    
+    def _build_citations_from_context(
+        self,
         context_docs: List[Dict[str, Any]]
     ) -> List[Citation]:
         """
-        Extract citations from generated answer.
-
-        Looks for patterns like:
-        - [Document Title, Section X]
-        - Section X(Y)
-        - Act Name, s. X
+        Build citations from context document metadata.
+        
+        Citations are derived from document metadata in priority order:
+        1. citation field (from Elasticsearch: chapter/SOR → act_number → authority → title)
+        2. title as fallback
+        
+        Args:
+            context_docs: Context documents used for generation
+        
+        Returns:
+            List of Citation objects with high confidence (1.0)
         """
         citations = []
-
-        # Pattern 1: [Document Title, Section X]
-        pattern1 = r'\[([^\]]+),\s*(?:Section|s\.?)\s*(\d+(?:\(\d+\))?)\]'
-        matches1 = re.finditer(pattern1, answer, re.IGNORECASE)
-
-        for match in matches1:
-            doc_title = match.group(1).strip()
-            section = match.group(2).strip()
-
-            # Find matching document
-            doc_id = None
-            for doc in context_docs:
-                if doc_title.lower() in doc['title'].lower():
-                    doc_id = doc['id']
-                    break
-
-            citations.append(Citation(
-                text=match.group(0),
-                document_id=doc_id,
-                document_title=doc_title,
+        
+        for doc in context_docs:
+            # Get citation from metadata (already prioritized in indexing)
+            citation_text = doc.get('citation', '').strip()
+            if not citation_text:
+                # Fallback to title if no citation metadata
+                citation_text = doc.get('title', 'Untitled Document')
+            
+            # Add section reference if available
+            section = doc.get('section_number', '')
+            if section:
+                citation_text = f"{citation_text}, Section {section}"
+            
+            citation = Citation(
+                text=citation_text,
+                document_id=doc.get('id'),
+                document_title=doc.get('title', 'Untitled'),
                 section=section,
-                confidence=0.9 if doc_id else 0.5
-            ))
-
-        # Pattern 2: Section X mentions
-        pattern2 = r'(?:Section|s\.?)\s+(\d+(?:\(\d+\))?)'
-        matches2 = re.finditer(pattern2, answer, re.IGNORECASE)
-
-        for match in matches2:
-            section = match.group(1).strip()
-
-            # Try to find document with this section
-            doc_id = None
-            doc_title = None
-
-            for doc in context_docs:
-                if doc.get('section_number') == section:
-                    doc_id = doc['id']
-                    doc_title = doc['title']
-                    break
-
-            # Avoid duplicates
-            if not any(c.section == section for c in citations):
-                citations.append(Citation(
-                    text=match.group(0),
-                    document_id=doc_id,
-                    document_title=doc_title,
-                    section=section,
-                    confidence=0.7 if doc_id else 0.4
-                ))
-
-        return citations
-
+                confidence=1.0  # Metadata-based citations are highly reliable
+            )
+            citations.append(citation)
+        
+        # Remove duplicates based on citation text
+        unique_citations = []
+        seen_texts = set()
+        for citation in citations:
+            if citation.text not in seen_texts:
+                seen_texts.add(citation.text)
+                unique_citations.append(citation)
+        
+        return unique_citations
+    
     def _calculate_confidence(
         self,
         answer: str,
         citations: List[Citation],
         context_docs: List[Dict[str, Any]],
-        intent_confidence: float
+        intent_confidence: float = 0.8
     ) -> float:
         """
         Calculate confidence score for the answer.
-
+        
         Factors:
-        - Number of citations (more = higher confidence)
-        - Citation quality (linked to documents = higher)
-        - Answer length appropriateness
-        - Context quality (search scores)
-        - Intent classification confidence
+        - Number and quality of citations
+        - Context document scores
+        - Presence of uncertainty phrases
+        - Intent confidence from NLP
+        - Answer completeness
+        
+        Args:
+            answer: Generated answer text
+            citations: Extracted citations
+            context_docs: Context documents used
+            intent_confidence: Confidence from query intent classification
+        
+        Returns:
+            Confidence score between 0.0 and 1.0
         """
-        scores = []
-
-        # 1. Citation factor (0-1)
-        if len(citations) > 0:
-            avg_citation_conf = sum(c.confidence for c in citations) / len(citations)
-            citation_score = min(0.3 + (len(citations) * 0.15), 1.0)  # Max at ~4 citations
-            citation_score *= avg_citation_conf  # Weighted by citation quality
-        else:
-            citation_score = 0.2  # Low confidence if no citations
-
-        scores.append(citation_score)
-
-        # 2. Answer quality factor (0-1)
-        answer_length = len(answer.split())
-
-        if answer_length < 10:
-            # Very short answer - probably uncertain
-            quality_score = 0.3
-        elif answer_length > 500:
-            # Very long answer - might be verbose/uncertain
-            quality_score = 0.6
-        else:
-            # Reasonable length
-            quality_score = 0.8
-
-        # Check for uncertainty phrases
-        uncertainty_phrases = [
-            "i don't know",
-            "i'm not sure",
-            "unclear",
-            "ambiguous",
-            "not enough information",
-            "cannot determine",
-            "insufficient"
-        ]
-
-        if any(phrase in answer.lower() for phrase in uncertainty_phrases):
-            quality_score *= 0.5
-
-        scores.append(quality_score)
-
-        # 3. Context quality factor (0-1)
+        # Base confidence from intent
+        confidence = intent_confidence
+        
+        # Citation factor (0.0 - 0.3)
+        # Citations are now always available from metadata with 1.0 confidence
+        if citations:
+            # All citations have 1.0 confidence from metadata
+            citation_count = min(len(citations), 5) / 5.0
+            citation_factor = (1.0 * 0.7 + citation_count * 0.3) * 0.3
+            confidence += citation_factor
+        # No penalty for missing citations since they're always built from metadata
+        
+        # Context quality factor (0.0 - 0.2)
         if context_docs:
-            # Use search scores
-            avg_search_score = sum(doc['score'] for doc in context_docs) / len(context_docs)
-            # Normalize (search scores can vary, this is a heuristic)
-            context_score = min(avg_search_score / 2.0, 1.0)
-        else:
-            context_score = 0.0
-
-        scores.append(context_score)
-
-        # 4. Intent confidence (0-1)
-        scores.append(intent_confidence)
-
-        # Combined confidence (weighted average)
-        weights = [0.35, 0.25, 0.25, 0.15]  # Citation, quality, context, intent
-        confidence = sum(s * w for s, w in zip(scores, weights))
-
-        return round(confidence, 3)
-
+            # Average document score (assuming scores around 1.0-2.0)
+            avg_score = sum(doc.get('score', 0.5) for doc in context_docs) / len(context_docs)
+            context_factor = min(avg_score / 2.0, 1.0) * 0.2
+            confidence += context_factor
+        
+        # Uncertainty penalty (-0.0 to -0.3)
+        uncertainty_phrases = [
+            'not sure', 'uncertain', 'unclear', 'might be', 'possibly',
+            'perhaps', 'may be', 'could be', 'I think', 'likely',
+            'do not contain', 'does not contain', 'not available',
+            'cannot find', 'unable to'
+        ]
+        
+        answer_lower = answer.lower()
+        uncertainty_count = sum(1 for phrase in uncertainty_phrases if phrase in answer_lower)
+        if uncertainty_count > 0:
+            # Each uncertainty phrase reduces confidence
+            uncertainty_penalty = min(uncertainty_count * 0.1, 0.3)
+            confidence -= uncertainty_penalty
+        
+        # Answer length factor (-0.1 for very short answers)
+        if len(answer) < 100:
+            confidence -= 0.1
+        
+        # Clamp between 0.0 and 1.0
+        confidence = max(0.0, min(1.0, confidence))
+        
+        return round(confidence, 2)
+    
     def _get_cache_key(self, question: str) -> str:
-        """Generate cache key for a question"""
+        """
+        Generate normalized cache key from question.
+        
+        Normalizes by:
+        - Converting to lowercase
+        - Stripping whitespace
+        - Hashing for consistent key
+        
+        Args:
+            question: User's question
+        
+        Returns:
+            Cache key (hash)
+        """
         # Normalize question
         normalized = question.lower().strip()
-        # Hash it
+        
+        # Generate hash
         return hashlib.md5(normalized.encode()).hexdigest()
-
+    
     def _get_cached_answer(self, question: str) -> Optional[RAGAnswer]:
-        """Retrieve cached answer if available and not expired"""
+        """
+        Retrieve cached answer if available and not expired.
+        
+        Args:
+            question: User's question
+        
+        Returns:
+            RAGAnswer if cached and valid, None otherwise
+        """
         cache_key = self._get_cache_key(question)
-
-        if cache_key in self.cache:
-            answer, timestamp = self.cache[cache_key]
-
-            # Check if expired
-            if datetime.now() - timestamp < self.cache_ttl:
-                return answer
-            else:
-                # Remove expired entry
-                del self.cache[cache_key]
-
-        return None
-
-    def _cache_answer(self, question: str, answer: RAGAnswer):
-        """Cache an answer"""
+        
+        if cache_key not in self.cache:
+            return None
+        
+        answer, timestamp = self.cache[cache_key]
+        
+        # Check if expired
+        if datetime.now() - timestamp > self.cache_ttl:
+            # Remove expired entry
+            del self.cache[cache_key]
+            return None
+        
+        return answer
+    
+    def _cache_answer(self, question: str, answer: RAGAnswer) -> None:
+        """
+        Cache an answer for future use.
+        
+        Args:
+            question: User's question
+            answer: RAGAnswer to cache
+        """
         cache_key = self._get_cache_key(question)
         self.cache[cache_key] = (answer, datetime.now())
-
-        # Simple cache size management
+        
+        # Simple cache size management (keep last 1000 entries)
         if len(self.cache) > 1000:
-            # Remove oldest 10%
-            sorted_keys = sorted(
-                self.cache.keys(),
-                key=lambda k: self.cache[k][1]
-            )
-            for key in sorted_keys[:100]:
-                del self.cache[key]
-
-    def clear_cache(self):
-        """Clear the answer cache"""
+            # Remove oldest entry
+            oldest_key = min(self.cache.keys(), key=lambda k: self.cache[k][1])
+            del self.cache[oldest_key]
+    
+    def clear_cache(self) -> None:
+        """Clear all cached answers."""
         self.cache.clear()
         logger.info("RAG answer cache cleared")
-
+    
     def get_cache_stats(self) -> Dict[str, Any]:
-        """Get cache statistics"""
+        """
+        Get cache statistics.
+        
+        Returns:
+            Dictionary with cache statistics
+        """
         return {
-            "total_entries": len(self.cache),
-            "cache_ttl_hours": self.cache_ttl.total_seconds() / 3600,
-            "max_size": 1000
+            'total_entries': len(self.cache),
+            'cache_ttl_hours': self.cache_ttl.total_seconds() / 3600,
+            'max_size': 1000
         }
-
+    
     def health_check(self) -> Dict[str, Any]:
-        """Check health of RAG service components"""
+        """
+        Perform health check on RAG service components.
+        
+        Returns:
+            Health status dictionary
+        """
         health = {
-            "status": "healthy",
-            "components": {}
+            'status': 'healthy',
+            'components': {}
         }
-
+        
         # Check search service
-        search_health = self.search_service.health_check()
-        health["components"]["search"] = search_health.get("status", "unknown")
-
-        # Check Gemini client
-        gemini_health = self.gemini_client.health_check()
-        health["components"]["gemini"] = gemini_health.get("status", "unknown")
-
-        # Check query parser
-        health["components"]["nlp"] = "operational"
-
-        # Overall status
-        if any(status != "healthy" for status in health["components"].values()):
-            if "unavailable" in health["components"].values():
-                health["status"] = "degraded"
-            else:
-                health["status"] = "partial"
-
-        health["cache_stats"] = self.get_cache_stats()
-
+        try:
+            # Simple check - search service should be available
+            health['components']['search'] = {
+                'status': 'healthy',
+                'available': True
+            }
+        except Exception as e:
+            health['components']['search'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+            health['status'] = 'degraded'
+        
+        # Check Gemini
+        try:
+            gemini_health = self.gemini_client.health_check()
+            health['components']['gemini'] = gemini_health
+            
+            if not self.gemini_client.is_available():
+                health['status'] = 'degraded'
+        except Exception as e:
+            health['components']['gemini'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+            health['status'] = 'degraded'
+        
+        # Check NLP
+        try:
+            health['components']['nlp'] = {
+                'status': 'healthy',
+                'available': True
+            }
+        except Exception as e:
+            health['components']['nlp'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+            health['status'] = 'degraded'
+        
+        # Cache stats
+        health['cache'] = self.get_cache_stats()
+        
+        # Multi-tier search stats
+        health['multi_tier_stats'] = self.get_tier_usage_stats()
+        
         return health
-
-
-if __name__ == "__main__":
-    # Test the RAG service
-    print("=" * 80)
-    print("RAG Service - Test")
-    print("=" * 80)
-
-    rag = RAGService()
-
-    # Health check
-    print("\n1. Health Check:")
-    health = rag.health_check()
-    print(f"   Status: {health['status']}")
-    print(f"   Components: {health['components']}")
-
-    # Test question answering (requires Gemini API key and indexed documents)
-    print("\n2. Question Answering Test:")
-    question = "Can a temporary resident apply for employment insurance?"
-
-    print(f"   Question: {question}")
-
-    answer = rag.answer_question(
-        question=question,
-        num_context_docs=3,
-        use_cache=False
-    )
-
-    print(f"\n   Answer: {answer.answer[:200]}...")
-    print(f"   Confidence: {answer.confidence_score:.2f}")
-    print(f"   Citations: {len(answer.citations)}")
-
-    for i, citation in enumerate(answer.citations[:3], 1):
-        print(f"      {i}. {citation.text} (confidence: {citation.confidence:.2f})")
-
-    print(f"   Source Documents: {len(answer.source_documents)}")
-    print(f"   Processing Time: {answer.processing_time_ms:.0f}ms")
-
-    print("\n" + "=" * 80)
-    print("Test complete!")

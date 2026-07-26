@@ -13,6 +13,7 @@ Created: 2025-11-22
 
 import json
 import os
+import re
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 from pathlib import Path
@@ -25,6 +26,17 @@ from sentence_transformers import SentenceTransformer
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Common Canadian federal act patterns for exact matching
+# These patterns extract act names from queries like "Tell me about the Employment Insurance Act"
+ACT_NAME_PATTERNS = [
+    # Match "the X Act" where X is capitalized words
+    r'(?:the\s+)?([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*)\s+Act\b',
+    # Match "the X Code" 
+    r'(?:the\s+)?([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*)\s+Code\b',
+    # Match "the X Regulations"
+    r'(?:the\s+)?([A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*)\s+Regulations?\b',
+]
 
 
 class SearchService:
@@ -64,6 +76,77 @@ class SearchService:
             logger.info(f"Loading embedding model: {self.embedding_model_name}")
             self.embedder = SentenceTransformer(self.embedding_model_name)
         return self.embedder
+    
+    def _extract_act_names(self, query: str) -> List[str]:
+        """
+        Extract potential Act names from the query.
+        
+        Examples:
+            "Tell me about the Employment Insurance Act" -> ["Employment Insurance Act"]
+            "What does the Canada Pension Plan Act cover?" -> ["Canada Pension Plan Act"]
+            "Criminal Code of Canada" -> ["Criminal Code"]
+        
+        Returns:
+            List of extracted act names
+        """
+        act_names = []
+        
+        for pattern in ACT_NAME_PATTERNS:
+            # Don't use re.IGNORECASE - we want to match only properly capitalized act names
+            # This prevents matching "What does the Excise Tax Act" and instead matches just "Excise Tax Act"
+            matches = re.finditer(pattern, query)
+            for match in matches:
+                # Get the full match (including "Act", "Code", etc.)
+                act_name = match.group(0).strip()
+                # Remove optional "the " prefix if present
+                if act_name.lower().startswith('the '):
+                    act_name = act_name[4:]
+                if act_name and len(act_name) > 5:  # Filter out very short matches
+                    act_names.append(act_name)
+        
+        return list(set(act_names))  # Remove duplicates
+    
+    def _detect_query_intent(self, query: str) -> Dict[str, Any]:
+        """
+        Detect query intent to optimize search strategy.
+        
+        Returns:
+            Dict with intent information:
+                - type: "overview", "specific_question", "comparison", etc.
+                - act_names: List of detected act names
+                - wants_summary: Whether query asks for summary/overview
+                - prefers_acts: Whether to prioritize act-level documents
+        """
+        query_lower = query.lower()
+        
+        # Extract act names
+        act_names = self._extract_act_names(query)
+        
+        # Detect overview/summary requests (expanded to include coverage questions)
+        overview_keywords = ['about', 'overview', 'summary', 'summarize', 'explain', 'what is', 
+                            'tell me about', 'describe', 'introduce', 'what does', 'cover']
+        wants_summary = any(keyword in query_lower for keyword in overview_keywords)
+        
+        # Special case: "what does X cover?" is always an overview question
+        if 'cover' in query_lower and len(act_names) > 0:
+            wants_summary = True
+        
+        # Detect specific section/subsection questions
+        specific_keywords = ['how to', 'can i', 'am i eligible', 'what are the requirements',
+                           'section', 'subsection', 'paragraph', 'clause']
+        is_specific = any(keyword in query_lower for keyword in specific_keywords)
+        
+        # Determine if we should prefer act-level documents
+        # If act names are detected and NOT asking about specific sections, prefer act-level docs
+        prefers_acts = len(act_names) > 0 and not is_specific
+        
+        return {
+            'type': 'overview' if wants_summary else 'specific',
+            'act_names': act_names,
+            'wants_summary': wants_summary,
+            'is_specific': is_specific,
+            'prefers_acts': prefers_acts
+        }
 
     def create_index(self, force_recreate: bool = False) -> bool:
         """
@@ -197,7 +280,7 @@ class SearchService:
             return 0, doc_count
 
     def keyword_search(self, query: str, filters: Optional[Dict] = None,
-                      size: int = 10, from_: int = 0) -> Dict[str, Any]:
+                      size: int = 10, from_: int = 0, boost_sections: bool = False) -> Dict[str, Any]:
         """
         Perform keyword-based search using BM25.
 
@@ -206,39 +289,52 @@ class SearchService:
             filters: Filter criteria (jurisdiction, program, etc.)
             size: Number of results to return
             from_: Offset for pagination
+            boost_sections: If True, boost section documents over full acts
 
         Returns:
             Search results dictionary
         """
         try:
-            # Build query
-            must_clauses = [
-                {
-                    "multi_match": {
-                        "query": query,
-                        "fields": [
-                            "title^3",  # Boost title matches
-                            "content",
-                            "summary^2",
-                            "legislation_name^2"
-                        ],
-                        "type": "best_fields",
-                        "fuzziness": "AUTO"
-                    }
-                }
-            ]
-
-            # Add filters
+            # Build filter clauses
             filter_clauses = self._build_filters(filters)
+            
+            # For specific queries (not act overviews), ONLY search sections
+            if boost_sections:
+                logger.info("🎯 Filtering to ONLY sections for specific query (excluding full acts)")
+                filter_clauses.append({"term": {"document_type": "section"}})
+            
+            # Build multi_match query - use best_fields for more flexible matching
+            multi_match_query = {
+                "query": query,
+                "fields": [
+                    "title^1.5",  # Moderate title boost
+                    "content^2",   # Boost content heavily for specific queries
+                    "summary^1.5",
+                    "legislation_name^1.5"
+                ],
+                "type": "best_fields",
+                "operator": "or"
+            }
+            
+            # Only use fuzziness when NOT filtering to sections (fuzziness too strict for multi-term queries)
+            if not boost_sections:
+                multi_match_query["fuzziness"] = "AUTO"
+            else:
+                logger.info("🔍 Disabled fuzziness for section-only search")
+            
+            # Build base query
+            base_query = {
+                "bool": {
+                    "must": [{"multi_match": multi_match_query}],
+                    "filter": filter_clauses
+                }
+            }
+            
+            search_query = base_query
 
             # Construct query
             search_body = {
-                "query": {
-                    "bool": {
-                        "must": must_clauses,
-                        "filter": filter_clauses
-                    }
-                },
+                "query": search_query,
                 "size": size,
                 "from": from_,
                 "highlight": {
@@ -253,6 +349,9 @@ class SearchService:
                 }
             }
 
+            # Log the actual query for debugging
+            logger.debug(f"🔍 Keyword query: {json.dumps(search_body, indent=2)}")
+
             # Execute search
             response = self.es.search(index=self.INDEX_NAME, body=search_body)
 
@@ -263,7 +362,7 @@ class SearchService:
             return {"hits": [], "total": 0, "error": str(e)}
 
     def vector_search(self, query: str, filters: Optional[Dict] = None,
-                     size: int = 10, from_: int = 0) -> Dict[str, Any]:
+                     size: int = 10, from_: int = 0, boost_sections: bool = False) -> Dict[str, Any]:
         """
         Perform vector-based semantic search using embeddings.
 
@@ -272,6 +371,7 @@ class SearchService:
             filters: Filter criteria
             size: Number of results to return
             from_: Offset for pagination
+            boost_sections: If True, filter to ONLY sections (exclude full acts)
 
         Returns:
             Search results dictionary
@@ -283,6 +383,11 @@ class SearchService:
 
             # Add filters
             filter_clauses = self._build_filters(filters)
+            
+            # Filter to sections only if requested
+            if boost_sections:
+                logger.info("🎯 Vector search: Filtering to ONLY sections (excluding full acts)")
+                filter_clauses.append({"term": {"document_type": "section"}})
 
             # Construct kNN query for indexed dense vectors
             search_body = {
@@ -295,9 +400,16 @@ class SearchService:
                 "size": size
             }
 
-            # Add filters if present
+            # Add filters if present - kNN requires bool query wrapper
             if filter_clauses:
-                search_body["knn"]["filter"] = filter_clauses
+                search_body["knn"]["filter"] = {
+                    "bool": {
+                        "must": filter_clauses
+                    }
+                }
+
+            # Log the actual query for debugging
+            logger.debug(f"🔍 Vector query: {json.dumps(search_body, indent=2)}")
 
             # Execute search
             response = self.es.search(index=self.INDEX_NAME, body=search_body)
@@ -313,7 +425,7 @@ class SearchService:
                      keyword_weight: float = 0.5,
                      vector_weight: float = 0.5) -> Dict[str, Any]:
         """
-        Perform hybrid search combining keyword and vector search.
+        Perform intelligent hybrid search with query-aware boosting.
 
         Args:
             query: Search query text
@@ -327,9 +439,40 @@ class SearchService:
             Combined and re-ranked search results
         """
         try:
-            # Perform both searches
-            keyword_results = self.keyword_search(query, filters, size=size*2, from_=from_)
-            vector_results = self.vector_search(query, filters, size=size*2, from_=from_)
+            # Detect query intent for intelligent search optimization
+            intent = self._detect_query_intent(query)
+            
+            # Log intent detection for debugging
+            if intent['act_names']:
+                logger.info(f"Detected act names in query: {intent['act_names']}")
+            logger.info(f"Query intent: {intent['type']}, prefers_acts: {intent['prefers_acts']}")
+            
+            # Adjust weights based on query type
+            # For overview queries about specific acts, favor keyword matching (titles)
+            # For complex/specific questions, favor semantic understanding
+            if intent['wants_summary'] and intent['act_names']:
+                # Override weights for overview queries - heavily favor exact title matches
+                keyword_weight = 0.7
+                vector_weight = 0.3
+                logger.info(f"Adjusted weights for overview query: keyword={keyword_weight}, vector={vector_weight}")
+            
+            # Perform both searches with section boost for specific queries
+            boost_sections = not intent['prefers_acts']
+            keyword_results = self.keyword_search(query, filters, size=size*2, from_=from_, boost_sections=boost_sections)
+            vector_results = self.vector_search(query, filters, size=size*2, from_=from_, boost_sections=boost_sections)
+
+            # Log what document types we got from Elasticsearch
+            keyword_doc_types = {}
+            for hit in keyword_results.get('hits', []):
+                doc_type = hit.get('source', {}).get('document_type', 'unknown')
+                keyword_doc_types[doc_type] = keyword_doc_types.get(doc_type, 0) + 1
+            logger.info(f"🔍 Keyword search returned: {keyword_doc_types}")
+            
+            vector_doc_types = {}
+            for hit in vector_results.get('hits', []):
+                doc_type = hit.get('source', {}).get('document_type', 'unknown')
+                vector_doc_types[doc_type] = vector_doc_types.get(doc_type, 0) + 1
+            logger.info(f"🔍 Vector search returned: {vector_doc_types}")
 
             # Combine and re-rank results
             combined_scores = {}
@@ -340,7 +483,9 @@ class SearchService:
                 combined_scores[doc_id] = {
                     'document': hit,
                     'keyword_score': hit['score'] * keyword_weight,
-                    'vector_score': 0.0
+                    'vector_score': 0.0,
+                    'title_boost': 0.0,
+                    'doc_type_boost': 0.0
                 }
 
             # Add vector scores
@@ -352,16 +497,60 @@ class SearchService:
                     combined_scores[doc_id] = {
                         'document': hit,
                         'keyword_score': 0.0,
-                        'vector_score': hit['score'] * vector_weight
+                        'vector_score': hit['score'] * vector_weight,
+                        'title_boost': 0.0,
+                        'doc_type_boost': 0.0
                     }
 
-            # Calculate combined scores
+            # Apply intelligent boosting based on query intent
             for doc_id, scores in combined_scores.items():
-                scores['combined_score'] = scores['keyword_score'] + scores['vector_score']
+                doc_source = scores['document']['source']
+                doc_title = doc_source.get('title', '').lower()
+                legislation_name = doc_source.get('legislation_name', '').lower()
+                doc_type = doc_source.get('document_type', '')
+                
+                # BOOST 1: Exact act name matching (10x boost)
+                # If query mentions "Employment Insurance Act", heavily boost docs with that exact title
+                for act_name in intent['act_names']:
+                    act_name_lower = act_name.lower()
+                    if act_name_lower in doc_title or act_name_lower in legislation_name:
+                        scores['title_boost'] = 10.0
+                        logger.debug(f"Applied title boost to: {doc_title[:50]}...")
+                        break
+                
+                # BOOST 2: Document type preference based on query intent
+                # When asking "Tell me about X Act", prefer regulation/act-level docs over sections
+                if intent['prefers_acts']:
+                    # Boost act-level documents (regulation, legislation, act overview)
+                    if doc_type in ['regulation', 'legislation', 'act'] or 'act' in doc_title:
+                        # Check if it's NOT a section (sections usually have "section X" in title)
+                        if not re.search(r'section\s+\d+', doc_title, re.IGNORECASE):
+                            scores['doc_type_boost'] = 5.0
+                            logger.debug(f"Applied act-level doc boost to: {doc_title[:50]}...")
+                else:
+                    # For specific queries (not overview), prefer sections over full acts
+                    if doc_type == 'section':
+                        scores['doc_type_boost'] = 8.0
+                        logger.debug(f"Applied section boost to: {doc_title[:50]}...")
+                    elif doc_type in ['regulation', 'legislation', 'act']:
+                        # Penalize full acts on specific queries
+                        scores['doc_type_boost'] = -3.0
+                        logger.debug(f"Applied act penalty to: {doc_title[:50]}...")
+                
+                # Calculate final combined score with boosts
+                scores['combined_score'] = (
+                    scores['keyword_score'] + 
+                    scores['vector_score'] + 
+                    scores['title_boost'] + 
+                    scores['doc_type_boost']
+                )
+                
                 scores['document']['score'] = scores['combined_score']
                 scores['document']['score_breakdown'] = {
                     'keyword': scores['keyword_score'],
                     'vector': scores['vector_score'],
+                    'title_boost': scores['title_boost'],
+                    'doc_type_boost': scores['doc_type_boost'],
                     'combined': scores['combined_score']
                 }
 
@@ -378,16 +567,101 @@ class SearchService:
             return {
                 "hits": final_hits,
                 "total": len(final_hits),
-                "search_type": "hybrid",
+                "search_type": "hybrid_intelligent",
+                "intent": intent,
                 "weights": {
                     "keyword": keyword_weight,
                     "vector": vector_weight
+                },
+                "boosts_applied": {
+                    "title_boost": "10x for exact act name matches",
+                    "doc_type_boost": "5x for act-level documents on overview queries"
                 }
             }
 
         except Exception as e:
             logger.error(f"Hybrid search failed: {e}")
             return {"hits": [], "total": 0, "error": str(e)}
+
+    def relaxed_search(self, query: str, filters: Optional[Dict] = None,
+                      size: int = 20, language_only: bool = True,
+                      use_synonym_expansion: bool = True) -> Dict[str, Any]:
+        """
+        Perform relaxed search with minimal filters and query expansion.
+        
+        This is Tier 2 search in the multi-tier RAG system. Used when
+        standard search fails to find enough results.
+        
+        Features:
+        - Query expansion using legal term synonyms
+        - Minimal filtering (language only by default)
+        - Higher result count (default 20)
+        - More lenient matching
+        
+        Args:
+            query: Search query text
+            filters: Filter criteria (only language filter applied by default)
+            size: Number of results to return (default: 20)
+            language_only: If True, only apply language filter (default: True)
+            use_synonym_expansion: If True, expand query with synonyms (default: True)
+        
+        Returns:
+            Search results dictionary
+        """
+        try:
+            # Import synonym expansion function
+            from backend.config.legal_synonyms import expand_query_with_synonyms
+            
+            # Expand query with synonyms if requested
+            expanded_query = query
+            if use_synonym_expansion:
+                expanded_query = expand_query_with_synonyms(query, max_expansions=3)
+                logger.info(f"Query expansion: '{query[:50]}' → '{expanded_query[:100]}'")
+            
+            # Build minimal filters
+            relaxed_filters = {}
+            
+            if language_only and filters and 'language' in filters:
+                # Only keep language filter
+                relaxed_filters['language'] = filters['language']
+                logger.info(f"Applying language-only filter: {filters['language']}")
+            elif not language_only and filters:
+                # Use provided filters
+                relaxed_filters = filters
+            
+            # Perform hybrid search with expanded query and relaxed filters
+            # Use lower keyword weight to favor semantic understanding
+            results = self.hybrid_search(
+                query=expanded_query,
+                filters=relaxed_filters,
+                size=size,
+                from_=0,
+                keyword_weight=0.4,  # Favor semantic search
+                vector_weight=0.6
+            )
+            
+            # Add metadata to indicate this was a relaxed search
+            results['search_type'] = 'relaxed_hybrid'
+            results['relaxed_search_metadata'] = {
+                'original_query': query,
+                'expanded_query': expanded_query,
+                'synonym_expansion_used': use_synonym_expansion,
+                'language_only_filter': language_only,
+                'filters_applied': relaxed_filters
+            }
+            
+            logger.info(f"Relaxed search returned {results['total']} results")
+            
+            return results
+            
+        except Exception as e:
+            logger.error(f"Relaxed search failed: {e}")
+            return {
+                "hits": [],
+                "total": 0,
+                "error": str(e),
+                "search_type": "relaxed_hybrid"
+            }
 
     def _build_filters(self, filters: Optional[Dict]) -> List[Dict]:
         """Build Elasticsearch filter clauses from filter dictionary"""
@@ -400,14 +674,21 @@ class SearchService:
         if 'jurisdiction' in filters:
             filter_clauses.append({"term": {"jurisdiction": filters['jurisdiction']}})
 
-        # Program filter
+        # Program filter (supports both 'program' and 'programs' for backwards compatibility)
         if 'program' in filters:
             programs = filters['program'] if isinstance(filters['program'], list) else [filters['program']]
-            filter_clauses.append({"terms": {"program": programs}})
+            filter_clauses.append({"terms": {"programs": programs}})
+        elif 'programs' in filters:
+            programs = filters['programs'] if isinstance(filters['programs'], list) else [filters['programs']]
+            filter_clauses.append({"terms": {"programs": programs}})
 
         # Document type filter
         if 'document_type' in filters:
             filter_clauses.append({"term": {"document_type": filters['document_type']}})
+
+        # Node type filter (Legislation vs Regulation)
+        if 'node_type' in filters:
+            filter_clauses.append({"term": {"node_type": filters['node_type']}})
 
         # Person type filter
         if 'person_type' in filters:
@@ -431,6 +712,10 @@ class SearchService:
         if 'tags' in filters:
             tags = filters['tags'] if isinstance(filters['tags'], list) else [filters['tags']]
             filter_clauses.append({"terms": {"tags": tags}})
+
+        # Language filter
+        if 'language' in filters:
+            filter_clauses.append({"term": {"language": filters['language']}})
 
         return filter_clauses
 
@@ -619,8 +904,21 @@ if __name__ == "__main__":
     for i, hit in enumerate(results['hits'][:3], 1):
         print(f"   {i}. {hit['source']['title']} (score: {hit['score']:.2f})")
 
+    # Test relaxed search
+    print("\n6. Relaxed Search Test:")
+    query = "temporary resident benefits"
+    results = search.relaxed_search(query, size=3, language_only=False)
+    print(f"   Query: '{query}'")
+    print(f"   Search Type: {results.get('search_type')}")
+    if 'relaxed_search_metadata' in results:
+        metadata = results['relaxed_search_metadata']
+        print(f"   Expanded Query: {metadata.get('expanded_query', '')[:80]}...")
+    print(f"   Results: {results['total']}")
+    for i, hit in enumerate(results['hits'][:3], 1):
+        print(f"   {i}. {hit['source']['title']} (score: {hit['score']:.2f})")
+
     # Test hybrid search
-    print("\n6. Hybrid Search Test:")
+    print("\n7. Hybrid Search Test:")
     query = "benefits for temporary residents"
     results = search.hybrid_search(query, size=3)
     print(f"   Query: '{query}'")
@@ -633,7 +931,7 @@ if __name__ == "__main__":
               f"Combined: {breakdown.get('combined', 0):.3f}")
 
     # Test with filters
-    print("\n7. Filtered Search Test:")
+    print("\n8. Filtered Search Test:")
     query = "benefits"
     filters = {'jurisdiction': 'federal', 'program': 'employment_insurance'}
     results = search.keyword_search(query, filters=filters, size=3)

@@ -1,0 +1,47 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="doc" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#1e40af"/>
+            <stop offset="50%" style="stop-color:#3b82f6"/>
+            <stop offset="100%" style="stop-color:#1e40af"/>
+        </linearGradient>
+    </defs>
+    <circle cx="64" cy="64" r="60" fill="url(#doc)"/>
+    
+    <!-- Open book/document -->
+    <path d="M 25 40 L 25 95 L 64 90 L 103 95 L 103 40 Z" fill="white"/>
+    <line x1="64" y1="40" x2="64" y2="90" stroke="#cbd5e0" stroke-width="2"/>
+    
+    <!-- Left page - simplified world map -->
+    <ellipse cx="45" cy="60" rx="12" ry="18" fill="#93c5fd" opacity="0.3"/>
+    <path d="M 35 55 Q 40 50 45 52 Q 48 54 52 52 Q 55 50 55 55" fill="#3b82f6" opacity="0.6"/>
+    <path d="M 33 65 Q 38 62 43 64 Q 46 65 50 63 Q 53 62 57 65" fill="#3b82f6" opacity="0.6"/>
+    <circle cx="38" cy="58" r="2" fill="#1e40af"/>
+    <circle cx="48" cy="60" r="2" fill="#1e40af"/>
+    <circle cx="42" cy="68" r="2" fill="#1e40af"/>
+    
+    <!-- Right page - legal text lines -->
+    <line x1="70" y1="50" x2="95" y2="50" stroke="#1e40af" stroke-width="2" opacity="0.7"/>
+    <line x1="70" y1="58" x2="95" y2="58" stroke="#1e40af" stroke-width="2" opacity="0.5"/>
+    <line x1="70" y1="66" x2="92" y2="66" stroke="#1e40af" stroke-width="2" opacity="0.5"/>
+    <line x1="70" y1="74" x2="95" y2="74" stroke="#1e40af" stroke-width="2" opacity="0.5"/>
+    <line x1="70" y1="82" x2="88" y2="82" stroke="#1e40af" stroke-width="2" opacity="0.5"/>
+    
+    <!-- Legal seal/stamp -->
+    <circle cx="82" cy="75" r="8" fill="none" stroke="#dc2626" stroke-width="2" opacity="0.7"/>
+    <text x="82" y="79" font-family="serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#dc2626" opacity="0.7">G7</text>
+    
+    <!-- AI tech indicators -->
+    <circle cx="64" cy="25" r="6" fill="#4fd1c5" opacity="0.4"/>
+    <circle cx="64" cy="25" r="4" fill="none" stroke="#4fd1c5" stroke-width="1.5"/>
+    <line x1="60" y1="28" x2="55" y2="35" stroke="#4fd1c5" stroke-width="1.5"/>
+    <line x1="68" y1="28" x2="73" y2="35" stroke="#4fd1c5" stroke-width="1.5"/>
+    <circle cx="55" cy="35" r="2" fill="#4fd1c5"/>
+    <circle cx="73" cy="35" r="2" fill="#4fd1c5"/>
+    
+    <!-- Bottom tech connection -->
+    <line x1="30" y1="100" x2="98" y2="100" stroke="#4fd1c5" stroke-width="2" opacity="0.5"/>
+    <circle cx="40" cy="100" r="2" fill="#4fd1c5"/>
+    <circle cx="64" cy="100" r="2" fill="#4fd1c5"/>
+    <circle cx="88" cy="100" r="2" fill="#4fd1c5"/>
+</svg>

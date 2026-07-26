@@ -1,4 +1,21 @@
 services:
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: regulatory-frontend
+    environment:
+      VITE_API_URL: http://backend:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+
   # Backend API
   backend:
     build:
@@ -17,6 +34,7 @@ services:
       NEO4J_PASSWORD: password123
       ELASTICSEARCH_URL: http://elasticsearch:9200
       REDIS_URL: redis://redis:6379
+      OLLAMA_HOST: http://ollama:11434
       CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://frontend:5173
       APP_ENV: development
       DEBUG: "True"
@@ -34,6 +52,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      ollama:
+        condition: service_started
     restart: unless-stopped
 
   # PostgreSQL Database
@@ -125,6 +145,27 @@ services:
       timeout: 5s
       retries: 5
 
+  # Ollama
+  # Model Selection:
+  # - llama3.2:3b (Default) - 3B parameters, fast, good for testing
+  # - llama3.2:7b - 7B parameters, better quality, slower
+  # - mistral:7b - Alternative 7B model
+  ollama:
+    image: ollama/ollama:latest
+    container_name: regulatory-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./backend/scripts/entrypoint_ollama.sh:/entrypoint_ollama.sh:ro
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+    entrypoint: ["/entrypoint_ollama.sh"]
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   neo4j_data:
@@ -132,3 +173,5 @@ volumes:
   neo4j_import:
   elasticsearch_data:
   redis_data:
+  ollama_data:
+    driver: local

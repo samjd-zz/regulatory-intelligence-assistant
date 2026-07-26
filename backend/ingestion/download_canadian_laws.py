@@ -152,12 +152,18 @@ PRIORITY_ACTS = [
 
 class CanadianLawDownloader:
     """
-    Downloader for Canadian Federal Acts from Open Canada.
+    Downloader for Canadian Federal Acts and Regulations from Open Canada.
     
     Note: The actual XML files are not available via direct API.
     This is a mock implementation that will:
     1. Create sample XML files for testing
     2. Document how to obtain real data
+    
+    Directory Structure:
+    - output_dir/en/     -> Acts (Statutes)
+    - output_dir/en-regs/ -> Regulations (SOR documents)
+    - output_dir/fr/     -> French Acts
+    - output_dir/fr-regs/ -> French Regulations
     """
     
     def __init__(self, output_dir: str = "data/regulations/canadian_laws"):
@@ -168,9 +174,17 @@ class CanadianLawDownloader:
             output_dir: Directory to save downloaded files
         """
         self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.acts_dir_en = self.output_dir / "en"
+        self.acts_dir_fr = self.output_dir / "fr"
+        self.regs_dir_en = self.output_dir / "en-regs"
+        self.regs_dir_fr = self.output_dir / "fr-regs"
         
-        logger.info(f"Download directory: {self.output_dir}")
+        # Create all directories
+        for dir_path in [self.acts_dir_en, self.acts_dir_fr, self.regs_dir_en, self.regs_dir_fr]:
+            dir_path.mkdir(parents=True, exist_ok=True)
+        
+        logger.info(f"Acts directory (EN): {self.acts_dir_en}")
+        logger.info(f"Regulations directory (EN): {self.regs_dir_en}")
     
     def create_sample_xml(self, title: str, chapter: str, filename: str) -> Path:
         """
@@ -288,16 +302,21 @@ OBTAINING REAL CANADIAN LAW XML DATA
 
 OPTION 1: Download from Open Canada Portal
 -------------------------------------------
+ACTS (Primary Legislation):
 1. Visit: https://open.canada.ca/data/en/dataset/1f0aae37-18e4-4bad-bbca-59a4094e44fa
 
-2. Download the complete XML dataset:
-   - File: "Consolidated Federal Acts and Regulations (XML)"
+2. Download: "Consolidated Federal Acts (XML)"
    - Size: ~50 MB compressed
-   - Format: ZIP archive containing XML files
+   - Extract to: data/regulations/canadian_laws/en/ (English)
+   - Extract to: data/regulations/canadian_laws/fr/ (French)
 
-3. Extract to: data/regulations/canadian_laws/
+REGULATIONS (Secondary Legislation - SOR/DORS):
+1. Visit: https://laws-lois.justice.gc.ca/eng/regulations/
+2. Download bulk regulation XML files or use sitemap
+3. Extract to: data/regulations/canadian_laws/en-regs/ (English)
+4. Extract to: data/regulations/canadian_laws/fr-regs/ (French)
 
-4. Run ingestion pipeline
+5. Run ingestion pipeline for both Acts and Regulations
 
 OPTION 2: Justice Laws Website (Individual Acts)
 -------------------------------------------------

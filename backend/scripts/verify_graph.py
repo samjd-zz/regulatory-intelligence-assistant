@@ -5,12 +5,12 @@ Run this to check the health and contents of the knowledge graph.
 import sys
 from pathlib import Path
 
-# Add project root to Python path
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+# Add backend directory to Python path for Docker environment
+backend_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_dir))
 
-from backend.utils.neo4j_client import get_neo4j_client
-from backend.services.graph_service import get_graph_service
+from utils.neo4j_client import get_neo4j_client
+from services.graph_service import get_graph_service
 import logging
 
 logging.basicConfig(level=logging.INFO)

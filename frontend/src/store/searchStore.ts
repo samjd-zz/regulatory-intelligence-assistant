@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { SearchResult, FilterState, SearchResponse } from '@/types'
 import { searchRegulations } from '@/services/api'
+// import { useLanguageStore } from './languageStore' // Disabled until language field is populated in documents
 
 interface SearchState {
   query: string
@@ -49,6 +50,10 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     set({ loading: true, error: null, query })
 
     try {
+      // Note: Language filtering disabled until documents have language field populated
+      // const currentLanguage = useLanguageStore.getState().language
+      // const filters = { ...get().filters, language: currentLanguage }
+      
       const response: SearchResponse = await searchRegulations({
         query,
         filters: get().filters,

@@ -2,45 +2,60 @@
 
 ## Overview
 
-The Regulatory Intelligence Assistant uses a Neo4j knowledge graph to model complex relationships between legislation, regulations, policies, programs, and applicable situations. This graph-based approach enables powerful traversal queries and relationship discovery.
+The Regulatory Intelligence Assistant uses a Neo4j knowledge graph to model regulatory documents and their relationships. **Note: The current implementation uses a simplified schema focused on `Regulation` and `Section` nodes with basic relationships.**
+
+## Current Implementation Status
+
+### ✅ Active (Production)
+- **Nodes:** `Regulation` (1,827), `Section` (277,031)
+- **Relationships:** `HAS_SECTION` (277,027), `PART_OF` (164,722), `REFERENCES` (28,604)
+- **Indexes:** 3 fulltext indexes, 16 range indexes
+- **Total:** 278,858 nodes, 470,353 relationships
+
+### ⚠️ Planned (Code Exists, Not Populated)
+- **Nodes:** `Program`, `Situation`, separate `Legislation`/`Policy` types
+- **Relationships:** `IMPLEMENTS`, `INTERPRETS`, `SUPERSEDES`, `APPLIES_TO`, `RELEVANT_FOR`
 
 ## Graph Schema
 
 ### Node Types
 
-#### 1. Legislation
-Primary legislative documents such as Acts and Statutes.
+#### 1. Regulation
+All regulatory documents (legislation, acts, regulations, policies) are stored as `Regulation` nodes.
 
 **Properties:**
 - `id` (String, UUID): Unique identifier
-- `title` (String): Full title of the legislation
-- `act_number` (String): Official act number (e.g., "S.C. 1996, c. 23")
-- `jurisdiction` (String): Jurisdiction level (federal, provincial, municipal)
-- `authority` (String): Issuing authority (e.g., "Parliament of Canada")
-- `effective_date` (Date): Date when legislation became effective
+- `title` (String): Full title of the regulation
+- `jurisdiction` (String): Jurisdiction (federal, provincial, municipal)
+- `authority` (String): Issuing authority
+- `language` (String): Language code (en, fr)
+- `effective_date` (Date): Date when regulation became effective
 - `status` (String): Current status (active, amended, repealed)
-- `full_text` (String): Complete text of the legislation
-- `metadata` (JSON String): Additional metadata
+- `full_text` (String): Complete text of the regulation
+- `content_hash` (String): Hash for deduplication
+- `extra_metadata` (JSON String): Additional metadata
 - `created_at` (DateTime): Node creation timestamp
 
 **Indexes:**
 - Unique constraint on `id`
 - Index on `title`
 - Index on `jurisdiction`
-- Index on `effective_date`
-- Index on `status`
+- Index on `authority`
 - Full-text search index on `title` and `full_text`
 
+**Database Table:** `regulations` (PostgreSQL)
+
 #### 2. Section
-Individual sections and subsections within legislation.
+Individual sections within regulations.
 
 **Properties:**
 - `id` (String, UUID): Unique identifier
 - `section_number` (String): Section designation (e.g., "7(1)(a)")
 - `title` (String): Section title/heading
 - `content` (String): Full text of the section
-- `level` (Integer): Nesting level (0 for top-level sections)
-- `metadata` (JSON String): Additional metadata
+- `citation` (String): Human-readable reference (e.g., "PIPEDA Section 4.3")
+- `level` (Integer): Nesting level (currently always 0)
+- `extra_metadata` (JSON String): Additional metadata
 - `created_at` (DateTime): Node creation timestamp
 
 **Indexes:**
@@ -49,74 +64,7 @@ Individual sections and subsections within legislation.
 - Index on `title`
 - Full-text search index on `title` and `content`
 
-#### 3. Regulation
-Regulatory provisions and administrative rules.
-
-**Properties:**
-- `id` (String, UUID): Unique identifier
-- `title` (String): Regulation title
-- `authority` (String): Regulatory authority
-- `effective_date` (Date): Date of effect
-- `status` (String): Current status
-- `full_text` (String): Complete regulation text
-- `metadata` (JSON String): Additional metadata (e.g., regulation number)
-- `created_at` (DateTime): Node creation timestamp
-
-**Indexes:**
-- Unique constraint on `id`
-- Index on `title`
-- Index on `authority`
-- Full-text search index on `title` and `full_text`
-
-#### 4. Policy
-Government policies and operational guidelines.
-
-**Properties:**
-- `id` (String, UUID): Unique identifier
-- `title` (String): Policy title
-- `department` (String): Responsible department
-- `version` (String): Policy version number
-- `effective_date` (Date): Date of effect
-- `metadata` (JSON String): Additional metadata
-- `created_at` (DateTime): Node creation timestamp
-
-**Indexes:**
-- Unique constraint on `id`
-- Index on `title`
-- Index on `department`
-
-#### 5. Program
-Government programs and public services.
-
-**Properties:**
-- `id` (String, UUID): Unique identifier
-- `name` (String): Program name
-- `department` (String): Administering department
-- `description` (String): Program description
-- `eligibility_criteria` (List[String]): Eligibility requirements
-- `metadata` (JSON String): Additional metadata
-- `created_at` (DateTime): Node creation timestamp
-
-**Indexes:**
-- Unique constraint on `id`
-- Index on `name`
-- Index on `department`
-
-#### 6. Situation
-Real-world scenarios and use cases.
-
-**Properties:**
-- `id` (String, UUID): Unique identifier
-- `description` (String): Situation description
-- `tags` (List[String]): Categorization tags
-- `metadata` (JSON String): Additional metadata
-- `created_at` (DateTime): Node creation timestamp
-
-**Indexes:**
-- Unique constraint on `id`
-- Index on `description`
-
-### Relationship Types
+**Database Table:** `sections` (PostgreSQL)
 
 #### 1. HAS_SECTION
 Links legislation to its constituent sections.

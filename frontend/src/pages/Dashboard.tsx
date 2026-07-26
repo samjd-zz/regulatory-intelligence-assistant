@@ -1,7 +1,9 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 export function Dashboard() {
 	const navigate = useNavigate();
+	const { t } = useTranslation();
 
 	return (
 		<div className="flex flex-col h-full animate-fade-in">
@@ -25,7 +27,7 @@ export function Dashboard() {
 							/>
 						</svg>
 						<span className="text-xs font-medium text-blue-600 dark:text-blue-300">
-							60-75% Time Savings
+							{t('dashboard.timeSavings')}
 						</span>
 					</div>
 
@@ -46,7 +48,7 @@ export function Dashboard() {
 							/>
 						</svg>
 						<span className="text-xs font-medium text-violet-600 dark:text-violet-300">
-							JSON API
+							{t('dashboard.jsonApi')}
 						</span>
 					</div>
 
@@ -67,7 +69,7 @@ export function Dashboard() {
 							/>
 						</svg>
 						<span className="text-xs font-medium text-amber-600 dark:text-amber-300">
-							Explainable AI
+							{t('dashboard.explainableAi')}
 						</span>
 					</div>
 
@@ -88,7 +90,7 @@ export function Dashboard() {
 							/>
 						</svg>
 						<span className="text-xs font-medium text-emerald-600 dark:text-emerald-300">
-							Production-Ready
+							{t('dashboard.productionReady')}
 						</span>
 					</div>
 
@@ -109,7 +111,7 @@ export function Dashboard() {
 							/>
 						</svg>
 						<span className="text-xs font-medium text-rose-600 dark:text-rose-300">
-							WCAG 2.1 AA
+							{t('dashboard.wcagCompliance')}
 						</span>
 					</div>
 
@@ -130,7 +132,7 @@ export function Dashboard() {
 							/>
 						</svg>
 						<span className="text-xs font-medium text-cyan-600 dark:text-cyan-300">
-							4.5/5 Satisfaction
+							{t('dashboard.satisfaction')}
 						</span>
 					</div>
 				</div>
@@ -141,7 +143,7 @@ export function Dashboard() {
 				<div className="col-span-12 lg:col-span-5 flex flex-col lg:pr-16 lg:border-r border-slate-100 dark:border-zinc-800">
 					<div className="mb-auto">
 						<p className="label-kpi animate-slide-up text-lg mb-4">
-							Total Regulations Indexed
+							{t('dashboard.totalRegulationsIndexed')}
 						</p>
 						<div className="flex items-baseline gap-4 mb-8 overflow-hidden">
 							<span className="text-7xl md:text-9xl value-kpi text-slate-900 dark:text-zinc-50 transition-all hover:text-teal-600 dark:hover:text-teal-400 duration-150 origin-left cursor-default animate-slide-up delay-100">
@@ -150,10 +152,10 @@ export function Dashboard() {
 						</div>
 						<div className="flex items-center gap-3 mb-8 animate-slide-up delay-200">
 							<span className="bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 text-[11px] font-bold px-2 py-1 uppercase tracking-wide animate-pulse">
-								Sync Active
+								{t('dashboard.syncActive')}
 							</span>
 							<span className="text-xs text-teal-600 dark:text-teal-400 font-medium">
-								+12 This Week
+								{t('dashboard.thisWeek')}
 							</span>
 						</div>
 
@@ -178,7 +180,7 @@ export function Dashboard() {
 								</div>
 								<div className="flex-1">
 									<h4 className="text-sm font-semibold text-slate-900 dark:text-zinc-100 mb-1">
-										Responsible AI
+										{t('dashboard.responsibleAi')}
 									</h4>
 									<ul className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed space-y-1">
 										<li className="flex items-center gap-1.5">
@@ -196,7 +198,7 @@ export function Dashboard() {
 													d="M5 13l4 4L19 7"
 												/>
 											</svg>
-											Bias-free algorithms
+											{t('dashboard.biasFreeAlgorithms')}
 										</li>
 										<li className="flex items-center gap-1.5">
 											<svg
@@ -213,7 +215,7 @@ export function Dashboard() {
 													d="M5 13l4 4L19 7"
 												/>
 											</svg>
-											Human oversight enabled
+											{t('dashboard.humanOversight')}
 										</li>
 										<li className="flex items-center gap-1.5">
 											<svg
@@ -230,7 +232,7 @@ export function Dashboard() {
 													d="M5 13l4 4L19 7"
 												/>
 											</svg>
-											Privacy compliant (PIPEDA)
+											{t('dashboard.privacyCompliant')}
 										</li>
 									</ul>
 								</div>
@@ -239,7 +241,7 @@ export function Dashboard() {
 
 						{/* Query Volume Chart - */}
 						<div className="mt-8 animate-slide-up delay-400">
-							<p className="label-kpi mb-8">Query Volume (6 Month Trend)</p>
+							<p className="label-kpi mb-8">{t('dashboard.queryVolume')}</p>
 							<div className="w-full h-48 flex items-end justify-between gap-6 max-w-2xl">
 								<div
 									className="w-full bg-slate-100 dark:bg-zinc-800 h-[30%] chart-bar"
@@ -279,36 +281,36 @@ export function Dashboard() {
 					{/* Top Row: Enhanced Metrics with Explainability */}
 					<div className="grid grid-cols-2 gap-12 md:gap-24">
 						<div className="animate-slide-up delay-200">
-							<p className="label-kpi mb-2">Search Accuracy</p>
+							<p className="label-kpi mb-2">{t('dashboard.searchAccuracy')}</p>
 							<div className="flex items-baseline gap-2 group">
 								<span className="text-5xl md:text-6xl value-kpi text-slate-800 dark:text-zinc-200 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
 									95.2%
 								</span>
 								<span className="text-sm text-slate-400 dark:text-zinc-400">
-									verified
+									{t('dashboard.verified')}
 								</span>
 							</div>
 							<div className="mt-2 flex items-center gap-2">
 								<span className="text-[10px] bg-teal-50 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400 px-2 py-0.5 font-medium">
-									High Confidence
+									{t('dashboard.highConfidence')}
 								</span>
 								<button
 									type="button"
 									className="text-[10px] text-slate-400 dark:text-zinc-500 hover:text-teal-600 dark:hover:text-teal-400 hover:underline transition-colors"
 									title="Based on: source quality, recency, relevance, expert validation"
 								>
-									Why?
+									{t('dashboard.why')}
 								</button>
 							</div>
 						</div>
 						<div className="animate-slide-up delay-300">
-							<p className="label-kpi mb-2">Avg Response Time</p>
+							<p className="label-kpi mb-2">{t('dashboard.avgResponseTime')}</p>
 							<div className="flex items-baseline gap-2 group">
 								<span className="text-5xl md:text-6xl value-kpi text-slate-800 dark:text-zinc-200 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
 									0.8s
 								</span>
 								<span className="text-sm text-slate-400 dark:text-zinc-400">
-									latency
+									{t('dashboard.latency')}
 								</span>
 							</div>
 							<div className="mt-2 flex items-center gap-1">
@@ -327,7 +329,7 @@ export function Dashboard() {
 									/>
 								</svg>
 								<span className="text-[10px] text-teal-600 dark:text-teal-400 font-medium">
-									{"<3s for 95% of queries"}
+									{t('dashboard.fastQueries')}
 								</span>
 							</div>
 						</div>
@@ -353,7 +355,7 @@ export function Dashboard() {
 								</svg>
 							</div>
 							<h3 className="text-base font-medium text-slate-900 dark:text-zinc-100">
-								Architecture
+								{t('dashboard.architecture')}
 							</h3>
 						</div>
 
@@ -362,14 +364,14 @@ export function Dashboard() {
 							<div className="space-y-6">
 								<div>
 									<h4 className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-3">
-										Application Stack
+										{t('dashboard.applicationStack')}
 									</h4>
 									<div className="grid grid-cols-2 gap-3">
 										{/* Frontend Card */}
 										<div className="py-2">
 											<div className="flex items-center gap-2 mb-2">
 												<span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-													Frontend
+													{t('dashboard.frontend')}
 												</span>
 											</div>
 											<div className="space-y-1.5">
@@ -422,7 +424,7 @@ export function Dashboard() {
 										<div className="py-2">
 											<div className="flex items-center gap-2 mb-2">
 												<span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
-													Backend
+													{t('dashboard.backend')}
 												</span>
 											</div>
 											<div className="space-y-1.5">
@@ -478,14 +480,14 @@ export function Dashboard() {
 							<div className="space-y-6">
 								<div>
 									<h4 className="text-[10px] font-bold text-slate-400 dark:text-zinc-500 uppercase tracking-widest mb-3">
-										Intelligence & Data
+										{t('dashboard.intelligenceData')}
 									</h4>
 									<div className="py-2">
 										<div className="grid grid-cols-2 gap-6">
 											{/* AI Engine */}
 											<div>
 												<span className="text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-2 block">
-													AI Engine
+													{t('dashboard.aiEngine')}
 												</span>
 												<div className="space-y-1.5">
 													<div className="flex items-center gap-1.5">
@@ -532,7 +534,7 @@ export function Dashboard() {
 											{/* Data Store */}
 											<div>
 												<span className="text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-2 block">
-													Data Store
+													{t('dashboard.dataStore')}
 												</span>
 												<div className="space-y-1.5">
 													<div className="flex items-center gap-1.5">
@@ -600,7 +602,7 @@ export function Dashboard() {
 									/>
 								</svg>
 								<span className="text-[10px] font-medium text-slate-600 dark:text-zinc-400 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
-									RESTful API
+									{t('dashboard.restfulApi')}
 								</span>
 							</div>
 							<div className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 dark:border-zinc-700 group hover:border-teal-500/30 transition-colors cursor-default">
@@ -619,7 +621,7 @@ export function Dashboard() {
 									/>
 								</svg>
 								<span className="text-[10px] font-medium text-slate-600 dark:text-zinc-400 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
-									JSON Responses
+									{t('dashboard.jsonResponses')}
 								</span>
 							</div>
 							<div className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 dark:border-zinc-700 group hover:border-teal-500/30 transition-colors cursor-default">
@@ -629,7 +631,7 @@ export function Dashboard() {
 									<span className="w-1 h-1 bg-emerald-500 group-hover:bg-teal-500 opacity-30 animate-pulse delay-150"></span>
 								</div>
 								<span className="text-[10px] font-medium text-slate-600 dark:text-zinc-400 group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
-									Horizontal Scaling
+									{t('dashboard.horizontalScaling')}
 								</span>
 							</div>
 						</div>
@@ -639,7 +641,7 @@ export function Dashboard() {
 					<div className="mt-8 animate-slide-up delay-450">
 						<div className="flex items-center justify-between mb-0">
 							<span className="text-xs font-medium text-slate-900 dark:text-zinc-100">
-								Was this dashboard helpful?
+								{t('dashboard.welcome')}
 							</span>
 							<div className="flex gap-2">
 								<button
@@ -694,7 +696,7 @@ export function Dashboard() {
 							onClick={() => navigate("/search")}
 						>
 							<span className="text-xs font-bold text-slate-900 dark:text-zinc-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 flex items-center gap-2 transition-all group-hover:translate-x-1">
-								SEARCH REGISTRY
+								{t('nav.search').toUpperCase()}
 								<span className="material-symbols-outlined text-[16px]">
 									arrow_forward
 								</span>
@@ -706,7 +708,7 @@ export function Dashboard() {
 							onClick={() => navigate("/chat")}
 						>
 							<span className="text-xs font-bold text-slate-900 dark:text-zinc-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 flex items-center gap-2 transition-all group-hover:translate-x-1">
-								START Q&A
+								{t('nav.chat').toUpperCase()}
 								<span className="material-symbols-outlined text-[16px]">
 									arrow_forward
 								</span>
@@ -718,7 +720,7 @@ export function Dashboard() {
 							onClick={() => navigate("/compliance")}
 						>
 							<span className="text-xs font-bold text-slate-900 dark:text-zinc-100 group-hover:text-teal-600 dark:group-hover:text-teal-400 flex items-center gap-2 transition-all group-hover:translate-x-1">
-								CHECK COMPLIANCE
+								{t('nav.compliance').toUpperCase()}
 								<span className="material-symbols-outlined text-[16px]">
 									arrow_forward
 								</span>

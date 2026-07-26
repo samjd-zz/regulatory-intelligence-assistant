@@ -88,6 +88,19 @@
           }
         }
       },
+      "regulation_title": {
+        "type": "text",
+        "analyzer": "legal_text_analyzer",
+        "fields": {
+          "exact": {
+            "type": "keyword"
+          },
+          "raw": {
+            "type": "text",
+            "analyzer": "standard"
+          }
+        }
+      },
       "content": {
         "type": "text",
         "analyzer": "legal_text_analyzer",
@@ -102,10 +115,24 @@
       "document_type": {
         "type": "keyword"
       },
+      "node_type": {
+        "type": "keyword",
+        "fields": {
+          "raw": {
+            "type": "text"
+          }
+        }
+      },
       "jurisdiction": {
         "type": "keyword"
       },
+      "language": {
+        "type": "keyword"
+      },
       "program": {
+        "type": "keyword"
+      },
+      "programs": {
         "type": "keyword"
       },
       "legislation_name": {

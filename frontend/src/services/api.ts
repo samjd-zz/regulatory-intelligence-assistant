@@ -8,6 +8,7 @@ import type {
   ComplianceCheckResponse,
   Regulation,
   ValidationResult,
+  RegulationRelationships,
 } from '@/types'
 
 // Create axios instance with base configuration
@@ -90,7 +91,7 @@ export async function askQuestion(request: QARequest): Promise<QAResponse> {
 // ============================================================================
 
 export async function getRegulation(id: string): Promise<Regulation> {
-  const { data } = await api.get(`/documents/${id}`)
+  const { data } = await api.get(`/regulation/${id}`)
   return data
 }
 
@@ -114,9 +115,31 @@ export async function getRegulationDetail(id: string): Promise<{
   return data
 }
 
+export async function getRegulationAmendments(id: string): Promise<{
+  regulation_id: string
+  amendments: Array<{
+    id: string
+    amendment_type: string
+    effective_date: string | null
+    description: string
+    created_at: string
+  }>
+  count: number
+}> {
+  const { data } = await api.get(`/search/regulation/${id}/amendments`)
+  return data
+}
+
 export async function getRelatedRegulations(id: string): Promise<Regulation[]> {
   const { data } = await api.get(`/graph/related/${id}`)
   return data.related || []
+}
+
+export async function getRegulationRelationships(
+  id: string
+): Promise<RegulationRelationships> {
+  const { data } = await api.get(`/graph/regulation/${id}/relationships`)
+  return data
 }
 
 // ============================================================================

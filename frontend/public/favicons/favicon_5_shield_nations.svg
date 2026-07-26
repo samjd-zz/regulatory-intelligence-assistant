@@ -1,0 +1,50 @@
+<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="shield" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:#1e40af"/>
+            <stop offset="100%" style="stop-color:#1e3a8a"/>
+        </linearGradient>
+    </defs>
+    <circle cx="64" cy="64" r="60" fill="#0f172a"/>
+    
+    <!-- Shield shape -->
+    <path d="M 64 20 L 100 35 L 100 70 Q 100 90 64 105 Q 28 90 28 70 L 28 35 Z" fill="url(#shield)"/>
+    <path d="M 64 20 L 100 35 L 100 70 Q 100 90 64 105 Q 28 90 28 70 L 28 35 Z" fill="white" opacity="0.1"/>
+    
+    <!-- Globe in center -->
+    <circle cx="64" cy="60" r="22" fill="#3b82f6" opacity="0.4"/>
+    <circle cx="64" cy="60" r="22" fill="none" stroke="#60a5fa" stroke-width="2"/>
+    
+    <!-- Latitude lines on globe -->
+    <ellipse cx="64" cy="60" rx="22" ry="8" fill="none" stroke="#93c5fd" stroke-width="1.5" opacity="0.6"/>
+    <ellipse cx="64" cy="60" rx="22" ry="14" fill="none" stroke="#93c5fd" stroke-width="1.5" opacity="0.5"/>
+    
+    <!-- Longitude line -->
+    <ellipse cx="64" cy="60" rx="11" ry="22" fill="none" stroke="#93c5fd" stroke-width="1.5" opacity="0.6"/>
+    
+    <!-- Circuit board pattern around globe -->
+    <circle cx="50" cy="45" r="3" fill="#4fd1c5"/>
+    <circle cx="78" cy="45" r="3" fill="#4fd1c5"/>
+    <circle cx="50" cy="75" r="3" fill="#4fd1c5"/>
+    <circle cx="78" cy="75" r="3" fill="#4fd1c5"/>
+    
+    <line x1="50" y1="45" x2="53" y2="52" stroke="#4fd1c5" stroke-width="2"/>
+    <line x1="78" y1="45" x2="75" y2="52" stroke="#4fd1c5" stroke-width="2"/>
+    <line x1="50" y1="75" x2="53" y2="68" stroke="#4fd1c5" stroke-width="2"/>
+    <line x1="78" y1="75" x2="75" y2="68" stroke="#4fd1c5" stroke-width="2"/>
+    
+    <!-- G7 text at top -->
+    <text x="64" y="32" font-family="Arial, sans-serif" font-size="10" font-weight="bold" text-anchor="middle" fill="#fbbf24">G7</text>
+    
+    <!-- Legal scales at bottom of shield -->
+    <line x1="64" y1="85" x2="64" y2="95" stroke="#fbbf24" stroke-width="2"/>
+    <line x1="52" y1="90" x2="76" y2="90" stroke="#fbbf24" stroke-width="2"/>
+    <path d="M 52 90 L 48 95 L 56 95 Z" fill="#fbbf24" opacity="0.8"/>
+    <path d="M 76 90 L 72 95 L 80 95 Z" fill="#fbbf24" opacity="0.8"/>
+    
+    <!-- Corner tech elements -->
+    <circle cx="35" cy="42" r="2" fill="#4fd1c5" opacity="0.6"/>
+    <circle cx="93" cy="42" r="2" fill="#4fd1c5" opacity="0.6"/>
+    <line x1="35" y1="42" x2="42" y2="48" stroke="#4fd1c5" stroke-width="1" opacity="0.4"/>
+    <line x1="93" y1="42" x2="86" y2="48" stroke="#4fd1c5" stroke-width="1" opacity="0.4"/>
+</svg>

@@ -1,358 +1,348 @@
-# Neo4j Knowledge Graph Scripts
+# Backend Scripts
 
-This directory contains scripts for initializing, populating, and managing the Neo4j knowledge graph.
+This directory contains scripts for initializing, managing, and maintaining the Regulatory Intelligence Assistant system.
 
-## Prerequisites
+## 🚀 Quick Start
 
-1. **Neo4j Running**: Ensure Neo4j is running via Docker:
+### First-Time Setup
 
-   ```bash
-   docker compose up -d neo4j
-   ```
+```bash
+# 1. Start all Docker services
+docker compose up -d
 
-   > **Note**: The project uses a custom Neo4j Docker image (`backend/neo4j/Dockerfile`) with pre-installed APOC and Graph Data Science plugins. The container handles restarts gracefully.
+# 2. Initialize database with data (interactive wizard)
+docker compose exec backend python scripts/init_data.py
 
-2. **Environment Variables**: Copy `.env.example` to `.env` and configure:
+# The wizard will guide you through:
+# - Choosing data type (Laws, Regulations, or Both)
+# - Setting limits for testing
+# - Automatic download if needed
+```
 
-   ```bash
-   cp .env.example .env
-   ```
+## 📁 Scripts Overview
 
-   Verify these settings:
+### Data Initialization
 
-   ```
-   NEO4J_URI=bolt://localhost:7687
-   NEO4J_USER=neo4j
-   NEO4J_PASSWORD=password123
-   ```
+#### `init_data.py` ⭐ **PRIMARY DATA LOADER**
+Interactive wizard for initializing the system with Canadian regulatory data.
 
-3. **Python Dependencies**: Install required packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
+**Usage:**
+```bash
+# Interactive mode (recommended)
+docker compose exec backend python scripts/init_data.py
 
-## Scripts Overview
+# Non-interactive with options
+docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive
+docker compose exec backend python scripts/init_data.py --type regulations --non-interactive
+docker compose exec backend python scripts/init_data.py --type both --non-interactive
+```
 
-### 1. `init_graph.cypher`
+**Features:**
+- ✅ Checks existing data
+- ✅ Downloads data if missing
+- ✅ Loads into PostgreSQL, Neo4j, and Elasticsearch
+- ✅ Shows progress and statistics
+- ✅ Supports custom limits for testing
 
-Cypher script defining the graph schema (constraints, indexes, full-text search).
+**Options:**
+- `--type`: Choose 'laws', 'regulations', or 'both'
+- `--limit`: Limit number of documents (e.g., 10, 50, 100)
+- `--force`: Re-ingest even if data exists
+- `--non-interactive`: Run without prompts
 
-**Purpose:** Sets up the foundational schema for the knowledge graph.
+---
+
+### Data Download
+
+#### `download_and_ingest_real_data.sh`
+Comprehensive script for downloading all Canadian laws from Justice Canada.
+
+**Usage:**
+```bash
+bash backend/scripts/download_and_ingest_real_data.sh
+```
+
+**What it does:**
+- Downloads XML files from laws-lois.justice.gc.ca
+- Processes both English and French versions
+- Ingests into all databases
+- Provides progress tracking
+
+#### `download_bulk_regulations.sh`
+Downloads SOR/DORS regulations in bulk with chunked ingestion.
+
+**Usage:**
+```bash
+bash backend/scripts/download_bulk_regulations.sh
+```
+
+**Features:**
+- Downloads up to 5,000 regulations
+- Processes in chunks of 100
+- Auto-ingests as it downloads
+- Skips existing files
+
+#### `ingest_regulations.py`
+Called by download scripts to process regulation XML files.
+
+---
+
+### Database & Neo4j Management
+
+#### `init_neo4j.py`
+Initializes Neo4j schema with indexes and constraints.
+
+**Usage:**
+```bash
+docker compose exec backend python scripts/init_neo4j.py
+```
+
+**Called by:** `entrypoint_backend.sh` (automatic on startup)
+
+**What it does:**
+- Executes schema from `init_graph.cypher`
+- Creates indexes and constraints
+- Sets up full-text search indexes
+
+#### `init_graph.cypher`
+Cypher schema definition file.
 
 **Contains:**
+- Unique constraints on node IDs
+- Performance indexes
+- Full-text search indexes
+- Node and relationship type definitions
 
-- Unique constraints on all node IDs
-- Performance indexes on frequently queried properties
-- Full-text search indexes for legislation and sections
-- Documentation of node and relationship types
+#### `optimize_neo4j_indexes.cypher`
+Additional optimization queries for Neo4j indexes.
 
-### 2. `init_neo4j.py`
+---
 
-Python script that initializes the Neo4j database with schema and sample data.
+### Maintenance & Operations
 
-**Usage:**
-
-```bash
-cd backend
-python scripts/init_neo4j.py
-```
-
-**What it does:**
-
-- Executes the Cypher schema from `init_graph.cypher`
-- Creates 4 sample legislation documents
-- Creates sections for each legislation
-- Sets up regulations, programs, and situations
-- Establishes relationships between entities
-- Displays a summary of created nodes
-
-**Expected Output:**
-
-```
-============================================================
-Neo4j Knowledge Graph Initialization
-============================================================
-
-Initializing Neo4j schema...
-✓ Schema initialization complete
-
-Populating sample data...
-✓ Created: Employment Insurance Act
-✓ Created: Canada Pension Plan
-✓ Created: Old Age Security Act
-✓ Created: Immigration and Refugee Protection Act
-...
-```
-
-### 3. `seed_graph_data.py`
-
-Comprehensive data seeding script with 15+ regulations.
+#### `reindex_elasticsearch.py`
+Rebuilds Elasticsearch index from PostgreSQL data.
 
 **Usage:**
-
 ```bash
-cd backend
-python scripts/seed_graph_data.py
+docker compose exec backend python scripts/reindex_elasticsearch.py
 ```
 
-**What it does:**
+**When to use:**
+- After bulk data changes
+- When search results seem stale
+- After index configuration changes
 
-- Creates 15+ federal legislation documents covering:
-  - Employment & Labor (EI Act, Labour Code, Employment Equity)
-  - Pension & Retirement (CPP, OAS)
-  - Immigration & Citizenship (IRPA, Citizenship Act)
-  - Health & Social Services (Canada Health Act)
-  - Human Rights & Accessibility
-  - Student Assistance
-  - Family Benefits (Canada Child Benefit)
-  - Disability Benefits
-  - Privacy & Data Protection
-- Creates sections for key legislation
-- Establishes regulations implementing legislation
-- Creates 5 government programs
-- Creates 5 real-world situations
-- Links sections to relevant situations
-- Creates cross-references between sections
-
-**Expected Output:**
-
-```
-============================================================
-Neo4j Knowledge Graph - Comprehensive Data Seeding
-============================================================
-
-✓ Created: Employment Insurance Act
-✓ Created: Canada Pension Plan
-✓ Created: Old Age Security Act
-...
-✓ Created program: Employment Insurance Regular Benefits
-...
-✓ Created situation: Temporary foreign worker seeking employment benefits
-...
-
-Graph Statistics
-============================================================
-Legislation created: 15
-Regulations created: 2
-Sections created: 12
-Programs created: 5
-Situations created: 5
-```
-
-### 4. `verify_graph.py`
-
-Verification and diagnostic script for the knowledge graph.
+#### `reindex_neo4j_overnight.py`
+Batch reindexing for Neo4j graph with progress tracking.
 
 **Usage:**
+```bash
+docker compose exec backend python scripts/reindex_neo4j_overnight.py --batch-size 50
+```
+
+**Features:**
+- Batch processing to avoid memory issues
+- Progress tracking
+- Dry-run mode for testing
+
+#### `rebuild_citation_relationships.py`
+Rebuilds citation relationships in Neo4j graph.
+
+**Usage:**
+```bash
+docker compose exec backend python scripts/rebuild_citation_relationships.py
+```
+
+#### `rebuild_section_hierarchy.py`
+Rebuilds parent-child relationships between document sections.
+
+**Usage:**
+```bash
+docker compose exec backend python scripts/rebuild_section_hierarchy.py
+```
+
+#### `migrate_neo4j_supersedes.py`
+Migration script for adding "supersedes" relationships between regulations.
+
+**Usage:**
+```bash
+docker compose exec backend python scripts/migrate_neo4j_supersedes.py
+```
+
+---
+
+### Verification & Diagnostics
+
+#### `verify_all_systems.py`
+Comprehensive system health check across all services.
+
+**Usage:**
+```bash
+docker compose exec backend python scripts/verify_all_systems.py
+```
+
+**Checks:**
+- ✅ PostgreSQL connectivity and data
+- ✅ Neo4j connectivity and graph
+- ✅ Elasticsearch index status
+- ✅ Redis connectivity
+- ✅ API endpoint responses
+
+#### `verify_graph.py`
+Neo4j-specific verification and diagnostics.
+
+**Usage:**
+```bash
+docker compose exec backend python scripts/verify_graph.py
+```
+
+**Shows:**
+- Connection status
+- Node/relationship counts
+- Schema information
+- Sample data
+- Useful Cypher queries
+
+#### `data_summary.sh`
+Quick data statistics across all databases.
+
+**Usage:**
+```bash
+bash backend/scripts/data_summary.sh
+```
+
+**Output:**
+- PostgreSQL document counts
+- Neo4j node/relationship counts
+- Elasticsearch index size
+- System health status
+
+---
+
+### Docker Entrypoints
+
+#### `entrypoint_backend.sh`
+Main Docker entrypoint for backend container.
+
+**Automatically:**
+- Waits for services (PostgreSQL, Neo4j, Elasticsearch)
+- Initializes Neo4j schema
+- Checks database status
+- Offers to initialize data if empty
+- Starts FastAPI server
+
+#### `entrypoint_ollama.sh`
+Docker entrypoint for Ollama LLM service.
+
+---
+
+## 📋 Typical Workflows
+
+### First-Time Setup
 
 ```bash
-cd backend
-python scripts/verify_graph.py
+# 1. Start all services
+docker compose up -d
+
+# 2. Initialize with data
+docker compose exec backend python scripts/init_data.py
+
+# 3. Verify everything works
+docker compose exec backend python scripts/verify_all_systems.py
 ```
 
-**What it does:**
-
-- Tests Neo4j connectivity
-- Displays schema information (constraints and indexes)
-- Shows node counts by type
-- Shows relationship counts by type
-- Displays sample data from each node type
-- Shows example relationships
-- Provides useful Cypher queries for exploration
-
-**Expected Output:**
-
-```
-======================================================================
-                Neo4j Knowledge Graph Verification
-======================================================================
-
-1. Verifying Neo4j Connectivity
-============================================================
-✓ Successfully connected to Neo4j
-
-2. Verifying Schema (Constraints & Indexes)
-============================================================
-Constraints:
-  ✓ legislation_id: UNIQUENESS
-  ✓ section_id: UNIQUENESS
-  ...
-
-3. Verifying Graph Data
-============================================================
-Node Counts by Label:
-  Legislation: 15
-  Program: 5
-  Regulation: 2
-  Section: 12
-  Situation: 5
-...
-```
-
-## Typical Workflow
-
-### Initial Setup (First Time)
+### Development Testing
 
 ```bash
-# 1. Start Neo4j
-docker compose up -d neo4j
+# Load small dataset for testing
+docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive
 
-# 2. Wait for Neo4j to be ready (check logs)
-docker compose logs -f neo4j
-
-# 3. Initialize schema and create sample data
-cd backend
-python scripts/init_neo4j.py
-
-# 4. Verify the setup
-python scripts/verify_graph.py
+# Check what's loaded
+bash backend/scripts/data_summary.sh
 ```
 
-### Adding More Data
+### Production Deployment
 
 ```bash
-# Run the comprehensive seeding script
-cd backend
-python scripts/seed_graph_data.py
+# Load full dataset
+docker compose exec backend python scripts/init_data.py --type both --non-interactive
 
-# Verify the data
-python scripts/verify_graph.py
+# Verify all systems
+docker compose exec backend python scripts/verify_all_systems.py
 ```
 
-### Resetting the Database
-
-If you need to start fresh:
+### Maintenance Operations
 
 ```bash
-# Option 1: Clear all data via Neo4j Browser
-# Navigate to http://localhost:7474 and run:
-# MATCH (n) DETACH DELETE n
+# Rebuild search index
+docker compose exec backend python scripts/reindex_elasticsearch.py
 
-# Option 2: Stop and remove Neo4j container/volume
-docker compose down
-docker volume rm regulatory-intelligence-assistant_neo4j_data
-docker compose up -d neo4j
+# Rebuild graph relationships
+docker compose exec backend python scripts/rebuild_citation_relationships.py
 
-# Then re-initialize
-cd backend
-python scripts/init_neo4j.py
+# Check system health
+docker compose exec backend python scripts/verify_all_systems.py
 ```
 
-## Exploring the Graph
+---
 
-### Neo4j Browser
+## 🗂️ Deprecated Scripts
 
-1. Open http://localhost:7474
-2. Login with:
-   - Username: `neo4j`
-   - Password: `password123`
+Old scripts have been moved to `deprecated/` folder. See `deprecated/README.md` for details.
 
-### Useful Cypher Queries
+**Replaced scripts:**
+- `seed_graph_data.py` → Use `init_data.py`
+- `test_document_api.py` → Use `pytest backend/tests/`
+- `test_graph_system.py` → Use `pytest backend/tests/`
+- `download_regulations.sh` → Use `download_bulk_regulations.sh`
+- `force_reload.sh` → Use `docker compose restart backend`
 
-**View all nodes (limited):**
+---
 
-```cypher
-MATCH (n) RETURN n LIMIT 50
-```
+## 🔧 Troubleshooting
 
-**View legislation with sections:**
-
-```cypher
-MATCH (l:Legislation)-[:HAS_SECTION]->(s:Section)
-RETURN l, s
-LIMIT 25
-```
-
-**View regulations implementing legislation:**
-
-```cypher
-MATCH (r:Regulation)-[:IMPLEMENTS]->(l:Legislation)
-RETURN r, l
-```
-
-**Find sections relevant for a situation:**
-
-```cypher
-MATCH (s:Section)-[r:RELEVANT_FOR]->(sit:Situation)
-WHERE sit.description CONTAINS 'retirement'
-RETURN s, r, sit
-```
-
-**Search legislation by title:**
-
-```cypher
-MATCH (l:Legislation)
-WHERE l.title CONTAINS 'Employment'
-RETURN l
-```
-
-**Get graph statistics:**
-
-```cypher
-// Node counts
-MATCH (n)
-RETURN labels(n)[0] as NodeType, count(*) as Count
-ORDER BY Count DESC
-
-// Relationship counts
-MATCH ()-[r]->()
-RETURN type(r) as RelationType, count(*) as Count
-ORDER BY Count DESC
-```
-
-## Troubleshooting
-
-### "Module not found" errors
+### Connection Issues
 
 ```bash
-# Ensure you're running from the backend directory
-cd backend
-python scripts/init_neo4j.py
-
-# Or use absolute imports from project root
-cd ..
-python -m backend.scripts.init_neo4j
-```
-
-### "Connection refused" errors
-
-```bash
-# Check if Neo4j is running
+# Check if services are running
 docker compose ps
 
-# Check Neo4j logs
+# Check service logs
+docker compose logs backend
 docker compose logs neo4j
+docker compose logs elasticsearch
 
-# Restart Neo4j (safe - handles restarts gracefully)
-docker compose restart neo4j
+# Restart services
+docker compose restart backend
 ```
 
-### "Authentication failed" errors
+### Data Issues
 
 ```bash
-# Verify credentials in .env file
-cat .env | grep NEO4J
+# Check data status
+bash backend/scripts/data_summary.sh
 
-# Reset Neo4j password via Docker (WARNING: deletes all data)
-docker compose down
-docker volume rm regulatory-intelligence-assistant_neo4j_data
-docker compose up -d neo4j
-# Wait 30 seconds, then try again
+# Verify all systems
+docker compose exec backend python scripts/verify_all_systems.py
+
+# Re-initialize if needed
+docker compose exec backend python scripts/init_data.py --force
 ```
 
-## Next Steps
+### Performance Issues
 
-After setting up the knowledge graph:
+```bash
+# Rebuild indexes
+docker compose exec backend python scripts/reindex_elasticsearch.py
+docker compose exec backend python scripts/reindex_neo4j_overnight.py
+```
 
-1. **Integrate with API**: Use the graph service in FastAPI endpoints
-2. **Add More Data**: Extend `seed_graph_data.py` with additional regulations
-3. **Build Query Endpoints**: Create API endpoints for graph traversal
-4. **Add Graph Algorithms**: Use Neo4j GDS for path finding, centrality, etc.
-5. **Implement Search**: Build full-text search using Neo4j's indexes
+---
 
-## Related Documentation
+## 📚 Related Documentation
 
-- [Neo4j Schema Documentation](../../docs/dev/neo4j-schema.md)
-- [Neo4j Knowledge Graph Overview](../../docs/dev/neo4j-knowledge-graph.md)
-- [Graph Service API](../services/graph_service.py)
-- [Neo4j Client Utilities](../utils/neo4j_client.py)
+- [Docker Deployment Guide](../../DOCKER_DEPLOYMENT.md)
+- [Data Ingestion Guide](../../docs/DATA_INGESTION.md)
+- [Architecture Overview](../../docs/ARCHITECTURE.md)
+- [Development Guide](../../docs/DEVELOPMENT.md)

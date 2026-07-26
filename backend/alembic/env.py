@@ -46,6 +46,22 @@ target_metadata = Base.metadata
 # ... etc.
 
 
+def include_object(object, name, type_, reflected, compare_to):
+    """
+    Exclude generated search_vector columns from Alembic schema comparison.
+    
+    These columns are GENERATED ALWAYS AS (...) STORED in PostgreSQL and are
+    automatically maintained by the database. We want to keep them for search
+    functionality but don't want Alembic to manage them.
+    """
+    if type_ == "column":
+        # Exclude search_vector columns from regulations and sections tables
+        if (name in ["search_vector", "search_vector_fr"] and 
+            object.table.name in ["regulations", "sections"]):
+            return False
+    return True
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
@@ -95,6 +111,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             compare_type=True,  # Detect column type changes
             compare_server_default=True,  # Detect default value changes
+            include_object=include_object,  # Exclude generated search_vector columns
         )
 
         with context.begin_transaction():

@@ -1,21 +1,33 @@
-import { LayoutDashboard, Moon, Search, MessageSquare, ShieldCheck, Sun } from "lucide-react";
+import { LayoutDashboard, Moon, Search, MessageSquare, ShieldCheck, Sun, Languages } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useTheme } from "@/context/ThemeContext";
+import { useLanguageStore } from "@/store/languageStore";
+import { useLanguageSync } from "@/hooks/useLanguageSync";
 
 export function Header() {
 	const location = useLocation();
 	const { theme, toggleTheme } = useTheme();
+	const { language, setLanguage } = useLanguageStore();
+	const { t } = useTranslation();
+	
+	// Sync i18n with language store
+	useLanguageSync();
 
 	const navItems = [
-		{ path: "/", label: "Overview", icon: LayoutDashboard },
-		{ path: "/search", label: "Search", icon: Search },
-		{ path: "/chat", label: "Assistant", icon: MessageSquare },
-		{ path: "/compliance", label: "Compliance", icon: ShieldCheck },
+		{ path: "/", label: t('nav.dashboard'), icon: LayoutDashboard },
+		{ path: "/search", label: t('nav.search'), icon: Search },
+		{ path: "/chat", label: t('nav.chat'), icon: MessageSquare },
+		{ path: "/compliance", label: t('nav.compliance'), icon: ShieldCheck },
 	];
 
 	const isActive = (path: string) => {
 		return location.pathname === path;
+	};
+
+	const toggleLanguage = () => {
+		setLanguage(language === 'en' ? 'fr' : 'en');
 	};
 
 	return (
@@ -50,6 +62,16 @@ export function Header() {
 							</Link>
 						);
 					})}
+					<button
+						type="button"
+						onClick={toggleLanguage}
+						className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer focus:outline-none text-sm font-medium text-slate-700 dark:text-zinc-300"
+						aria-label="Toggle language"
+						title={language === 'en' ? 'Switch to French' : 'Passer à l\'anglais'}
+					>
+						<Languages className="w-4 h-4" />
+						<span className="uppercase">{language}</span>
+					</button>
 					<button
 						type="button"
 						onClick={toggleTheme}

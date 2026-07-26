@@ -28,8 +28,9 @@ class TestQueryIntent:
     def test_query_intent_membership(self):
         """Test QueryIntent enum membership."""
         intents = list(QueryIntent)
-        assert len(intents) == 8
+        assert len(intents) == 9  # Added STATISTICS intent
         assert QueryIntent.SEARCH in intents
+        assert QueryIntent.STATISTICS in intents
         assert QueryIntent.UNKNOWN in intents
 
 

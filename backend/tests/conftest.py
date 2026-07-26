@@ -16,13 +16,18 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 # Load test environment variables
-env_path = Path(__file__).parent.parent / '.env.test'
-if env_path.exists():
-    load_dotenv(env_path, override=True)
-    print(f"\n✓ Loaded test environment from {env_path}")
+# Only load .env.test if not running in Docker (where services are already configured)
+in_docker = os.path.exists('/.dockerenv')
+if not in_docker:
+    env_path = Path(__file__).parent.parent / '.env.test'
+    if env_path.exists():
+        load_dotenv(env_path, override=True)
+        print(f"\n✓ Loaded test environment from {env_path}")
+    else:
+        print(f"\n⚠ Test environment file not found: {env_path}")
+        print("  Using default environment variables")
 else:
-    print(f"\n⚠ Test environment file not found: {env_path}")
-    print("  Using default environment variables")
+    print("\n✓ Running in Docker, using container environment variables")
 
 # Add parent directory for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
