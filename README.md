@@ -32,47 +32,6 @@
 
 AI-powered system that helps public servants and citizens navigate complex regulatory landscapes through semantic search, AI Q&A, compliance checking, and knowledge graphs.
 
-## 🚀 Quick Start
-
-```bash
-# 1. Clone and setup
-git clone <repository-url>
-cd regulatory-intelligence-assistant
-cp backend/.env.example backend/.env
-
-# 2. Add your Gemini API key to backend/.env
-# GEMINI_API_KEY=your_key_here
-
-# 3. Start all services (includes frontend, backend, PostgreSQL, Neo4j, Elasticsearch, Redis)
-docker compose up -d
-
-# 4. Wait for services to initialize (~30 seconds)
-# The backend automatically:
-#   - Runs database migrations
-#   - Initializes Neo4j schema and indexes
-#   - Waits for all dependencies to be ready
-
-# 5. Initialize with data (interactive wizard)
-docker compose exec backend python scripts/init_data.py
-
-# The wizard guides you through:
-#   1. Canadian Laws (Acts/Lois) - ~800 documents
-#   2. Regulations - ~4,240 documents  
-#   3. Both (Full Dataset) - ~5,040 documents total
-#   Plus optional limits for testing (e.g., 10, 50, 100)
-
-# 6. Access the application
-# Frontend: http://localhost:5173
-# API Docs: http://localhost:8000/docs
-# Neo4j Browser: http://localhost:7474 (neo4j/password123)
-```
-
-**First time?** See the [Quick Start Guide](./docs/QUICKSTART.md) for detailed instructions.
-
-**Quick test?** Load 10 documents: `docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive`
-
-**Automated startup?** Set `AUTO_INIT_DATA=true` in `docker-compose.yml` to auto-load 50 documents on first start.
-
 ## ✨ Key Features
 
 ### 🔍 Multi-Tier Search
@@ -193,6 +152,48 @@ curl -X POST http://localhost:8000/api/compliance/check \
     "form_data": {"hours_worked": 700, "sin": "123-456-789"}
   }'
 ```
+
+## 🚀 Quick Start
+
+```bash
+# 1. Clone and setup
+git clone <repository-url>
+cd regulatory-intelligence-assistant
+cp backend/.env.example backend/.env
+
+# 2. Add your Gemini API key to backend/.env
+# GEMINI_API_KEY=your_key_here
+
+# 3. Start all services (includes frontend, backend, PostgreSQL, Neo4j, Elasticsearch, Redis)
+docker compose up -d
+
+# 4. Wait for services to initialize (~30 seconds)
+# The backend automatically:
+#   - Runs database migrations
+#   - Initializes Neo4j schema and indexes
+#   - Waits for all dependencies to be ready
+
+# 5. Initialize with data (interactive wizard)
+docker compose exec backend python scripts/init_data.py
+
+# The wizard guides you through:
+#   1. Canadian Laws (Acts/Lois) - ~800 documents
+#   2. Regulations - ~4,240 documents  
+#   3. Both (Full Dataset) - ~5,040 documents total
+#   Plus optional limits for testing (e.g., 10, 50, 100)
+
+# 6. Access the application
+# Frontend: http://localhost:5173
+# API Docs: http://localhost:8000/docs
+# Neo4j Browser: http://localhost:7474 (neo4j/password123)
+```
+
+**First time?** See the [Quick Start Guide](./docs/QUICKSTART.md) for detailed instructions.
+
+**Quick test?** Load 10 documents: `docker compose exec backend python scripts/init_data.py --type laws --limit 10 --non-interactive`
+
+**Automated startup?** Set `AUTO_INIT_DATA=true` in `docker-compose.yml` to auto-load 50 documents on first start.
+
 
 **Full API documentation**: http://localhost:8000/docs
 
