@@ -1,5 +1,33 @@
 # Regulatory Intelligence Assistant
 
+<details>
+<summary>🇯🇵 <b>日本語の概要はこちら (Click to expand Japanese summary)</b></summary>
+
+<br />
+
+### 概要 (Overview)
+**Regulatory Intelligence Assistant (RIA)** は、G7 GovAI Grand Challenge 向けに開発された、カナダ連邦法・規制・政策などの複雑な法制度データを高速かつ高精度に解析・ナビゲートするためのマルチティアーAI検索・コンプライアンス支援プラットフォームです。
+
+単なるプロンプト回答にとどまらず、決定論的検索（BM25）、ナレッジグラフ（Neo4j）、ベクトル検索（kNN）を統合し、公務員や法的専門家が信頼できる根拠（エビデンス）に基づいた意図理解・Q&A・適合性チェックを行えるシステムを構築しています。
+
+### 主な機能 (Key Features)
+
+* **マルチティアー・ハイブリッド検索 (Multi-Tier Search)**:
+  * **Elasticsearch (BM25)**: 法的キーワードや条文番号の決定論的精密スコアリング。
+  * **Neo4j (Knowledge Graph)**: 法律（Legislation）、規制（Regulation）、政策（Policy）、該当状況（Situation）相互の依存関係や階層構造をグラフトラバーサルで追跡。
+  * **kNN Vector Search**: 自然言語による意味理解と文脈検索。
+* **対話型 AI Q&A と根拠追跡 (Conversational Q&A & Citation Tracking)**: すべてのAI回答に対して参照元の法文・セクションの出所（シテーション）を明記し、ハルシネーション（幻覚）を排除。
+* **自動コンプライアンス検証 (Automated Compliance Checking)**: 提出フォームや文書の内容を法規制要件と自動照合し、パス/不適合/警告の視覚的判定と詳細レポートを生成。
+* **低遅延 & 高可用性 (Sub-500ms Latency & Degradation)**: 主インデックスの応答遅延やコンテキスト不足が発生した場合、補完的インデックスへスムーズに自動フォールバック。
+
+### 技術スタック (Tech Stack)
+
+* **Backend**: Python (FastAPI), PostgreSQL, Elasticsearch, Neo4j Graph DB, Vector Embeddings
+* **Frontend**: React, TypeScript, Vite, Zustand, Tailwind CSS
+* **E2E Testing**: Playwright (WCAG 2.1 AA アクセシビリティ標準準拠)
+
+</details>
+
 > **G7 GovAI Grand Challenge 2025** - Statement 2: Navigating Complex Regulations
 
 AI-powered system that helps public servants and citizens navigate complex regulatory landscapes through semantic search, AI Q&A, compliance checking, and knowledge graphs.
